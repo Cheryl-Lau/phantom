@@ -398,14 +398,14 @@ subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
                    if (vxyzu(4,ip) < u_hii) then
                       vxyzu(4,ip) = u_hii
                    endif
-!                   u_ionized = u_hii*(1.0-nH_site) + u_hi*nH_site  ! testing
+!                   u_ionized = u_hii*(1.0-nH_site) + u_hi*nH_site  
 !                   if (vxyzu(4,ip) < u_ionized) vxyzu(4,ip) = u_ionized
                 enddo over_parts
              elseif (n == 0 .and. i /= 0) then !- is particle
                 if (vxyzu(4,i) < u_hii) then
                    vxyzu(4,i) = u_hii
                 endif
-!                u_ionized = u_hii*(1.0-nH_site) + u_hi*nH_site  ! testing
+!                u_ionized = u_hii*(1.0-nH_site) + u_hi*nH_site
 !                if (vxyzu(4,i) < u_ionized) vxyzu(4,i) = u_ionized
              else
                 call fatal('photoionize_cmi','unidentified site')
@@ -442,7 +442,7 @@ subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
                 endif
              endif
           endif
-       enddo 
+       enddo
        if (ip_cmi /= npart_cmi) call fatal('photoionize_cmi','number of particles &
          & passed to and from CMI do not match')
 
