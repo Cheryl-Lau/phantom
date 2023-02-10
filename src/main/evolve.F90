@@ -102,6 +102,7 @@ subroutine evol(infile,logfile,evfile,dumpfile)
 #ifdef BINPOS
  use mf_write,         only:binpos_write
 #endif
+ use easter_egg,       only:egged,bring_the_egg
 
  character(len=*), intent(in)    :: infile
  character(len=*), intent(inout) :: logfile,evfile,dumpfile
@@ -134,6 +135,7 @@ subroutine evol(infile,logfile,evfile,dumpfile)
  integer         :: j,nskip,nskipped,nevwrite_threshold,nskipped_sink,nsinkwrite_threshold
  type(timer)     :: timer_fromstart,timer_lastdump,timer_step,timer_ev,timer_io
  real, parameter :: xor(3)=0.
+ logical         :: iexist
 
  tprint    = 0.
  nsteps    = 0
@@ -579,6 +581,13 @@ subroutine evol(infile,logfile,evfile,dumpfile)
     call flush(iprint)
     !--Write out log file prematurely (if requested based upon nstep, walltime)
     if ( summary_printnow() ) call summary_printout(iprint,nptmass)
+
+    inquire(file='egg.txt',exist=iexist)
+    if (iexist .and. .not.egged) then
+       call bring_the_egg
+       egged = .true.
+    endif
+    if (.not.iexist) egged = .false.
 
  enddo timestepping
 

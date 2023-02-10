@@ -312,6 +312,9 @@ subroutine empty_tree(node)
     node(i)%leftchild = 0
     node(i)%rightchild = 0
     node(i)%parent = 0
+#ifdef PHOTOION
+    node(i)%mass  = 0.
+#endif
 #ifdef GRAVITY
     node(i)%mass  = 0.
     node(i)%quads = 0.
@@ -641,6 +644,9 @@ subroutine construct_node(nodeentry, nnode, mymum, level, xmini, xmaxi, npnode, 
  !!$omp default(none) schedule(static) &
  !!$omp shared(npnode,xyzh_soa,x0,i1) &
  !!$omp private(i,xi,yi,zi,dx,dy,dz,dr2,pmassi) &
+#ifdef PHOTOION
+ !!$omp shared(iphase_soa,massoftype) &
+#endif
 #ifdef GRAVITY
  !!$omp shared(iphase_soa,massoftype) &
  !!$omp reduction(+:quads) &
@@ -659,6 +665,11 @@ subroutine construct_node(nodeentry, nnode, mymum, level, xmini, xmaxi, npnode, 
 #endif
     dr2   = dx*dx + dy*dy + dz*dz
     r2max = max(r2max,dr2)
+#ifdef PHOTOION
+    if (maxphase==maxp) then
+       pmassi = massoftype(iamtype(iphase_soa(i)))
+    endif
+#endif
 #ifdef GRAVITY
     if (maxphase==maxp) then
        pmassi = massoftype(iamtype(iphase_soa(i)))
@@ -707,6 +718,9 @@ subroutine construct_node(nodeentry, nnode, mymum, level, xmini, xmaxi, npnode, 
  nodeentry%size    = sqrt(r2max) + epsilon(r2max)
  nodeentry%hmax    = hmax
  nodeentry%parent  = mymum
+#ifdef PHOTOION
+ nodeentry%mass    = totmass_node
+#endif
 #ifdef GRAVITY
  nodeentry%mass    = totmass_node
  nodeentry%quads   = quads

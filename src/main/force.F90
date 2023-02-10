@@ -60,6 +60,8 @@ module forces
 
  public :: force, reconstruct_dv ! latter to avoid compiler warning
 
+ integer, public :: nexceedmaxbin
+
  !--indexing for xpartveci array
  integer, parameter :: &
        ixi  = 1, &
@@ -2416,10 +2418,11 @@ subroutine finish_cell_and_store_results(icall,cell,fxyzu,xyzh,vxyzu,poten,dt,dv
  use options,        only:alpha,ipdv_heating,ishock_heating,psidecayfac,overcleanfac,hdivbbmax_max,use_dustfrac,damp
  use part,           only:h2chemistry,rhoanddhdrho,iboundary,igas,maxphase,maxvxyzu, &
                           massoftype,get_partinfo,tstop,strain_from_dvdx,ithick,iradP
- use cooling,        only:energ_cooling,cooling_explicit
+ use cooling,        only:energ_cooling,cooling_explicit,part_nocooling,ipart_nocooling, &
+                          npartnocool
 #ifdef IND_TIMESTEPS
  use part,           only:ibin
- use timestep_ind,   only:get_newbin,check_dtmin
+ use timestep_ind,   only:get_newbin,check_dtmin,maxbins
  use timestep_sts,   only:sts_it_n,ibin_sts
 #endif
  use viscosity,      only:bulkvisc,dt_viscosity,irealvisc,shearfunc
@@ -2518,6 +2521,12 @@ subroutine finish_cell_and_store_results(icall,cell,fxyzu,xyzh,vxyzu,poten,dt,dv
  real                  :: densi, vxi,vyi,vzi,u0i,dudtcool
  real                  :: posi(3),veli(3),gcov(0:3,0:3),metrici(0:3,0:3,2)
  integer               :: ii,ia,ib,ic,ierror
+ integer               :: in,ipartnocool
+
+ real, parameter :: vsmall = epsilon(vsmall)    !!! for checking dtcool
+ real, parameter :: dlog2 = 1.4426950408889634d0
+ real :: distvec(3),dist
+ integer :: ibinnew
 
  eni = 0.
  realviscosity = (irealvisc > 0)
@@ -2773,11 +2782,24 @@ subroutine finish_cell_and_store_results(icall,cell,fxyzu,xyzh,vxyzu,poten,dt,dv
                 call nicil_get_dudt_nimhd(dudtnonideal,etaohmi,etaambii,rhoi,curlBi,Bxyzi)
                 fxyz4 = fxyz4 + fac*dudtnonideal
              endif
+
              !--add conductivity and resistive heating
-             fxyz4 = fxyz4 + fac*fsum(idendtdissi)
+             fxyz4 = fxyz4 + fac*fsum(idendtdissi)  !- fsum(idendtdissi) can be negative
+
+             if (-0.5*dt*fsum(idendtdissi) > vxyzu(4,i)) print*,'conductivity turns it negative',i,vxyzu(4,i)
+
              if (cooling_explicit) then
                 dudtcool = 0.
                 call energ_cooling(xi,yi,zi,vxyzu(4,i),dudtcool,rhoi,0.,Tgas=tempi)
+                !
+                ! Stop particle cooling where necessary
+                !
+                if (part_nocooling .and. npartnocool > 0) then
+                   do in = 1,npartnocool
+                      ipartnocool = ipart_nocooling(in)
+                      if (i == ipartnocool) dudtcool = 0
+                   enddo
+                endif
                 fxyz4 = fxyz4 + fac*dudtcool
              endif
              ! extra terms in du/dt from one fluid dust
@@ -2842,8 +2864,30 @@ subroutine finish_cell_and_store_results(icall,cell,fxyzu,xyzh,vxyzu,poten,dt,dv
        endif
 
        ! cooling timestep dt < fac*u/(du/dt)
-       if (maxvxyzu >= 4) then
+       if (maxvxyzu >= 4 .and. .not.gr) then
+
+!          Try: only consider contributions from cooling and not heating
+!          if (eni + dtc*fxyzu(4,i) < epsilon(0.) .and. eni > epsilon(0.)) dtcool = C_cool*abs(eni/fxyzu(4,i))
           if (abs(fxyzu(4,i)) > epsilon(0.) .and. eni > epsilon(0.)) dtcool = C_cool*abs(eni/fxyzu(4,i))
+
+!          if (abs(fxyzu(4,i)) > epsilon(0.) .and. eni > epsilon(0.) .and. &
+!              abs(eni/fxyzu(4,i)) > 1./C_cool*dtmax/2**maxbins) then
+!              dtcool = C_cool*abs(eni/fxyzu(4,i))
+!          endif
+
+          !!!! To test dtcool !!!
+          ibinnew = max(int(log(2.*dtmax/dtcool)*dlog2-epsilon(vsmall)),0)
+          if (ibinnew > 30) then
+             nexceedmaxbin = nexceedmaxbin + 1
+             ! compute distance from sn
+             distvec = (/xi,yi,zi/) - (/ -1.,0.,0. /)
+             dist = sqrt(distvec(1)**2 + distvec(2)**2 + distvec(3)**2)
+             print*,'particle exceeding maxbin 30: iexceed,ibin,dtcool,x,y,z,h,rho,temp,u,vx,vy,vz,dist_to_sn',&
+                     nexceedmaxbin,ibinnew,dtcool,xi,yi,zi,hi,rhoi,tempi,eni,vxi,vyi,vzi,dist
+          elseif (ibinnew == 30) then
+             print*,'particle at bin 30: dtcool',dtcool
+          endif
+
        endif
 
        ! timestep based on non-ideal MHD

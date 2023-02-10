@@ -407,6 +407,9 @@ subroutine read_analysis_options(dumpfile)
     call prompt('Do you want to test for boundness?', checkbound, .true.)
     call prompt('Do you want to include sink contribution to the potential?', sinkpotential,.true.)
     call prompt('Do you want to skip small dumps (missing velocity data)? ',skipsmalldumps,.true.)
+!    checkbound     = .true.
+!    sinkpotential  = .true.
+!    skipsmalldumps = .true.
 
     if (checkbound)     boundchoice = 'y'
     if (sinkpotential)  sinkchoice  = 'y'
@@ -854,9 +857,9 @@ end subroutine calc_clump_boundness
 !+
 !-----------------------------------------------------------------------
 subroutine update_border_potential(iclump,npart,xyzh,xyzmh_ptmass,pmass)
-#ifdef PERIODIC
+!#ifdef PERIODIC
  use boundary,  only:dxbound,dybound,dzbound
-#endif
+!#endif
  integer, intent(in) :: iclump,npart
  real,    intent(in) :: pmass,xyzh(:,:),xyzmh_ptmass(:,:)
  integer             :: i,j,ii,jj,jpt,cID,nmember,imember(maxp)

@@ -40,16 +40,16 @@ class PhantomAnalysis(pyphantom.Simulation):
       ####################################
       try:
           self.utherm      = self.get_part_u(npart)/(udist**2/utime**2)
-      except: 
-          print "Unable to load uterm, likely the quantity is not stored."
+      except:
+          print("Unable to load uterm, likely the quantity is not stored.")
       try:
           self.temperature = self.get_part_temp(npart)
-      except: 
-       	  print	"Unable to load temperature, likely the quantity is not stored."
+      except:
+       	  print("Unable to load temperature, likely the quantity is not stored.")
       try:
           self.bxyz        = self.get_part_bxyz(npart)/umagfd
-      except: 
-       	  print	"Unable to load magnetic field, likely the quantity is not stored."
+      except:
+       	  print("Unable to load magnetic field, likely the quantity is not stored.")
       ####################
 
       # Point masses

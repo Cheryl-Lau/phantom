@@ -24,10 +24,10 @@ class RealTimePlotSimulation:
     anim = animation.FuncAnimation(remoteplotter.fig, self.update_plot, interval=100)
     show()
     # The phantom process is properly stopped
-    print 'Killing the job...'
+    print ('Killing the job...')
     self.plotter_conn.send(('gokillyourself',))
     phantomprocess.join()
-    print 'Done.'
+    print ('Done.')
 
   def update_plot(self, num):
     extent = self.remoteplotter.axesExtent()
@@ -48,7 +48,7 @@ class RealTimePlotSimulation:
       if worker_conn.poll():
 	message = worker_conn.recv()
 	if message[0] == 'gokillyourself':
-	  print 'Suicide order received. Exiting main loop.'
+	  print ('Suicide order received. Exiting main loop.')
 	  break
 	if message[0] == 'axes':
 	  extent = message[1]
@@ -81,11 +81,11 @@ class PostProcVideo:
   def plot(self, prefix, number):
     dumpfile = '%s_%05d' % (prefix, number)
     a = pyphantom.Simulation(prefix+'.in', 0., 0., analysis=True)
-    print 'Reading ', dumpfile, '...'
+    print ('Reading ', dumpfile, '...')
     try:
       a.update_from_dump(dumpfile)
     except pyphantom.UnableToReadDumpFile:
-      print 'Skipping small dump.'
+      print ('Skipping small dump.')
       return None
     extent = self.remoteplotter.axesExtent()
     data = self.remoteplotter.pickableData(a, extent)

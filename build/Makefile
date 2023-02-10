@@ -31,6 +31,7 @@ SHELL = /bin/bash
 VPATH = "${RUNDIR}" ../src/main ../src/utils ../src/setup ../src/tests ../src/lib/NICIL/src
 BINDIR= ../bin
 UNAME=${shell uname}
+
 #----------------------------------------------------------------
 # Sensible defaults for phantom configuration
 #----------------------------------------------------------------
@@ -58,6 +59,7 @@ endif
 ifndef SPLASH_DIR
    SPLASH_DIR=${shell if [ -d $$HOME/splash ]; then echo $$HOME/splash; fi}
 endif
+
 #MPI= yes
 #
 # endian can be "BIG", "LITTLE" or anything else which has no effect
@@ -70,6 +72,7 @@ LIBCXX = -lstdc++
 #FPPFLAGS=
 LDFLAGS=
 SRCPHOTO=
+SRCPHOTOION=
 LIBTOOL=libtool
 
 #----------------------------------------------------------------
@@ -87,6 +90,7 @@ LIBTOOL=libtool
 # -DMHD                 ! magnetic fields
 # -DNONIDEALMHD         ! non-ideal magnetic fields including ionisation; uses NICIL
 # -DPHOTO               ! turn on the photoevaporation
+# -DPHOTOION            ! turn on photoionization with MCRT method (couples to CMacIonize)
 # -DLIGHTCURVE          ! lightcurve estimation
 #----------------------------------------------------------------
 #
@@ -757,6 +761,145 @@ ifeq ($(SETUP), balsarakim)
     H2CHEM=yes
 endif
 
+ifeq ($(SETUP), bksne)
+#   Toy model of supernova in elongated turbulent cloud simulation
+    SETUPFILE=velfield_fromcubes.f90 setup_sphereinbox_bksne.f90
+    SRCINJECT=inject_sne.f90
+    PERIODIC=no
+    GRAVITY=yes
+    ISOTHERMAL=no # for gamma = 5/3
+    MHD=no
+    IND_TIMESTEPS=yes
+    DUST=no
+    KNOWN_SETUP=yes
+    H2CHEM=no
+    MAXP=5000000
+endif
+
+ifeq ($(SETUP), sphngsne)
+#   Supernova in elongated turbulent cloud simulation
+    SETUPFILE=velfield_fromcubes.f90 setup_sphere_evolvedmc.f90
+    SRCINJECT=inject_sne_sphng.f90
+    ANALYSIS=analysis_binvelocity.f90
+    PERIODIC=no
+    GRAVITY=yes
+    ISOTHERMAL=no
+    MHD=no
+    IND_TIMESTEPS=yes
+    KNOWN_SETUP=yes
+    H2CHEM=no
+    MAXP=10000000
+endif
+
+ifeq ($(SETUP), evolvedmc)
+#   Turbulent cloud simulation
+    SETUPFILE=velfield_fromcubes.f90 setup_sphere_evolvedmc.f90
+    PERIODIC=no
+    GRAVITY=yes
+    ISOTHERMAL=no
+    IND_TIMESTEPS=yes
+    KNOWN_SETUP=yes
+    MAXP=1000000
+endif
+
+ifeq ($(SETUP), 1dshock)
+#   1-D shock to test cooling
+    SETUPFILE=velfield_fromcubes.f90 setup_unifdis_shock.f90
+    SRCINJECT=inject_shock.f90
+    ISOTHERMAL=no
+    GRAVITY=no
+    PERIODIC=no
+    IND_TIMESTEPS=yes
+    KNOWN_SETUP=yes
+    MAXP=1000000
+endif
+
+ifeq ($(SETUP), testhiiregion)
+#   Heating particles within Stromgren sphere
+    SETUPFILE=velfield_fromcubes.f90 setup_sphere_testhiiregion.f90
+    SRCINJECT=inject_test_hiiregion.f90
+    PERIODIC=no
+    GRAVITY=yes
+    ISOTHERMAL=no
+    IND_TIMESTEPS=yes
+    KNOWN_SETUP=yes
+    H2CHEM=no
+    MAXP=5000000
+endif
+
+ifeq ($(SETUP), collshock)
+#   Collision of 1-D shocks
+    SETUPFILE=velfield_fromcubes.f90 setup_unifdis_collshock.f90
+    SRCINJECT=inject_collshock.f90
+    FPPFLAGS= -DPHOTOION
+    SRCPHOTOION=photoionize_cmi.F90
+    CMACIONIZE=yes
+    PERIODIC=yes
+    GRAVITY=no
+    ISOTHERMAL=no
+    IND_TIMESTEPS=yes
+    KNOWN_SETUP=yes
+    H2CHEM=no
+    MAXP=1000000
+endif
+
+ifeq ($(SETUP), extfshock)
+#   Produce shocks with potential well by applying external force
+    SETUPFILE=velfield_fromcubes.f90 setup_unifdis_extfshock.f90
+    ANALYSIS=analysis_printposvel.f90
+    PERIODIC=no
+    GRAVITY=no
+    ISOTHERMAL=no
+    IND_TIMESTEPS=yes
+    KNOWN_SETUP=yes
+    H2CHEM=no
+    MAXP=100000
+endif
+
+ifeq ($(SETUP), cmi)
+#	 Coupling Phantom to CMacIonize for adding ionizing radiation
+    SETUPFILE=velfield_fromcubes.f90 setup_sphere_evolvedmc.f90
+    FPPFLAGS= -DPHOTOION
+    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 photoionize_cmi.F90
+    CMACIONIZE=yes
+    PERIODIC=no
+    GRAVITY=yes
+    ISOTHERMAL=no
+    IND_TIMESTEPS=yes
+    KNOWN_SETUP=yes
+    MAXP=1000000
+endif
+
+ifeq ($(SETUP), rhdsne)
+#	 Injecting supernova with photoionization (calling CMI)
+    SETUPFILE=velfield_fromcubes.f90 setup_sphere_evolvedmc.f90
+    SRCINJECT=inject_sne_sphng.f90
+    FPPFLAGS= -DPHOTOION
+    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 photoionize_cmi.F90
+    CMACIONIZE=yes
+    PERIODIC=no
+    GRAVITY=yes
+    ISOTHERMAL=no
+    IND_TIMESTEPS=yes
+    KNOWN_SETUP=yes
+    MAXP=10000000
+endif
+
+ifeq ($(SETUP), starbench)
+#	 Benchmark test for the Phantom-CMI RHD scheme
+    SETUPFILE=setup_unifdis_cmi.f90
+    ANALYSIS=analysis_get_partinfo.f90
+    FPPFLAGS= -DPHOTOION
+    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 photoionize_cmi.F90
+    CMACIONIZE=yes
+    PERIODIC=no
+    GRAVITY=no
+    ISOTHERMAL=no
+    IND_TIMESTEPS=no
+    KNOWN_SETUP=yes
+    MAXP=5000000
+endif
+
 ifeq ($(SETUP), mhdvortex)
 #   Balsara (2004) MHD vortex
     PERIODIC=yes
@@ -892,7 +1035,7 @@ endif
 
 ifeq ($(SETUP), jet)
 #   Jet simulation from Price, Tricco & Bate (2012)
-    SETUPFILE= setup_sphereinbox.f90
+    SETUPFILE= velfield_fromcubes.f90 setup_sphereinbox.f90
     #ANALYSIS= analysis_jet.f90
     ANALYSIS= ${SRCNIMHD} analysis_protostar_environ.F90
     PERIODIC=yes
@@ -1160,6 +1303,10 @@ ifeq ($(MCFOST), yes)
     LDFLAGS+= -I$(MCFOST_INCLUDE) -I$(MCFOST_INCLUDE)/voro++ -I$(MCFOST_INCLUDE)/hdf5 -I$(MCFOST_INCLUDE)/$(FC) \
 	-L$(MCFOST_DIR)/src -lmcfost -L$(MCFOST_LIBS) $(LIBCXX) -lcfitsio -lvoro++ -lsprng \
 	-L$(HDF5ROOT)/lib/Intel -lhdf5_fortran -L$(HDF5ROOT)/lib -lhdf5 -lz -lxgboost -ldmlc -lrabit -lhdf5_fortran -lhdf5 -lz
+endif
+
+ifeq ($(CMACIONIZE), yes)
+    LDFLAGS+= -L/$(CMI_DIR)/build/lib -lCMIFortranLibrary -lCMILibrary -lLegacyEngine -lSharedEngine $(HDF5ROOT)/lib/libhdf5.so /usr/lib/x86_64-linux-gnu/libz.so /usr/lib/x86_64-linux-gnu/libdl.so /usr/lib/x86_64-linux-gnu/libm.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -lstdc++ -lc
 endif
 
 
@@ -1677,7 +1824,8 @@ endif
 #
 ifeq ($(HDF5), yes)
 ifeq (X$(HDF5ROOT), X)
-    HDF5ROOT= /usr/local/opt/hdf5
+#    HDF5ROOT= /usr/local/opt/hdf5
+    HDF5ROOT=/minthome/okitacscl1/hdf5-1.12.2/hdf5
 endif
 ifeq (X$(HDF5INCLUDE), X)
     HDF5INCLUDE= $(HDF5ROOT)/include
@@ -1775,9 +1923,9 @@ SOURCES= physcon.f90 ${CONFIG} ${SRCKERNEL} io.F90 units.f90 boundary.f90 \
          centreofmass.f90 ${SRCPOT} damping.f90 checkconserved.f90 \
          partinject.F90 utils_inject.f90 utils_filenames.f90 utils_summary.F90 ${SRCCHEM} \
          ${SRCDUST} dust_formation.F90 ptmass_radiation.F90 \
-         mpi_dens.F90 mpi_force.F90 stack.F90 mpi_derivs.F90 kdtree.F90 linklist_kdtree.F90 ${SRCTURB} \
-         ${SRCPHOTO} ${SRCINJECT} ${SRCKROME} memory.F90 ${SRCREADWRITE_DUMPS}  \
-         quitdump.f90 ptmass.F90 \
+         mpi_dens.F90 mpi_force.F90 stack.F90 mpi_derivs.F90 kdtree.F90 linklist_kdtree.F90 ${SRCPHOTOION}\
+         ${SRCTURB} ${SRCPHOTO} ${SRCKROME} memory.F90 ${SRCREADWRITE_DUMPS} egg.f90 \
+         quitdump.f90 ptmass.F90 ${SRCINJECT} \
          readwrite_infile.F90 dens.F90 force.F90 utils_deriv.f90 deriv.F90 energies.F90 sort_particles.F90 \
          evwrite.F90 step_leapfrog.F90 writeheader.F90 ${SRCAN} step_supertimestep.F90 mf_write.f90 evolve.F90 \
          checksetup.F90 initial.F90
@@ -1794,11 +1942,16 @@ else
     .PHONY: phantom
 endif
 
+
 phantom: checksystem checkparams $(OBJECTS) phantom.o
 	$(FC) $(FFLAGS) -o $(BINDIR)/$@ $(OBJECTS) phantom.o $(LDFLAGS)
 ifeq ($(UNAME), Darwin)
 	dsymutil $(BINDIR)/$@
 endif
+
+photoionize_cmi.o: photoionize_cmi.F90
+	$(FC) -c $(FFLAGS) -fopenmp -I$(CMI_DIR)/build/include $< -o $@
+
 
 
 	@echo ""
@@ -1850,7 +2003,7 @@ SRCDUMP= physcon.f90 ${CONFIG} ${SRCKERNEL} io.F90 units.f90 boundary.f90 mpi_ut
          utils_dumpfiles.f90 utils_vectors.f90 utils_mathfunc.f90 \
          utils_datafiles.f90 utils_filenames.f90 utils_tables.f90 datafiles.f90 gitinfo.f90 \
          centreofmass.f90 \
-         timestep.f90 ${SRCEOS} cullendehnen.f90 ${SRCGR} ${SRCPOT} ${SRCPHOTO} \
+         timestep.f90 ${SRCEOS} cullendehnen.f90 ${SRCGR} ${SRCPOT} ${SRCPHOTO} ${SRCPHOTOION}\
          memory.F90 \
          utils_sphNG.f90 \
          setup_params.f90 ${SRCFASTMATH} checkoptions.F90 \

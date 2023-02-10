@@ -58,6 +58,10 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
  use photoevap,      only:find_ionfront,photo_ionize
  use part,           only:massoftype
 #endif
+#ifdef PHOTOION
+ use photoionize_cmi, only:set_ionizing_source_cmi,release_ionizing_radiation_cmi
+ use part,            only:nptmass,xyzmh_ptmass
+#endif
 #ifdef DUSTGROWTH
  use growth,         only:get_growth_rate
  use part,           only:VrelVf
@@ -104,6 +108,8 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
  real,         intent(in)    :: metrics(:,:,:,:)
  real(kind=4)                :: t1,tcpu1,tlast,tcpulast
 
+ integer :: ip  !! testing
+
  t1    = 0.
  tcpu1 = 0.
  call get_timings(t1,tcpu1)
@@ -121,6 +127,7 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
 ! icall = 2 does not remake the link list and does not recalculate density
 !           (ie. only re-evaluates the SPH force term using updated values
 !            of the input variables)
+
 !
 ! call link list to find neighbours
 !
@@ -133,16 +140,36 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
 
  call do_timing('link',tlast,tcpulast,start=.true.)
 
+#ifdef PHOTOION
+ if (icall==1 .or. icall==0) then
+    !- checking
+    do ip = 1,npart
+       if (vxyzu(4,ip) < 0.) then
+          print*,'icall; negative u in deriv before cmi',icall,ip,vxyzu(4,ip)
+          exit
+       endif
+    enddo
+    !- Determine the ionizing sources at current timestep
+    call set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
+    !- Inject photoionization - calling CMacIonize
+    call release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
+    !- checking
+    do ip = 1,npart
+       if (vxyzu(4,ip) < 0.) then
+          print*,'icall; negative u in deriv after cmi',icall,ip,vxyzu(4,ip)
+          exit
+       endif
+    enddo
+ endif
+#endif
+
 #ifdef PHOTO
- !
- ! update location of particles on grid and calculate the location of the ionization front
- !
+ !- update location of particles on grid and calculate the location of the ionization front
  call find_ionfront(time,npart,xyzh,massoftype(igas))
- !
- ! update the temperatures of the particles depending on whether ionized or not
- !
+ !- update the temperatures of the particles depending on whether ionized or not
  call photo_ionize(vxyzu,npart)
 #endif
+
 !
 ! calculate density by direct summation
 !
@@ -160,11 +187,27 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
     call do_timing('dens',tlast,tcpulast)
  endif
 
+ !- checking
+ do ip = 1,npart
+    if (vxyzu(4,ip) < 0.) then
+       print*,'icall; negative u in deriv after density iterate',icall,ip,vxyzu(4,ip)
+       exit
+    endif
+ enddo
+
 #ifdef GR
  call cons2primall(npart,xyzh,metrics,pxyzu,vxyzu,dens,eos_vars)
 #else
  call cons2prim_everything(npart,xyzh,vxyzu,dvdx,rad,eos_vars,radprop,gamma_chem,Bevol,Bxyz,dustevol,dustfrac,alphaind)
 #endif
+
+ !- checking
+ do ip = 1,npart
+   if (vxyzu(4,ip) < 0.) then
+      print*,'icall; negative u in deriv after cons2prim_everything',icall,ip,vxyzu(4,ip)
+      exit
+   endif
+ enddo
 
 !
 ! compute forces
@@ -180,6 +223,14 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
             ipart_rhomax,dt,stressmax,eos_vars,dens,metrics)
  call do_timing('force',tlast,tcpulast)
 
+ !- checking
+ do ip = 1,npart
+   if (vxyzu(4,ip) < 0.) then
+      print*,'icall; negative u in deriv after force',icall,ip,vxyzu(4,ip)
+      exit
+   endif
+ enddo
+
 #ifdef DUSTGROWTH
  ! compute growth rate of dust particles
  call get_growth_rate(npart,xyzh,vxyzu,dustgasprop,VrelVf,dustprop,ddustprop(1,:))!--we only get ds/dt (i.e 1st dimension of ddustprop)
@@ -189,6 +240,7 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
  !compute dust temperature
  if (maxvxyzu >= 4) call get_dust_temperature_from_ptmass(npart,xyzh,nptmass,xyzmh_ptmass,dust_temp)
 #endif
+
 !
 ! set new timestep from Courant/forces condition
 !
@@ -197,7 +249,6 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
 #else
  dtnew = min(dtforce,dtcourant,dtrad,dtmax)
 #endif
-
 
  call do_timing('total',t1,tcpu1,lunit=iprint)
 

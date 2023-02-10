@@ -60,7 +60,7 @@ module readwrite_infile
 ! :Dependencies: cooling, damping, dim, dust, dust_formation, eos,
 !   externalforces, forcing, growth, infile_utils, inject, io, linklist,
 !   metric, nicil_sup, options, part, photoevap, ptmass, ptmass_radiation,
-!   timestep, viscosity
+!   timestep, viscosity, photoionize_cmi
 !
  use timestep,  only:dtmax_dratio,dtmax_max,dtmax_min
  use options,   only:nfulldump,nmaxdumps,twallmax,iexternalforce,idamp,tolh, &
@@ -104,6 +104,9 @@ subroutine write_infile(infile,logfile,evfile,dumpfile,iwritein,iprint)
 #endif
 #ifdef PHOTO
  use photoevap,       only:write_options_photoevap
+#endif
+#ifdef PHOTOION
+ use photoionize_cmi, only:write_options_photoionize
 #endif
 #ifdef INJECT_PARTICLES
  use inject,          only:write_options_inject
@@ -253,6 +256,10 @@ subroutine write_infile(infile,logfile,evfile,dumpfile,iwritein,iprint)
  call write_options_photoevap(iwritein)
 #endif
 
+#ifdef PHOTOION
+ call write_options_photoionize(iwritein)
+#endif
+
 #ifdef INJECT_PARTICLES
  call write_options_inject(iwritein)
  call write_options_dust_formation(iwritein)
@@ -313,6 +320,9 @@ subroutine read_infile(infile,logfile,evfile,dumpfile)
 #ifdef PHOTO
  use photoevap,       only:read_options_photoevap
 #endif
+#ifdef PHOTOION
+ use photoionize_cmi, only:read_options_photoionize
+#endif
 #ifdef INJECT_PARTICLES
  use inject,          only:read_options_inject
  use dust_formation,  only:read_options_dust_formation,idust_opacity
@@ -340,7 +350,7 @@ subroutine read_infile(infile,logfile,evfile,dumpfile)
  logical :: imatch,igotallrequired,igotallturb,igotalllink,igotloops
  logical :: igotallbowen,igotallcooling,igotalldust,igotallextern,igotallinject,igotallgrowth
  logical :: igotallionise,igotallnonideal,igotalleos,igotallptmass,igotallphoto,igotalldamping
- logical :: igotallprad,igotalldustform
+ logical :: igotallprad,igotalldustform,igotallphotoion
  integer, parameter :: nrequired = 1
 
  ireaderr = 0
@@ -355,6 +365,7 @@ subroutine read_infile(infile,logfile,evfile,dumpfile)
  igotalldust     = .true.
  igotallgrowth   = .true.
  igotallphoto    = .true.
+ igotallphotoion = .true.
  igotalllink     = .true.
  igotallextern   = .true.
  igotallinject   = .true.
@@ -511,6 +522,9 @@ subroutine read_infile(infile,logfile,evfile,dumpfile)
 #ifdef PHOTO
        if (.not.imatch) call read_options_photoevap(name,valstring,imatch,igotallphoto,ierr)
 #endif
+#ifdef PHOTOION
+       if (.not.imatch) call read_options_photoionize(name,valstring,imatch,igotallphotoion,ierr)
+#endif
 #ifdef INJECT_PARTICLES
        if (.not.imatch) call read_options_inject(name,valstring,imatch,igotallinject,ierr)
        if (.not.imatch) call read_options_dust_formation(name,valstring,imatch,igotalldustform,ierr)
@@ -547,7 +561,7 @@ subroutine read_infile(infile,logfile,evfile,dumpfile)
                     .and. igotalleos    .and. igotallcooling .and. igotallextern  .and. igotallturb &
                     .and. igotallptmass .and. igotallinject  .and. igotallionise  .and. igotallnonideal &
                     .and. igotallphoto  .and. igotallgrowth  .and. igotalldamping .and. igotallprad &
-                    .and. igotalldustform
+                    .and. igotalldustform .and. igotallphotoion
 
  if (ierr /= 0 .or. ireaderr > 0 .or. .not.igotallrequired) then
     ierr = 1
@@ -566,6 +580,7 @@ subroutine read_infile(infile,logfile,evfile,dumpfile)
           if (.not.igotalldust) write(*,*) 'missing dust options'
           if (.not.igotallgrowth) write(*,*) 'missing growth options'
           if (.not.igotallphoto) write(*,*) 'missing photoevaporation options'
+          if (.not.igotallphotoion) write(*,*) 'missing photoionize_cmi options'
           if (.not.igotallextern) write(*,*) 'missing external force options'
           if (.not.igotallinject) write(*,*) 'missing inject-particle options'
           if (.not.igotallionise) write(*,*) 'missing ionisation options'

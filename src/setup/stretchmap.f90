@@ -189,7 +189,6 @@ subroutine set_density_profile(np,xyzh,min,max,rhofunc,rhotab,xtab,start,geom,co
     else
        rhozero = totmass/(xmax - xmin)
     endif
-
     if (isverbose) then
        write(*,*) 'density at '//trim(labelcoord(icoord,igeom))//' = ',xmin,' is ',rho_at_min
        write(*,*) 'total mass      = ',totmass

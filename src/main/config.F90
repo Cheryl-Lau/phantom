@@ -338,6 +338,8 @@ module dim
 !--------------------
 #ifdef INJECT_PARTICLES
  logical, parameter :: particles_are_injected = .true.
+#elif defined(PHOTOION)
+ logical, parameter :: particles_are_injected = .true.
 #else
  logical, parameter :: particles_are_injected = .false.
 #endif

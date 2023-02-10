@@ -178,14 +178,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
  ialphaloc = 2
  nvfloorp  = 0
 
- !- checking
- do i = 1,npart
-    if (vxyzu(4,i) < 0.) then
-       print*,'negative u in step before first predictor',i,vxyzu(4,i)
-       exit
-    endif
- enddo
-
  !$omp parallel do default(none) &
  !$omp shared(npart,xyzh,vxyzu,fxyzu,iphase,hdtsph,store_itype) &
  !$omp shared(rad,drad,pxyzu)&
@@ -223,7 +215,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
        if (ufloor > 0.) then
           if (vxyzu(4,i) < ufloor) then
              vxyzu(4,i) = ufloor
-             print*,'ufloored',i,vxyzu(4,i)
              nvfloorp   = nvfloorp + 1
           endif
        endif
@@ -243,14 +234,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
  enddo predictor
  !omp end parallel do
  if (use_dustgrowth) call check_dustprop(npart,dustprop(1,:))
-
- !- checking
- do i = 1,npart
-    if (vxyzu(4,i) < 0.) then
-       print*,'negative u in step after first predictor',i,vxyzu(4,i)
-       exit
-    endif
- enddo
 
 !----------------------------------------------------------------------
 ! substepping with external and sink particle forces, using dtextforce
@@ -283,15 +266,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
 ! interpolation of SPH quantities needed in the SPH
 ! force evaluations, using dtsph
 !----------------------------------------------------
-
- !- checking
- do i = 1,npart
-    if (vxyzu(4,i) < 0.) then
-       print*,'negative u in step before predict_sph',i,vxyzu(4,i)
-       exit
-    endif
- enddo
-
 !$omp parallel do default(none) schedule(guided,1) &
 !$omp shared(maxp,maxphase,maxalpha) &
 !$omp shared(xyzh,vxyzu,vpred,fxyzu,divcurlv,npart,store_itype) &
@@ -353,7 +327,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
        if (ufloor > 0.) then
           if (vpred(4,i) < ufloor) then
              vpred(4,i) = ufloor
-             print*,'ufloored',i,vpred(4,i)
              nvfloorps  = nvfloorps + 1
           endif
        endif
@@ -399,14 +372,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
  !$omp end parallel do
  if (use_dustgrowth) call check_dustprop(npart,dustproppred(1,:))
 
- !- checking
- do i = 1,npart
-    if (vxyzu(4,i) < 0.) then
-       print*,'negative u in step after predict_sph',i,vxyzu(4,i)
-       exit
-    endif
- enddo
-
 !
 ! recalculate all SPH forces, and new timestep
 !
@@ -421,15 +386,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
                 ppred,dens,metrics)
     if (gr) vxyzu = vpred ! May need primitive variables elsewhere?
  endif
-
- !- checking
- do i = 1,npart
-    if (vxyzu(4,i) < 0.) then
-       print*,'negative u in step after deriv(1)',i,vxyzu(4,i)
-       exit
-    endif
- enddo
-
 !
 ! if using super-timestepping, determine what dt will be used on the next loop
 !
@@ -460,15 +416,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
     pmassi  = massoftype(igas)
     ntypes  = get_ntypes(npartoftype)
     store_itype = (maxphase==maxp .and. ntypes > 1)
-
-    !- checking
-    do i = 1,npart
-       if (vxyzu(4,i) < 0.) then
-          print*,'negative u in step before leapfrog corrector step',i,vxyzu(4,i)
-          exit
-       endif
-    enddo
-
 !$omp parallel default(none) &
 !$omp shared(xyzh,vxyzu,vpred,fxyzu,npart,hdtsph,store_itype) &
 !$omp shared(pxyzu,ppred) &
@@ -544,7 +491,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
           if (ufloor > 0.) then
              if (vxyzu(4,i) < ufloor) then
                 vxyzu(4,i) = ufloor
-                print*,'ufloored',i,vxyzu(4,i)
                 nvfloorc   = nvfloorc + 1
              endif
           endif
@@ -630,15 +576,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
     enddo corrector
 !$omp enddo
 !$omp end parallel
-
-    !- checking
-    do i = 1,npart
-       if (vxyzu(4,i) < 0.) then
-          print*,'negative u in step after leapfrog corrector step',i,vxyzu(4,i)
-          exit
-       endif
-    enddo
-
     if (use_dustgrowth) call check_dustprop(npart,dustprop(1,:))
 
     if (gr) then
@@ -706,14 +643,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
        enddo until_converged
 !$omp end parallel do
 
-      !- checking
-      do i = 1,npart
-         if (vxyzu(4,i) < 0.) then
-            print*,'negative u in step after until_converged',i,vxyzu(4,i)
-            exit
-         endif
-      enddo
-
        if (use_dustgrowth) call check_dustprop(npart,dustprop(1,:))
 
 !
@@ -724,15 +653,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
                      Bpred,dBevol,radpred,drad,radprop,dustproppred,ddustprop,dustpred,ddustevol,dustfrac,&
                      eos_vars,timei,dtsph,dtnew,ppred,dens,metrics)
        if (gr) vxyzu = vpred ! May need primitive variables elsewhere?
-
-       !- checking
-       do i = 1,npart
-          if (vxyzu(4,i) < 0.) then
-             print*,'negative u in step after deriv(2)',i,vxyzu(4,i)
-             exit
-          endif
-       enddo
-
     endif
  enddo iterations
  ! Summary statements & crash if velocity is not converged
@@ -1250,14 +1170,6 @@ subroutine step_extern(npart,ntypes,dtsph,dtextforce,xyzh,vxyzu,fext,fxyzu,time,
        dtextforcenew = min(dtextforcenew,C_force*dtf)
     endif
 
-    !- checking
-    do i = 1,npart
-       if (vxyzu(4,i) < 0.) then
-          print*,'negative u in step before substep predictor',i,vxyzu(4,i)
-          exit
-       endif
-    enddo
-
     !
     ! predictor step for sink-gas and external forces, also recompute sink-gas and external forces
     !
@@ -1434,14 +1346,6 @@ subroutine step_extern(npart,ntypes,dtsph,dtextforce,xyzh,vxyzu,fext,fxyzu,time,
     !$omp enddo
     !$omp end parallel
 
-    !- checking
-    do i = 1,npart
-       if (vxyzu(4,i) < 0.) then
-          print*,'negative u in step after substep predictor',i,vxyzu(4,i)
-          exit
-       endif
-    enddo
-
     if (nptmass > 0 .and. isink_radiation > 0) then
        call get_rad_accel_from_ptmass(nptmass,npart,xyzh,xyzmh_ptmass,fext)
        fextx = fextx + fextrad(1)
@@ -1475,14 +1379,6 @@ subroutine step_extern(npart,ntypes,dtsph,dtextforce,xyzh,vxyzu,fext,fxyzu,time,
     naccreted    = 0
     ibin_wakei   = 0
     dptmass(:,:) = 0.
-
-    !- checking
-    do i = 1,npart
-       if (vxyzu(4,i) < 0.) then
-          print*,'negative u in step before substep accreteloop',i,vxyzu(4,i)
-          exit
-       endif
-    enddo
 
     !$omp parallel default(none) &
     !$omp shared(maxp,maxphase) &
@@ -1544,14 +1440,6 @@ subroutine step_extern(npart,ntypes,dtsph,dtextforce,xyzh,vxyzu,fext,fxyzu,time,
     enddo accreteloop
     !$omp enddo
     !$omp end parallel
-
-    !- checking
-    do i = 1,npart
-       if (vxyzu(4,i) < 0.) then
-          print*,'negative u in step after substep accreteloop',i,vxyzu(4,i)
-          exit
-       endif
-    enddo
 
     !
     ! reduction of sink particle changes across MPI

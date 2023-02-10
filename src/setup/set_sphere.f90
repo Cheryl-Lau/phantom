@@ -22,7 +22,7 @@ module spherical
  use stretchmap, only:rho_func
  implicit none
 
- public  :: set_sphere,set_ellipse,rho_func
+ public  :: set_sphere,set_ellipse,set_unifdis_sphereN,rho_func
 
  integer, parameter :: &
    ierr_notinrange    = 1, &
@@ -226,17 +226,19 @@ end subroutine set_sphere_mc
 !+
 !-----------------------------------------------------------------------
 subroutine set_unifdis_sphereN(lattice,id,master,xmin,xmax,ymin,ymax,zmin,zmax,psep,&
-                    hfact,npart,nps_requested,xyzh,v_sphere,npart_total,mask,ierr,r_sphere,r_ellipsoid,in_ellipsoid)
+                    hfact,npart,nps_requested,xyzh,v_sphere,npart_total,mask,ierr,r_sphere,&
+                    r_ellipsoid,in_ellipsoid)
  character(len=*), intent(in)    :: lattice
  integer,          intent(in)    :: id,master
  integer,          intent(inout) :: npart
  integer,          intent(in)    :: nps_requested
  real,             intent(in)    :: xmin,xmax,ymin,ymax,zmin,zmax,hfact,v_sphere
  real,             intent(out)   :: psep,xyzh(:,:)
- real,   optional, intent(in)    :: r_sphere,r_ellipsoid(3)
  integer(kind=8),  intent(inout) :: npart_total
  integer,          intent(out)   :: ierr
  integer,          parameter     :: itermax = 100
+ real,             intent(in),   optional :: r_sphere,r_ellipsoid(3)
+
  procedure(mask_prototype)       :: mask
  integer(kind=8)                 :: npart_local
  integer                         :: iter,test_region,nps_lo,nps_hi,npr_lo,npr_hi,nps_hi_nx
@@ -392,37 +394,130 @@ subroutine set_unifdis_sphereN(lattice,id,master,xmin,xmax,ymin,ymax,zmin,zmax,p
  write(*,'(a,I10,2a)') ' set_sphere: Iterations complete: added ',npart0,' particles in the ',trim(c_shape)
 
 end subroutine set_unifdis_sphereN
+
 !-----------------------------------------------------------------------
 !+
 !  Wrapper to set an ellipse
 !+
 !-----------------------------------------------------------------------
-subroutine set_ellipse(lattice,id,master,r_ellipsoid,delta,hfact,xyzh,np,nptot,np_requested,mask)
+subroutine set_ellipse(lattice,id,master,r_ellipsoid,vol_ellipsoid,delta,hfact,xyzh,np,nptot,exactN,&
+                       np_requested,mask)
  character(len=*), intent(in)    :: lattice
- integer,          intent(in)    :: id,master,np_requested
+ integer,          intent(in)    :: id,master
  integer,          intent(inout) :: np
- real,             intent(in)    :: r_ellipsoid(3),hfact
+ real,             intent(in)    :: r_ellipsoid(3),vol_ellipsoid,hfact
  real,             intent(out)   :: xyzh(:,:)
  real,             intent(inout) :: delta
- integer(kind=8),  intent(inout) :: nptot
- procedure(mask_prototype), optional :: mask
- procedure(mask_prototype), pointer  :: my_mask
- integer                         :: ierr
- real                            :: xi,yi,zi,vol_ellipse
+ integer,          intent(in),    optional :: np_requested
+ integer(kind=8),  intent(inout), optional :: nptot
+ logical,          intent(in),    optional :: exactN
+ procedure(mask_prototype),       optional :: mask
+ procedure(mask_prototype),       pointer  :: my_mask
+ integer           :: ierr
+ real              :: xmin,xmax,ymin,ymax,zmin,zmax,rfac
+ logical           :: use_sphereN
 
+ use_sphereN = .false.
+ if (present(exactN) .and. present(np_requested)) then
+    if ( exactN ) use_sphereN = .true.
+ endif
  if (present(mask)) then
     my_mask => mask
  else
     my_mask => mask_true
  endif
- xi = 1.5*r_ellipsoid(1)
- yi = 1.5*r_ellipsoid(2)
- zi = 1.5*r_ellipsoid(3)
 
- vol_ellipse = 4.0*pi/3.0*r_ellipsoid(1)*r_ellipsoid(2)*r_ellipsoid(3)
- call set_unifdis_sphereN(lattice,id,master,-xi,xi,-yi,yi,-zi,zi,delta,hfact,np,np_requested,xyzh, &
-                          vol_ellipse,nptot,my_mask,ierr,r_ellipsoid=r_ellipsoid,in_ellipsoid=.true.)
+ rfac = 1.2  ! Slightly beyond ellipsoid
+ xmin = -rfac*r_ellipsoid(1)
+ xmax = rfac*r_ellipsoid(1)
+ ymin = -rfac*r_ellipsoid(2)
+ ymax = rfac*r_ellipsoid(2)
+ zmin = -rfac*r_ellipsoid(3)
+ zmax = rfac*r_ellipsoid(3)
+
+ if (lattice=='random' .and. present(np_requested)) then
+    call set_ellipse_mc(id,master,xmin,xmax,ymin,ymax,zmin,zmax,hfact,np_requested,np,xyzh,r_ellipsoid,&
+                        vol_ellipsoid,ierr,nptot,mask)
+ elseif (use_sphereN) then ! iterate to get N particles
+    call set_unifdis_sphereN(lattice,id,master,xmin,xmax,ymin,ymax,zmin,zmax,delta,hfact,np,np_requested,&
+                             xyzh,vol_ellipsoid,nptot,my_mask,ierr,r_ellipsoid=r_ellipsoid,in_ellipsoid=.true.)
+ else
+    call set_unifdis(lattice,id,master,xmin,xmax,ymin,ymax,zmin,zmax,delta,hfact,np,xyzh,.false.,&
+                     rellipsoid=r_ellipsoid,in_ellipsoid=.true.,nptot=nptot,verbose=.false.,centre=.true.,&
+                     mask=my_mask,err=ierr)
+ endif
 
 end subroutine set_ellipse
+
+!-----------------------------------------------------------------------
+!+
+! set up uniform particle distribution in ellipsoid using Monte Carlo particle
+! placement (rejection method). Particles are placed in pairs so the distribution
+! is symmetric about the origin.
+!+
+!-----------------------------------------------------------------------
+subroutine set_ellipse_mc(id,master,xmin,xmax,ymin,ymax,zmin,zmax,hfact,np_requested,np,xyzh,&
+                          r_ellipsoid,vol_ellipsoid,ierr,nptot,mask)
+ use random,  only:ran2
+ integer,         intent(in)    :: id,master,np_requested
+ integer,         intent(inout) :: np
+ real,            intent(in)    :: xmin,xmax,ymin,ymax,zmin,zmax,hfact
+ real,            intent(in)    :: r_ellipsoid(3),vol_ellipsoid
+ real,            intent(out)   :: xyzh(:,:)
+ integer,         intent(out)   :: ierr
+ integer(kind=8), intent(inout), optional :: nptot
+ procedure(mask_prototype)      :: mask
+ integer         :: npin,iseed,maxp
+ real            :: psep,xi,yi,zi
+ integer(kind=8) :: iparttot
+
+ npin = np
+ iparttot = npin
+ ! estimate mean particle spacing to set initial smoothing lengths
+ psep = (vol_ellipsoid/real(np_requested))**(1./3.)
+ iseed = -1980
+ maxp  = size(xyzh(1,:))  ! xyzh not yet initialized???
+ ierr  = 1
+
+ ! Generate a total of np_requested particles inside ellipsoid
+ do while (np < (npin+np_requested-1))
+    xi = (-1)**nint(ran2(iseed))*ran2(iseed)*r_ellipsoid(1)
+    yi = (-1)**nint(ran2(iseed))*ran2(iseed)*r_ellipsoid(2)
+    zi = (-1)**nint(ran2(iseed))*ran2(iseed)*r_ellipsoid(3)
+    if ((xi**2/r_ellipsoid(1)**2 + yi**2/r_ellipsoid(2)**2 + zi**2/r_ellipsoid(3)**2) < 1.) then
+       ! Add two particles, symmetric around the origin
+       iparttot = iparttot + 1
+       if (mask(iparttot)) then
+          np = np + 1
+          if (np > maxp) then
+             print*,' ERROR: np > maxp'
+             return
+          endif
+          xyzh(1,np) = xi
+          xyzh(2,np) = yi
+          xyzh(3,np) = zi
+          xyzh(4,np) = hfact*psep
+       endif
+       iparttot = iparttot + 1
+       if (mask(iparttot)) then
+          np = np + 1
+          if (np > maxp) then
+             print*,' ERROR: np > maxp'
+             return
+          endif
+          xyzh(1,np) = -xi
+          xyzh(2,np) = -yi
+          xyzh(3,np) = -zi
+          xyzh(4,np) = hfact*psep
+       endif
+    endif
+ enddo
+
+ ierr = 0
+ if (present(nptot)) nptot = iparttot
+ if (id==master) write(*,"(1x,a,i10,a)") 'placed ',np-npin,' particles in random-but-symmetric ellipsoid'
+
+end subroutine set_ellipse_mc
+
 !-----------------------------------------------------------------------
 end module spherical

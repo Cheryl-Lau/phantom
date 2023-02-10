@@ -20,7 +20,7 @@ module setup
 !   - ilattice    : *lattice type (1=cubic, 2=closepacked)*
 !   - mass_unit   : *mass unit (e.g. solarm)*
 !   - nx          : *number of particles in x direction*
-!   - rhozero     : *initial density in code units*
+!   - totmass     : *total mass of particles*
 !   - xmax        : *xmax boundary*
 !   - xmin        : *xmin boundary*
 !   - ymax        : *ymax boundary*
@@ -34,17 +34,14 @@ module setup
 !
  use dim,          only:use_dust,mhd
  use options,      only:use_dustfrac
- use setup_params, only:rhozero
+
  implicit none
  public :: setpart
 
  integer           :: npartx,ilattice
- real              :: cs0,xmini,xmaxi,ymini,ymaxi,zmini,zmaxi,Bzero
+ real              :: totmass,cs0,xmini,xmaxi,ymini,ymaxi,zmini,zmaxi,Bzero
  character(len=20) :: dist_unit,mass_unit
  real(kind=8)      :: udist,umass
-
- !--change default defaults to reproduce the test from Section 5.6.7 of Price+(2018)
- logical :: BalsaraKim = .false.
 
  !--dust
  real    :: dust_to_gas
@@ -60,20 +57,24 @@ contains
 !----------------------------------------------------------------
 subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,time,fileprefix)
  use dim,          only:maxvxyzu,h2chemistry,gr
- use setup_params, only:npart_total,ihavesetupB
- use io,           only:master
+ use setup_params, only:npart_total,ihavesetupB,rhozero
+ use io,           only:master,fatal
  use unifdis,      only:set_unifdis
  use boundary,     only:xmin,ymin,zmin,xmax,ymax,zmax,dxbound,dybound,dzbound,set_boundary
  use part,         only:Bxyz,periodic,abundance,iHI,dustfrac,ndustsmall,ndusttypes,grainsize,graindens
+ use part,         only:set_particle_type,igas
  use physcon,      only:pi,mass_proton_cgs,kboltz,years,pc,solarm,micron
  use set_dust,     only:set_dustfrac
- use units,        only:set_units,unit_density
+ use units,        only:set_units,unit_density,unit_velocity,select_unit
  use domain,       only:i_belong
- use eos,          only:gmw
+ use eos,          only:gmw,ieos
  use options,      only:icooling,alpha,alphau
- use timestep,     only:dtmax,tmax,C_cour,C_force,C_cool,tolv
+ use timestep,     only:dtmax,tmax,C_cour,C_force,C_cool,tolv,nout
  use cooling,      only:Tfloor
- use h2cooling,    only:abundc,abundo,abundsi,abunde,dust_to_gas_ratio,iphoto
+ use prompting,    only:prompt
+ use velfield,     only:set_velfield_from_cubes
+ use datafiles,    only:find_phantom_datafile
+ use inject,       only:xmin_sk,xmax_sk,ymin_sk,ymax_sk,zmin_sk,zmax_sk,time_sk
  integer,           intent(in)    :: id
  integer,           intent(inout) :: npart
  integer,           intent(out)   :: npartoftype(:)
@@ -84,10 +85,17 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real,              intent(inout) :: time
  character(len=20), intent(in)    :: fileprefix
  real,              intent(out)   :: vxyzu(:,:)
- character(len=40) :: filename
- real    :: totmass,deltax
+ character(len=120) :: filex,filey,filez
+ character(len=100) :: filename,infilename,cwd
+ character(len=20), parameter     :: filevx = 'cube_v1.dat'
+ character(len=20), parameter     :: filevy = 'cube_v2.dat'
+ character(len=20), parameter     :: filevz = 'cube_v3.dat'
+ real    :: vol_box,boxlength,cs0_cgs,deltax,sk_sizefracx,sk_sizefracy,sk_sizefracz
+ real    :: rmsmach,rms_mach,v2i,turbfac,turbboxsize
+ real    :: vxyz_avg,vxyz_min,vxyz_max,vxyz_avg_cgs,vxyz_min_cgs,vxyz_max_cgs
  integer :: i,ierr
- logical :: iexist
+ logical :: adiabatic = .true.    ! false for isothermal
+ logical :: iexist,in_iexist
  !
  !--general parameters
  !
@@ -98,175 +106,20 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     gamma = 5./3.
  endif
  !
- ! default units
- !
- mass_unit = 'solarm'
- dist_unit = 'pc'
- !
- ! set boundaries to default values
- !
- xmini = xmin; xmaxi = xmax
- ymini = ymin; ymaxi = ymax
- zmini = zmin; zmaxi = zmax
- !
- ! set default values for input parameters
- !
- npartx   = 64
- ilattice = 1
- rhozero  = 1.
- if (gr) then
-    cs0 = 1.e-4
- else
-    cs0 = 1.
- endif
- if (use_dust) then
-    use_dustfrac = .true.
-    dust_to_gas  = 0.01
-    ndustsmall   = 1
-    ndusttypes   = 1
-    grainsize(1) = 1.*micron/udist
-    graindens(1) = 3./unit_density
- endif
- if (BalsaraKim) then
-    ! there is a typo in Price+ (2018) in stating the physical density;
-    ! this mass_unit yields the correct value of 2.3e-24g/cm^3
-    mass_unit = '33982786.25*solarm'
-    dist_unit = 'kpc'
-    xmini = -0.1; xmaxi = 0.1
-    ymini = -0.1; ymaxi = 0.1
-    zmini = -0.1; zmaxi = 0.1
-    Bzero = 0.056117
-    cs0   = sqrt(0.3*gamma)   ! P=0.3, rho=1.0, cs=sqrt(gamma*P/rho)
-    ilattice = 2
-    filename=trim(fileprefix)//'.in'
-    inquire(file=filename,exist=iexist)
-    if (.not.iexist) then
-       tmax    = 0.035688
-       dtmax   = 1.250d-4
-       C_cour  = 0.200
-       C_force = 0.150
-       C_cool  = 0.15
-       tolv    = 1.0d3
-       alpha   = 1
-       alphau  = 0.1
-       gmw     = 1.22
-       Tfloor  = 3.
-       if (h2chemistry) then
-          ! flags controlling h2chemistry
-          icooling = 1
-          abundc  = 2.0d-4
-          abundo  = 4.5d-4
-          abundsi = 3.0d-5
-          abunde  = 2.0d-4
-          iphoto  = 0
-          dust_to_gas_ratio = 0.010
-       else
-          icooling = 0
-       endif
-    endif
- endif
- !
- ! get disc setup parameters from file or interactive setup
+ ! Interactive setup
  !
  filename=trim(fileprefix)//'.setup'
  inquire(file=filename,exist=iexist)
  if (iexist) then
     !--read from setup file
     call read_setupfile(filename,ierr)
-    if (id==master) call write_setupfile(filename)
     if (ierr /= 0) then
+       if (id==master) call write_setupfile(filename)
        stop
     endif
  elseif (id==master) then
-    call setup_interactive(id,polyk)
-    call write_setupfile(filename)
-    stop 'rerun phantomsetup after editing .setup file'
- else
-    stop
- endif
- !
- ! set units and boundaries
- !
- if (gr) then
-    call set_units(mass=umass,c=1.d0,G=1.d0)
- else
-    call set_units(dist=udist,mass=umass,G=1.d0)
- endif
- call set_boundary(xmini,xmaxi,ymini,ymaxi,zmini,zmaxi)
- !
- ! setup particles
- !
- deltax = dxbound/npartx
- npart = 0
- npart_total = 0
-
- select case(ilattice)
- case(2)
-    call set_unifdis('closepacked',id,master,xmin,xmax,ymin,ymax,zmin,zmax,deltax,hfact,&
-                     npart,xyzh,periodic,nptot=npart_total,mask=i_belong)
- case default
-    if (ilattice /= 1) print*,' error: chosen lattice not available, using cubic'
-    call set_unifdis('cubic',id,master,xmin,xmax,ymin,ymax,zmin,zmax,deltax,hfact,npart,xyzh,&
-                     periodic,nptot=npart_total,mask=i_belong)
- end select
-
- npartoftype(:) = 0
- npartoftype(1) = npart
- print*,' npart = ',npart,npart_total
-
- totmass = rhozero*dxbound*dybound*dzbound
- massoftype = totmass/npart_total
- if (id==master) print*,' particle mass = ',massoftype(1)
- if (id==master) print*,' initial sound speed = ',cs0,' pressure = ',cs0**2/gamma
-
- if (maxvxyzu < 4 .or. gamma <= 1.) then
-    polyk = cs0**2
- else
-    polyk = 0.
- endif
- do i=1,npart
-    vxyzu(1:3,i) = 0.
-    if (maxvxyzu >= 4 .and. gamma > 1.) vxyzu(4,i) = cs0**2/(gamma*(gamma-1.))
- enddo
-
- if (use_dustfrac) then
-    do i=1,npart
-       call set_dustfrac(dust_to_gas,dustfrac(:,i))
-    enddo
- endif
-
- if (h2chemistry) then
-    do i=1,npart
-       abundance(:,i)   = 0.
-       abundance(iHI,i) = 1.  ! assume all atomic hydrogen initially
-    enddo
- endif
-
- if (mhd .and. balsarakim) then
-    Bxyz = 0.
-    do i = 1,npart
-       Bxyz(1,i) = Bzero
-    enddo
-    ihavesetupB = .true.
- endif
-end subroutine setpart
-
-!------------------------------------------------------------------------
-!
-! interactive setup
-!
-!------------------------------------------------------------------------
-subroutine setup_interactive(id,polyk)
- use io,        only:master
- use mpiutils,  only:bcast_mpi
- use dim,       only:maxp,maxvxyzu
- use prompting, only:prompt
- use units,     only:select_unit
- integer, intent(in)  :: id
- real,    intent(out) :: polyk
- integer              :: ierr
-
- if (id==master) then
+    mass_unit = 'solarm'
+    dist_unit = 'pc'
     ierr = 1
     do while (ierr /= 0)
        call prompt('Enter mass unit (e.g. solarm,jupiterm,earthm)',mass_unit)
@@ -279,55 +132,175 @@ subroutine setup_interactive(id,polyk)
        call select_unit(dist_unit,udist,ierr)
        if (ierr /= 0) print "(a)",' ERROR: length unit not recognised'
     enddo
-
+    call set_units(dist=udist,mass=umass,G=1.d0)
+    !
+    ! set boundaries
+    !
+    boxlength = 1.
+    xmini = -0.5*boxlength; xmaxi = 0.5*boxlength
+    ymini = -0.5*boxlength; ymaxi = 0.5*boxlength
+    zmini = -0.5*boxlength; zmaxi = 0.5*boxlength
     call prompt('enter xmin boundary',xmini)
     call prompt('enter xmax boundary',xmaxi,xmini)
     call prompt('enter ymin boundary',ymini)
     call prompt('enter ymax boundary',ymaxi,ymini)
     call prompt('enter zmin boundary',zmini)
     call prompt('enter zmax boundary',zmaxi,zmini)
- endif
- !
- ! number of particles
- !
- if (id==master) then
-    print*,' uniform setup... (max = ',nint((maxp)**(1/3.)),')'
+    !
+    ! number of particles
+    !
+    npartx = 50
     call prompt('enter number of particles in x direction ',npartx,1)
- endif
- call bcast_mpi(npartx)
- !
- ! mean density
- !
- if (id==master) call prompt(' enter density (gives particle mass)',rhozero,0.)
- call bcast_mpi(rhozero)
- !
- ! sound speed in code units
- !
- if (id==master) then
+    !
+    ! total mass
+    !
+    totmass = 1.4775E-5   ! ###################### [Vary mass to change density] ############################
+    ! Test: 1.4475E3,  1.4475E3E-1, 1.4475E3E-3, 1.4475E3E-5
+    call prompt(' enter the total mass of particles',totmass,0.)
+    !
+    ! sound speed in code units
+    !
+    cs0_cgs = 0.91E5
+    cs0 = cs0_cgs/unit_velocity
     call prompt(' enter sound speed in code units (sets polyk)',cs0,0.)
- endif
- call bcast_mpi(cs0)
- !
- ! dust to gas ratio
- !
- if (use_dustfrac) then
-    call prompt('Enter dust to gas ratio',dust_to_gas,0.)
-    call bcast_mpi(dust_to_gas)
+
+    if (id==master) call write_setupfile(filename)
+    stop 'rerun phantomsetup after editing .setup file'
+ else
+    stop
  endif
  !
- ! magnetic field strength
- if (mhd .and. balsarakim) then
-    call prompt('Enter magnetic field strength in code units ',Bzero,0.)
-    call bcast_mpi(Bzero)
+ ! set units and boundaries
+ !
+ call set_units(dist=udist,mass=umass,G=1.d0)
+ call set_boundary(xmini,xmaxi,ymini,ymaxi,zmini,zmaxi)
+ !
+ ! setup particles
+ !
+ deltax = dxbound/npartx
+ npart = 0
+ npart_total = 0
+
+
+ call set_unifdis('closepacked',id,master,xmin,xmax,ymin,ymax,zmin,zmax,deltax,hfact,&
+                  npart,xyzh,periodic,nptot=npart_total,mask=i_belong)
+
+ npartoftype(:) = 0
+ npartoftype(igas) = npart
+ print*,' npart = ',npart,npart_total
+
+ if (massoftype(igas) < epsilon(massoftype(igas))) massoftype(igas) = totmass/npart_total
+
+ do i = 1,npartoftype(igas)
+    call set_particle_type(i,igas)
+ enddo
+
+ print*,' particle mass = ',massoftype(igas)
+ print*,' initial sound speed = ',cs0,' pressure = ',cs0**2/gamma
+
+ vol_box = (xmaxi-xmini)*(ymaxi-ymini)*(zmaxi-zmini)
+ rhozero = totmass / vol_box
+
+ print*,'density = ',rhozero
+ print*,'density_cgs = ',rhozero*unit_density
+ print*,'nrho_cgs = ',rhozero*unit_density/mass_proton_cgs
+
+ polyk = 0.
+ !
+ ! Set internal energy
+ !
+ do i=1,npart
+    if (maxvxyzu >= 4 .and. gamma > 1.) vxyzu(4,i) = cs0**2/(gamma*(gamma-1.))
+ enddo
+ !
+ ! Set turbulence
+ !
+ rms_mach = 3.
+ vxyzu = 0.
+ if (rms_mach > 0.) then
+    call getcwd(cwd)
+
+    ! Kennedy or Dial
+    filex  = find_phantom_datafile(filevx,'velfield_sphng_small')
+    filey  = find_phantom_datafile(filevy,'velfield_sphng_small')
+    filez  = find_phantom_datafile(filevz,'velfield_sphng_small')
+    ! Convert endian for different vfield files:
+    ! setenv GFORTRAN_CONVERT_UNIT big/small_endian
+
+    turbboxsize = max(abs(xmini),abs(xmaxi),abs(ymini),abs(ymaxi),abs(zmini),abs(zmaxi))
+    call set_velfield_from_cubes(xyzh(:,1:npart),vxyzu(:,:npart),npart, &
+                                 filex,filey,filez,1.,turbboxsize,.false.,ierr)
+    if (ierr /= 0) call fatal('setup','error setting up turb velocity field')
+
+    rmsmach = 0.0
+    print*, 'Turbulence being set by user'
+    do i = 1,npart
+       v2i     = dot_product(vxyzu(1:3,i),vxyzu(1:3,i))
+       rmsmach = rmsmach + v2i/cs0**2
+    enddo
+    rmsmach = sqrt(rmsmach/npart)
+    if (rmsmach > 0.) then
+       turbfac = rms_mach/rmsmach ! normalise the energy to the desired mach number
+     else
+       turbfac = 0.
+    endif
+    do i = 1,npart
+       vxyzu(1:3,i) = turbfac*vxyzu(1:3,i)
+    enddo
+
+    vxyz_avg = 0.
+    vxyz_min = huge(vxyz_min)
+    vxyz_max = epsilon(vxyz_max)
+!    open(2022,file='velfield.txt')
+    do i = 1,npart
+       vxyz_avg = vxyz_avg + mag(vxyzu(1:3,i))
+       if (mag(vxyzu(1:3,i)) < vxyz_min) vxyz_min = mag(vxyzu(1:3,i))
+       if (mag(vxyzu(1:3,i)) > vxyz_max) vxyz_max = mag(vxyzu(1:3,i))
+!       write(2022,*) mag(vxyzu(1:3,i))*unit_velocity*1E-5
+    enddo
+!    close(2022)
+    vxyz_avg = vxyz_avg/npart
+    vxyz_avg_cgs = vxyz_avg*unit_velocity
+    vxyz_min_cgs = vxyz_min*unit_velocity
+    vxyz_max_cgs = vxyz_max*unit_velocity
+    print*,'vturb (km/s) mean',vxyz_avg_cgs*1E-5,'min',vxyz_min_cgs*1E-5,'max',vxyz_max_cgs*1E-5
+
  endif
  !
- ! type of lattice
+ ! Set default runtime parameters if .in file does not exist
  !
- if (id==master) then
-    call prompt(' select lattice type (1=cubic, 2=closepacked)',ilattice,1)
+ infilename=trim(fileprefix)//'.in'
+ inquire(file=infilename,exist=in_iexist)
+ if (.not. in_iexist) then
+    tmax     = 1E-1
+    dtmax    = 1E-8
+    nout     = 1E2
+    ieos     = 2
+!    icooling = 7   ! JML06 implicit
+!    Tfloor   = 3.
+    alphau = 1
+    ! Set boundaries of shock region
+    sk_sizefracx = 1.
+    sk_sizefracy = 0.5
+    sk_sizefracz = 1.
+    call prompt('enter size frac of shock region in x',sk_sizefracx)
+    call prompt('enter size frac of shock region in y',sk_sizefracy)
+    call prompt('enter size frac of shock region in z',sk_sizefracz)
+    xmin_sk = xmin; xmax_sk = xmin + (xmax-xmin)*sk_sizefracx
+    ymin_sk = ymin; ymax_sk = ymin + (ymax-ymin)*sk_sizefracy
+    zmin_sk = zmin; zmax_sk = zmin + (zmax-zmin)*sk_sizefracz
+    ! Set time of shock
+    call prompt('enter time of injecting shock',time_sk)
  endif
- call bcast_mpi(ilattice)
-end subroutine setup_interactive
+
+end subroutine setpart
+
+real function mag(vec)
+ real, intent(in) :: vec(3)
+
+ mag = sqrt(vec(1)**2 + vec(2)**2 + vec(3)**2)
+
+end function mag
 
 !------------------------------------------------------------------------
 !
@@ -361,13 +334,10 @@ subroutine write_setupfile(filename)
  !
  write(iunit,"(/,a)") '# setup'
  call write_inopt(npartx,'nx','number of particles in x direction',iunit)
- call write_inopt(rhozero,'rhozero','initial density in code units',iunit)
+ call write_inopt(totmass,'totmass','total mass of particles',iunit)
  call write_inopt(cs0,'cs0','initial sound speed in code units',iunit)
  if (use_dustfrac) then
     call write_inopt(dust_to_gas,'dust_to_gas','dust-to-gas ratio',iunit)
- endif
- if (mhd .and. balsarakim) then
-    call write_inopt(Bzero,'Bzero','magnetic field strength in code units',iunit)
  endif
  call write_inopt(ilattice,'ilattice','lattice type (1=cubic, 2=closepacked)',iunit)
  close(iunit)
@@ -411,13 +381,10 @@ subroutine read_setupfile(filename,ierr)
  ! other parameters
  !
  call read_inopt(npartx,'nx',db,min=8,errcount=nerr)
- call read_inopt(rhozero,'rhozero',db,min=0.,errcount=nerr)
+ call read_inopt(totmass,'totmass',db,min=0.,errcount=nerr)
  call read_inopt(cs0,'cs0',db,min=0.,errcount=nerr)
  if (use_dustfrac) then
     call read_inopt(dust_to_gas,'dust_to_gas',db,min=0.,errcount=nerr)
- endif
- if (mhd .and. balsarakim) then
-    call read_inopt(Bzero,'Bzero',db,min=0.,errcount=nerr)
  endif
  call read_inopt(ilattice,'ilattice',db,min=1,max=2,errcount=nerr)
  call close_db(db)

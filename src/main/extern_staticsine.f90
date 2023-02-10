@@ -55,10 +55,12 @@ subroutine staticsine_force(xi,yi,fxi,fyi,fzi,phi)
  xforce = xi*cos(inclination) - yi*sin(inclination)
 
  !--Potential
- phi = amplitude*cos(wavek*(xforce+phase))
+! phi = amplitude*cos(wavek*(xforce+phase))
+ phi = amplitude*cos(wavek*xforce + phase)
 
  !--Magnitude of Force (along axis aligned with sinusoid)
- fi = wavek*amplitude*sin(wavek*(xforce+phase))
+! fi = wavek*amplitude*sin(wavek*(xforce+phase))
+ fi = wavek*amplitude*sin(wavek*xforce + phase)
 
  !--Separate into x and y components according to the inclination of the sinusoidal perturbation
  fxi = fi*cos(inclination)

@@ -32,7 +32,6 @@ module options
  real(kind=4), public :: twallmax
 
 ! artificial viscosity, thermal conductivity, resistivity
-
  real, public :: alpha,alphau,beta
  real, public :: alphamax
  real, public :: alphaB, psidecayfac, overcleanfac, hdivbbmax_max

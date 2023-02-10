@@ -150,6 +150,9 @@ subroutine startrun(infile,logfile,evfile,dumpfile)
 #ifdef PHOTO
  use photoevap,        only:set_photoevap_grid
 #endif
+#ifdef PHOTOION
+ use photoionize_cmi,  only:init_ionizing_radiation_cmi
+#endif
 #ifdef NONIDEALMHD
  use units,            only:utime,umass,unit_Bfield
  use eos,              only:gmw
@@ -389,6 +392,12 @@ subroutine startrun(infile,logfile,evfile,dumpfile)
 !
 #ifdef PHOTO
  call set_photoevap_grid
+#endif
+!
+!-- Init procedures to inject ionizing radiation (calling CMI)
+!
+#ifdef PHOTOION
+ call init_ionizing_radiation_cmi(npart,xyzh)
 #endif
 !
 !--get timestep for external forces

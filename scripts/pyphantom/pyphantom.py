@@ -29,17 +29,17 @@ class Simulation():
     if not analysis:
       self.logfile, self.evfile, self.dumpfile = self.init(infile, tmax, dtmax)
       self.update_time()
-    
+
   def update_time(self):
     try:
       self.dtlast = self.dt
     except AttributeError:
       self.dtlast = 0.
     self.time, self.tmax, self.nsteps, self.nmax, self.dt = self.get_time()
-    
+
   def __iter__(self):
     return self
-  
+
   def next(self):
     self.update_time()
     if self.time >= self.tmax or self.nsteps >= self.nmax:
@@ -49,37 +49,39 @@ class Simulation():
       self.step()
       self.logfile, self.evfile, self.dumpfile = self.finalize_step(self.infile, self.logfile, self.evfile, self.dumpfile)
     return self.time
-    
+
   def __del__(self):
     self.finalize()
-    
+
   def read_ev_files(self):
     prefix = self.infile.rstrip('.in')
-    print "Searching files with prefix '%s'..." % prefix
+    print("Searching files with prefix '%s'..." % prefix)
     evfiles = sorted([f for f in listdir('.') if f.startswith(prefix) and f.endswith('.ev')])
     udist, umass, utime, udens, umagfd = self.get_units()
     wololo = {'time':utime, 'ekin':udist**2*umass/utime**2, 'etherm':udist**2*umass/utime**2, 'emag':udist**2*umass/utime**2, 'epot':udist**2*umass/utime**2, 'etot':udist**2*umass/utime**2, 'totmom':umass*udist/utime, 'angtot':umass*udist**2/utime, 'rhomax':udens, 'rhomean':udens, 'dt':utime, 'rmsmach':1., 'alphamax':1., 'alphau':1., 'alphaBmax':1., 'totmomall':umass*udist/utime, 'angall':umass*udist**2/utime, 'accretedmas':umass, 'totentrop':udist**2*umass/utime**2, 'Macc sink 1':umass, 'Macc sink 2':umass, 'divB max':umagfd, 'divB mean':umagfd, 'hdivB/B max':1./udist, 'hdivB/B av':1./udist}
-    def concatdicts(A, B):
-      for k in B.keys():
-	if k in A.keys():
-	  try:
-	    A[k] = concatenate([A[k], B[k]])
-	  except ValueError: pass
-	else:
-	  A[k] = B[k]
+
     output = dict()
     datefirst = path.getmtime(evfiles[0])
     for evfile in evfiles:
       if path.getmtime(evfile) >= datefirst:
-	data = self.read_ev_file(evfile)
-	concatdicts(output, data)
+        data = self.read_ev_file(evfile)
+        concatdicts(output, data)
     for column in output.keys():
       if column in wololo.keys():
-	output[column] *= wololo[column] # Unit conversion to cgs
+        output[column] *= wololo[column] # Unit conversion to cgs
     return output
 
+  def concatdicts(A, B):
+    for k in B.keys():
+      if k in A.keys():
+        try:
+          A[k] = concatenate([A[k], B[k]])
+        except ValueError: pass
+      else:
+        A[k] = B[k]
+
   def read_ev_file(self, evfile):
-    print 'Reading ev file: ', evfile
+    print('Reading ev file: ', evfile)
     with open(evfile, 'r') as f:
       header = f.readline()
       column_names = re.findall(r'\[\d+\s+([^\]]+)\]', header)
@@ -88,10 +90,10 @@ class Simulation():
     for column_number, column_name in enumerate(column_names):
       output[column_name] = data[column_number]
     return output
-  
+
   def update_from_dump(self, dumpfile):
     self.time, _, _ = self.read_dump(dumpfile)
-    
+
   def inject_or_update_particles(self, ifirst, n, position, velocity, h, u, boundary=False):
     # Inputs
     ifirst_c = c_int(ifirst+1)
@@ -99,7 +101,7 @@ class Simulation():
     boundary_c = c_int(boundary)
     # Calling subroutine
     self.libph.inject_or_update_particles_(byref(ifirst_c), byref(n_c), c_void_p(position.ctypes.data), c_void_p(velocity.ctypes.data), c_void_p(h.ctypes.data), c_void_p(u.ctypes.data), byref(boundary_c))
-    
+
   def inject_or_update_sphere(self, ifirst, resolution, center, radius, center_velocity, expansion_velocity, h, u, angles, boundary=False):
     # Inputs
     ifirst_c = c_int(ifirst+1)
@@ -111,7 +113,7 @@ class Simulation():
     boundary_c = c_int(boundary)
     # Calling subroutine
     self.libph.inject_or_update_sphere_(byref(ifirst_c), byref(resolution_c), c_void_p(center.ctypes.data), byref(radius_c), c_void_p(center_velocity.ctypes.data), byref(expansion_velocity_c), byref(h_c), byref(u_c), c_void_p(angles.ctypes.data), byref(boundary_c))
-    
+
   def inject_or_update_sink_particle(self, sink_number, position, velocity, radius, mass):
     # Inputs
     sink_number_c = c_int(sink_number+1)
@@ -123,11 +125,11 @@ class Simulation():
   def init_step(self):
     # Calling subroutine
     self.libph.init_step_wrapper_()
-    
+
   def step(self):
     # Calling subroutine
     self.libph.step_wrapper_()
-    
+
   def finalize_step(self, infile, logfile, evfile, dumpfile):
     # Inputs
     len_infile_c = c_int(len(infile))
@@ -188,11 +190,11 @@ class Simulation():
     dtmax_c = c_double(dtmax)
     # Calling subroutine
     self.libph.override_tmax_dtmax_(byref(tmax_c), byref(dtmax_c))
-    
+
   def finalize(self):
     # Calling subroutine
     self.libph.finalize_()
-    
+
   def get_boundaries(self):
     # Outputs
     xmin_c = c_double()
@@ -239,7 +241,7 @@ class Simulation():
     self.libph.get_hfact_(byref(hfact_c))
     # Returning outputs
     return hfact_c.value
-  
+
   def get_npart(self, nodisabled=False):
     # Inputs
     nodisabled_c = c_int(nodisabled)
@@ -279,10 +281,10 @@ class Simulation():
     if ierr == 1: raise IncorrectNumberOfParticles
     # Returning output
     return part_vxyz
-   
+
   def get_part_bxyz(self, npart, nodisabled=False):
     npart_c      = c_int(npart)
-    nodisabled_c = c_int(npart) 
+    nodisabled_c = c_int(npart)
     part_bxyz    = zeros(npart, dtype=float)
     ierr_c       = c_int()
     self.libph.get_part_bxyz_(byref(npart_c), c_void_p(part_bxyz.ctypes.data), byref(nodisabled_c), byref(ierr_c))
@@ -290,7 +292,7 @@ class Simulation():
     if ierr == 1: raise IncorrectNumberOfParticles
     if ierr == 2: raise MagneticFieldNotStored
     return part_bxyz
-    
+
   def get_part_u(self, npart, nodisabled=False):
     # Input
     npart_c = c_int(npart)
@@ -358,7 +360,7 @@ class Simulation():
     if ierr == 1: raise IncorrectNumberOfPointMasses
     # Returning output
     return ptmass_vxyz
-  
+
   def get_ptmass_spinxyz(self,nptmass):
     # Input
     nptmass_c = c_int(nptmass)
@@ -421,7 +423,7 @@ class Simulation():
     self.libph.plot_log_rho_xysec_(byref(z_c), byref(xmin_c), byref(ymin_c), byref(npx_c), byref(npy_c), byref(dx_c), byref(dy_c), byref(npart_c), byref(massofgas_c), byref(hfact_c), c_void_p(part_xyzh.ctypes.data), c_void_p(pixmap.ctypes.data))
     # Returning output
     return pixmap
-  
+
   def get_units(self):
     # Outputs
     udist = c_double()
@@ -433,7 +435,7 @@ class Simulation():
     self.libph.get_units_(byref(udist), byref(umass), byref(utime), byref(udens), byref(umagfd))
     # Returning output
     return udist.value, umass.value, utime.value, udens.value, umagfd.value
-  
+
   def delete_particles_outside_box(self, xmin, xmax, ymin, ymax, zmin, zmax):
     # Inputs
     xmin_c = c_double(xmin)

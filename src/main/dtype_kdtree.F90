@@ -31,10 +31,8 @@ module dtypekdtree
                     + 4 &           ! leftchild
                     + 4 &           ! rightchild
                     + 4 &           ! parent
-#ifdef GRAVITY
                     + 8 &           ! mass
                     + 8*6 &         ! quads(6)
-#endif
 #ifdef TREEVIZ
  + 8*ndimtree &  ! xmin(ndimtree)
                     + 8*ndimtree &  ! xmax(ndimtree)
@@ -56,6 +54,9 @@ module dtypekdtree
     integer :: leftchild
     integer :: rightchild
     integer :: parent
+#ifdef PHOTOION
+    real :: mass
+#endif
 #ifdef GRAVITY
     real :: mass
     real :: quads(6)

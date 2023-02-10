@@ -14,13 +14,17 @@ module cooling
 !     2 = Townsend (2009) cooling tables [implicitly calculated]
 !     3 = Gammie cooling [explicitly calculated]
 !     5 = Koyama & Inutuska (2002) [explicitly calculated]
-!     6 = Koyama & Inutuska (2002) [implicitly calculated][not yet implemented; JHW]
+!     6 = Koyama & Inutuska (2002) [implicitly calculated]
+!     7 = Joung & Mac Low (2006) in the framework of Koyama & Inutuska (2002) [implicitly calculated]
+!         (suitable for high-temp simulations up to 10^8K)
 !
 ! :References:
 !   Koyama & Inutsuka (2002), ApJL 564, 97-100
 !   Vazquez-Semadeni, et.al (2007), ApJ 657, 870-883
 !   Townsend (2009), ApJS 181, 391-397
 !   Gail & Sedlmayr textbook Physics and chemistry of Circumstellar dust shells
+!   Joung & Mac Low (2006), ApJ 653, 1266-1279
+!   SPHNG coolcurve.F & thermeq.f modified by Ian Bonnell
 !
 ! :Owner: Lionel Siess
 !
@@ -52,9 +56,24 @@ module cooling
  public :: write_options_cooling, read_options_cooling
  public :: find_in_table, implicit_cooling, exact_cooling
  logical, public :: calc_Teq
+
  logical, public :: cooling_implicit
  logical, public :: cooling_explicit
  real,    public :: bowen_Cprime = 3.000d-5
+ real,    public :: GammaKI_cgs = 2.d-26 ! [erg/s] heating rate for Koyama & Inutuska cooling
+
+ integer, public, parameter :: maxcoolingoff = 20
+ logical, public :: snecoolingoff = .false.      ! Temporarily switch off cooling around sne
+ integer, public :: ncoolingoff = 0              ! Number of coords to switch off cooling at current time
+ real,    public :: xyzh_coolingoff(4,maxcoolingoff)
+ real,    public :: dt_cooloff = 2E-4            ! Time period to disable cooling
+ real,    public :: range_cooloff = 5E-2         ! Radius around sn location to disable cooling (code units)
+ logical, public :: range_cooloff_useh = .false. ! or use resolution length of progenitor
+
+ integer, public, parameter :: maxpart_nocooling = 1E8
+ logical, public :: part_nocooling = .true.            ! Disable cooling for some particles
+ integer, public :: ipart_nocooling(maxpart_nocooling) ! Indicies of particles to stop cooling
+ integer, public :: npartnocool                        ! Current total number of particles to stop cooling
 
  private
  integer, parameter :: nTg = 64
@@ -66,7 +85,19 @@ module cooling
  real    :: habund     = 0.7
  real    :: temp_floor = 1.e4                       ! required for exact_cooling_table
  real    :: Tgrid(nTg)
- real    :: crate_coef
+
+ real    :: LambdaKI_coef,GammaKI
+ real    :: KI02_rho_min_cgs = 1.0d-30  ! minimum density of the KI02 cooling curve
+ real    :: KI02_rho_max_cgs = 1.0d-14  ! maximum density of the KI02 cooling curve
+ real    :: KI02_rho_min,KI02_rho_max
+ real    :: rhov4_KI02(2,maxt)
+
+ real    :: rhominJML_cgs = 7E-29   ! density range of which JML06 cooling curve has equilibium solution(s)
+ real    :: rhomaxJML_cgs = 1E-19   !  -Note: rhominJML_cgs is hard limit; rhomaxJML_cgs can be increased by lowering TminJML
+ real    :: TminJML = 1E1           ! temperature range of JML06 cooling curve
+ real    :: TmaxJML = 1E8
+ real    :: rhoueqJML_table(5,maxt)
+
  integer :: icool_radiation_H0 = 0, icool_relax_Bowen = 0, icool_dust_collision = 0, icool_relax_Stefan = 0
  character(len=120) :: cooltable = 'cooltable.dat'
  !--Minimum temperature (failsafe to prevent u < 0); optional for ALL cooling options
@@ -94,7 +125,7 @@ subroutine init_cooling(id,master,iprint,ierr)
 
  if (h2chemistry) then
     if (id==master) write(iprint,*) 'initialising cooling function...'
-    call init_chem()
+    call init_chem()  ! nothing in init_chem
     call init_h2cooling()
  else
     !you can't have cool_relaxation_Stefan and cool_relaxation_Bowen at the same time
@@ -120,8 +151,16 @@ subroutine init_cooling(id,master,iprint,ierr)
     !--initialise remaining variables
     if (icooling == 2) then
        call init_cooltable(ierr)
-    elseif (icooling == 5) then
-       crate_coef = 2.0d-26*umass*utime**3/(mass_proton_cgs**2 * udist**5)
+    elseif (icooling == 5 .or. icooling == 6 .or. icooling == 7) then
+       LambdaKI_coef = GammaKI_cgs*umass*utime**3/(mass_proton_cgs**2 * udist**5)
+       GammaKI       = GammaKI_cgs*utime**3/(mass_proton_cgs*udist**2)
+       if (icooling == 7) then
+          call init_rhoutableJML(ierr)
+          if (ierr > 0) call fatal('init_cooling','Failed to create JML06 cooling table')
+       else
+          call init_hv4table(ierr)
+          if (ierr > 0) call fatal('init_cooling','Failed to create KI02 cooling table')
+       endif
     elseif (icooling > 0) then
        call set_Tgrid
     endif
@@ -206,6 +245,246 @@ subroutine init_cooltable(ierr)
     endif
  enddo
 end subroutine init_cooltable
+
+!-----------------------------------------------------------------------
+!+
+!  create a h-v4 table based upon the cooling curve of KI02
+!+
+!-----------------------------------------------------------------------
+subroutine init_hv4table(ierr)
+ use part,    only:hrho,igas
+ use physcon, only:mass_proton_cgs,kboltz
+ use units,   only:unit_density,unit_velocity
+ use eos,     only:gmw,gamma
+ integer, intent(out) :: ierr
+ integer              :: i,ctr
+ real                 :: nrho0_min,nrho0_max,nrho,dnrho,dGammaKI,Lambda,dLambda
+ real                 :: T,Tnew,Trat,fatT,faTdT
+ logical              :: iterate
+ logical              :: print_cc = .true. ! Print the cooling curve (for testing)
+
+ !--Initialise densities
+ KI02_rho_min = KI02_rho_min_cgs/unit_density
+ KI02_rho_max = KI02_rho_max_cgs/unit_density
+ nrho0_min    = KI02_rho_min_cgs/mass_proton_cgs
+ nrho0_max    = KI02_rho_max_cgs/mass_proton_cgs
+ dnrho        = (log10(nrho0_max) - log10(nrho0_min))/maxt
+ !--Initialise additional variables
+ dGammaKI     = 0.0
+ ierr         = 0
+
+ if (print_cc) open(unit=1031,file='coolingcurve.dat')
+ if (print_cc) write(1031,'(3A15)') 'n','T','Lambda(T)'
+
+ !--Iterate (in cgs units)!
+ T = 20000.
+ do i = 1,maxt
+    ctr     = 0
+    iterate = .true.
+    nrho    = 10**(log10(nrho0_min) + (i-1)*dnrho)
+    do while ( iterate )
+       Lambda  = 1.d7*exp(-1.184d5/(T+1.d3)) + 0.014*sqrt(T)*exp(-92./T) ! This is actually Lamda / Gamma
+       dLambda = 0.007*exp(-92./T)*(T+184.)*T**(-1.5) + 1.184d12*exp(-1.184d5/(T+1.d3))*(T+1.d3)**(-2)
+       fatT    = Lambda*GammaKI_cgs*nrho - GammaKI_cgs
+       faTdT   = dLambda*GammaKI_cgs*nrho - dGammaKI
+       Tnew    = abs(T - fatT/faTdT)
+       Trat    = abs( 1.0 - T/Tnew )
+       T       = Tnew
+       ctr     = ctr + 1
+       !--converged
+       if (Trat < 1.0d-6) iterate = .false.
+       !--failed to converge
+       if (T < 0. .or. ctr > 2000) then
+          iterate = .false.
+          ierr    = 1
+       endif
+    enddo
+    if (print_cc) then
+       if (nrho > 0) write(1031,'(E15.5E2,F15.5,E15.5E2)') nrho,T,Lambda*GammaKI_cgs
+    endif
+    rhov4_KI02(1,i) = nrho
+    rhov4_KI02(2,i) = T
+ enddo
+ if (print_cc) close(1031)
+
+ !--Convert to useful values
+ do i = 1,maxt
+    rhov4_KI02(1,i) = rhov4_KI02(1,i)*mass_proton_cgs/unit_density                               ! number density (cm^-3) -> mass density (code units)
+    rhov4_KI02(2,i) = kboltz*rhov4_KI02(2,i)/(gmw*mass_proton_cgs*(gamma-1.0))/unit_velocity**2  ! T -> internal energy (code units)
+ enddo
+
+end subroutine init_hv4table
+
+!-----------------------------------------------------------------------
+!
+!  Procedures for initiating rho-u table using the cooling curve of JML06;
+!  For each rho, there can be up to 3 thermal equilibium solutions
+!
+!-----------------------------------------------------------------------
+subroutine init_rhoutableJML(ierr)
+ use io,      only:fatal
+ use physcon, only:mass_proton_cgs,kboltz
+ use units,   only:unit_density,unit_ergg
+ use eos,     only:gmw,gamma
+ integer, intent(out) :: ierr
+ integer   :: i,irterr1,irterr2,irterr3,numroots
+ real      :: nrhomin_cgs,nrhomax_cgs,dnrho_cgs,nrho_cgs,rho
+ real      :: T01,T02,Teq1,Teq2,Teq3,ueq1,ueq2,ueq3
+
+ nrhomin_cgs = rhominJML_cgs/mass_proton_cgs
+ nrhomax_cgs = rhomaxJML_cgs/mass_proton_cgs
+ dnrho_cgs = (log10(nrhomax_cgs)-log10(nrhomin_cgs))/maxt
+ ierr = 0
+
+ ! Temp of local max and min of JML06 cooling curve (for root-search brackets)
+ T01 = 198609.4917357372
+ T02 = 31622776.6016837933
+
+ ! Solve for Teq1, Teq2 and Teq3 for each value of n
+ do i = 1,maxt
+    nrho_cgs = nrhomin_cgs * 10**((i-1)*dnrho_cgs)
+    call root_bisection(nrho_cgs,TminJML,T01,Teq1,irterr1)
+    call root_bisection(nrho_cgs,T01,T02,Teq2,irterr2)
+    call root_bisection(nrho_cgs,T02,TmaxJML,Teq3,irterr3)
+
+    ! Get total number of roots
+    if (irterr3 == 1) then
+       if (irterr2 == 1) then
+          if (irterr1 == 1) then
+             ierr = 1
+             call fatal('cooling','No roots found for one of the densities in table')
+          else
+             numroots = 1
+          endif
+       else
+          numroots = 2
+       endif
+    else
+       numroots = 3
+    endif
+
+    ! Convert nrho_cgs and T to rho and u in code units
+    rho = nrho_cgs * mass_proton_cgs / unit_density
+    ueq1 = kboltz * Teq1 / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
+    ueq2 = kboltz * Teq2 / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
+    ueq3 = kboltz * Teq3 / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
+    rhoueqJML_table(1,i) = rho
+    rhoueqJML_table(2,i) = numroots
+    rhoueqJML_table(3,i) = ueq1
+    rhoueqJML_table(4,i) = ueq2
+    rhoueqJML_table(5,i) = ueq3
+ enddo
+
+end subroutine init_rhoutableJML
+
+!
+! Cooling function mimicking the cooling curve of Joung & Mac Low (2006) Fig. 1;
+! created by modifying the cooling function of Koyama & Inutsuka (2002)
+!
+real function lambdacoolJML(temp)
+ real, intent(in) :: temp
+ real  :: lambdagamma1,lambdagamma2,lambdagamma
+
+ ! First term of KI02
+ if (temp > 10**4.15) then
+    lambdagamma1 = 4.69414E-4 * 1E7 * exp(-1.184E5 * 1.15983E6 / ((temp*10**(-0.08))**2.68935 + 1000))
+ else
+    lambdagamma1 = 1E7 * exp(-1.184E5 / ((temp*10**(-0.16)) + 1000))* temp**0.18
+ endif
+ ! Second term of KI02
+ lambdagamma2 = 0.215 * 0.014 * (temp*10**(-0.2))**0.66 * exp(-92/(temp*10**(-0.12))) *10**0.2
+
+ ! Shift up
+ lambdagamma = (lambdagamma1 + lambdagamma2) * 10**0.75
+
+ ! Modify low temp part
+ if (temp < 10**3.7) then
+    lambdagamma = lambdagamma * 10**1.665 * temp**(-0.45)
+ endif
+ ! Modify high temp part
+ if (temp > 10**5.3) then
+    if (temp < 10**6.5) then
+       lambdagamma = lambdagamma * 10**5.3 * temp**(-1.)
+    else
+       lambdagamma = lambdagamma * 10**0.425 * temp**(-0.25)
+    endif
+ endif
+ ! Modify highest temp part
+ if (temp > 10**7.5) then
+    lambdagamma = lambdagamma * 10**(-5.25) * temp**0.7
+ endif
+
+ lambdacoolJML = lambdagamma * GammaKI_cgs
+
+end function lambdacoolJML
+
+!
+! Thermal equilibium: f_T = n*lambda(T) - gamma
+!
+real function equifunc(nrho,temp)
+ real, intent(in) :: nrho,temp
+
+ equifunc = nrho*lambdacoolJML(temp) - GammaKI_cgs
+
+end function equifunc
+
+!
+! Brackets the equilibium solution Teq with given Tmin and Tmax;
+! returns Teq = 0. and irterr = 1 if no roots found
+!
+subroutine root_bisection(nrho,Tmin,Tmax,Teq,irterr)
+ real,    intent(in)  :: nrho,Tmin,Tmax
+ integer, intent(out) :: irterr
+ real,    intent(out) :: Teq
+ integer :: n_iter,Tminsign,Tmaxsign
+ real    :: Tminbisec,Tmaxbisec,tol,Tmid,f_T
+ logical :: converged
+
+ n_iter = 0
+ tol = 0.05           ! tolerance in root-search
+ converged = .false.  ! root flag
+ irterr = 0           ! no-root flag
+ Tminsign = sign(1.,equifunc(nrho,Tmin))
+ Tmaxsign = sign(1.,equifunc(nrho,Tmax))
+
+ if (Tminsign == Tmaxsign) then
+    Teq = 0.
+    irterr = 1
+ endif
+
+ Tmaxbisec = Tmax
+ Tminbisec = Tmin
+ do while (.not.converged .and. irterr == 0)
+
+    if ((Tmaxbisec-Tminbisec) < tol) then
+       converged = .true.
+       Teq = (Tmaxbisec+Tminbisec)/2.
+    endif
+
+    Tmid = (Tmaxbisec+Tminbisec)/2.
+    f_T = equifunc(nrho,Tmid)
+
+    if (Tminsign == -1) then      ! ascending
+       if (f_T >= 0) then
+          Tmaxbisec = Tmid
+       elseif (f_T < 0) then
+          Tminbisec = Tmid
+       endif
+    elseif (Tmaxsign == -1) then  ! descending
+       if (f_T < 0) then
+          Tmaxbisec = Tmid
+       elseif (f_T >= 0) then
+          Tminbisec = Tmid
+       endif
+    endif
+    n_iter = n_iter + 1
+    if (n_iter > 1000) then
+       Teq = 0.
+       irterr = 1
+    endif
+ enddo
+
+end subroutine root_bisection
 
 !-----------------------------------------------------------------------
 !
@@ -374,17 +653,183 @@ end subroutine cooling_Gammie
 !+
 !   Cooling rate as per Koyama & Inutuska (2002; eqns 4 & 5);
 !   typos corrected as per Vazquez-Semadeni+ (2007)
+!   This is for the explicit calculation
+!   In equilibrium, n*LambdaKI = (rho/mp)*LambdaKI = GammaKI
 !+
 !-----------------------------------------------------------------------
-subroutine cooling_KoyamaInutuska(rhoi,Tgas,dudti)
+subroutine cooling_KoyamaInutuska_explicit(rhoi,Tgas,dudti)
  real, intent(in)    :: rhoi,Tgas
  real, intent(inout) :: dudti
- real                :: crate
+ real                :: LambdaKI
 
- crate = crate_coef*(1.d7*exp(-118400./(Tgas+1000.))+0.014*sqrt(Tgas)*exp(-92./Tgas))
- dudti = dudti - crate*rhoi
+ ! Derivation to obtain correct units; used Koyama & Inutuska (2002) as the reference
+ !LambdaKI = GammaKI_cgs * (1.d7*exp(-118400./(Tgas+1000))+0.014*sqrt(Tgas)*exp(-92./Tgas)) ! The cooling rate in erg cm^3/s = g cm^5/s^3
+ !LambdaKI = LambdaKI/mass_proton_cgs**2                                                    ! units are now cm^5/(g s^3) ! since [u] = erg/g = cm^2/s^2
+ !LambdaKI = LambdaKI*umass*utime**3/udist**5                                               ! convert to from cm^5/(g s^3) to code units
+ !dudti    = dudti - LambdaKI*rhoi*fac                                                      ! multiply by rho (code) to get l^5/(m t^3) * m/l^3 = l^2/s^3 = [u]
+ !
+ !GammaKI = GammaKI_cgs                                                                     ! The heating rate in erg /s = g cm^2/s^3
+ !GammaKI = GammaKI/mass_proton_cgs                                                         ! divide by proton mass.  Units are now g cm^2 / s^3 / g = cm^2/s^3
+ !GammaKI = GammaKI*utime**3/udist**2                                                       ! convert from cm^2/s^3 to code units
+ !dudti   = dudti + GammaKI                                                                 ! units and dependencies are correct
 
-end subroutine cooling_KoyamaInutuska
+ LambdaKI = LambdaKI_coef*(1.d7*exp(-118400./(Tgas+1000.))+0.014*sqrt(Tgas)*exp(-92./Tgas))
+ dudti    = dudti - LambdaKI*rhoi + GammaKI
+
+end subroutine cooling_KoyamaInutuska_explicit
+
+!-----------------------------------------------------------------------
+!+
+!   Cooling rate as per Koyama & Inutuska (2002; eqns 4 & 5);
+!   typos corrected as per Vazquez-Semadeni+ (2007)
+!   This is the implicit method given by (5)-(6) in Vazquez-Semadeni+ (2007)
+!+
+!-----------------------------------------------------------------------
+subroutine cooling_KoyamaInutuska_implicit(eni,rhoi,dt,dudti)
+ use eos, only:gamma,temperature_coef,gmw
+ real, intent(in)    :: rhoi,eni,dt
+ real, intent(out)   :: dudti
+ integer             :: i,j,jm1
+ real                :: ponrhoi,tempi,eni_equil,eni_final,deni,tau1,LambdaKI
+
+ !--Determine the indicies surrounding the input h
+ i = minloc(abs(rhov4_KI02(1,1:maxt)-rhoi), 1)
+ if (i==1) then
+    !print*, 'min density too large! extrapolating using two smallest densities'
+    j = 2
+ elseif (i==maxt) then
+    !print*, 'max density too small! extrapolating using two largest densities'
+    j = maxt
+ elseif (rhov4_KI02(1,i-1) <= rhoi .and. rhoi <= rhov4_KI02(1,i  )) then
+    j = i
+ elseif (rhov4_KI02(1,i  ) <= rhoi .and. rhoi <= rhov4_KI02(1,i+1)) then
+    j = i+1
+ else
+    print*, rhoi,rhov4_KI02(1,i-1:i+1)
+    print*, 'this should not happen'
+    stop
+ endif
+
+ !--Calculate the equilibrium energy by linear interpolation
+ jm1       = j - 1
+ eni_equil = rhov4_KI02(2,j) + (rhov4_KI02(2,jm1)-rhov4_KI02(2,j))/(rhov4_KI02(1,jm1)-rhov4_KI02(1,j))*(rhoi-rhov4_KI02(1,j))
+
+ !--Determine the inverse time require to radiate/acquire excess/deficit energy & Update energy
+ ponrhoi  = (gamma-1.)*eni
+ tempi    = temperature_coef*gmw*ponrhoi
+ LambdaKI = LambdaKI_coef*(1.d7*exp(-118400./(tempi+1000.))+0.014*sqrt(tempi)*exp(-92./tempi))
+ dudti    = LambdaKI*rhoi - GammaKI
+ deni     = eni - eni_equil
+
+ if (abs(deni) > 0.) then
+    ! in both limits, this will approach the correct value
+    tau1      = abs(dudti/deni)
+    eni_final = eni_equil + deni*exp(-dt*tau1)
+    dudti     = -(eni - eni_final)/dt
+ else
+    ! in the unlikly chance deni = 0
+    dudti = -dudti
+ endif
+
+end subroutine cooling_KoyamaInutuska_implicit
+
+!-----------------------------------------------------------------------
+!
+! Implicit cooling based on Koyama & Inutuska (2002), adapted to deal with cooling
+! curve of Joung & Mac Low (2006) which has more than one equilibium solution
+!
+!-----------------------------------------------------------------------
+subroutine cooling_JoungMacLow_implicit(eni,rhoi,dt,dudti)
+ use io,      only:fatal
+ use physcon, only:kboltz,mass_proton_cgs
+ use eos,     only:gamma,gmw
+ use units,   only:unit_ergg
+ real, intent(in)  :: rhoi,eni,dt
+ real, intent(out) :: dudti
+ integer :: i,j,r,numroots
+ real    :: ueqs(3),ueq_final,tempi,LambdaKI,deni,tau,eni_new
+ real    :: rhotable(maxt),numroottable(maxt),utable(maxt)
+
+ rhotable = rhoueqJML_table(1,:)
+ numroottable = rhoueqJML_table(2,:)
+
+ !- First entry in rhoueq_table is the minimum density of which there exists at least one root;
+ !- Directly use first entry if rhoi is smaller than this limit
+ if (rhoi < rhotable(1)) then
+    numroots = int(numroottable(1))
+    ueqs = (/ rhoueqJML_table(1,3), rhoueqJML_table(1,4), rhoueqJML_table(1,5) /)
+ else
+
+    !- Interpolate between table entries to give the final ueqs
+    ! ([i] closest index; [j] lower bound; [j+1] upper bound around rhoi)
+    i = minloc(abs(rhotable(:)-rhoi),1)
+    if (i == 1) then
+       j = 1
+    elseif (i == maxt) then
+       j = i-1
+    elseif (rhotable(i) >= rhoi .and. rhotable(i-1) < rhoi) then
+       j = i-1
+    elseif (rhotable(i) < rhoi .and. rhotable(i+1) >= rhoi) then
+       j = i
+    endif
+
+    !- Interpolate only if both ueq[j] and ueq[j+1] exist,
+    !- otherwise, use the nearest root
+    numroots = int(numroottable(i))
+    if (numroots == 0) call fatal('cooling_JoungMacLow_implicit','no equilibrium solution found')
+
+    ueqs = (/ 0., 0., 0. /)
+    each_root: do r = 1,numroots
+       utable = rhoueqJML_table(2+r,:)
+
+       if (utable(j) > 0. .and. utable(j+1) > 0.) then
+          ueqs(r) = utable(j) + (rhoi-rhotable(j))*(utable(j+1) - utable(j))/(rhotable(j+1)-rhotable(j))
+
+       else
+          if (utable(j) == 0. .and. utable(j+1) > 0.) then
+             ueqs(r) = utable(j+1)
+          elseif (utable(j) > 0. .and. utable(j+1) == 0.) then
+             ueqs(r) = utable(j)
+          else
+             call fatal('cooling_JoungMacLow_implicit','erroneous equilibrium solutions')
+          endif
+       endif
+    enddo each_root
+ endif
+
+ ! Determine the right ueq with the particle's eni
+ ! Note: ueqs(1) and ueqs(3) are stable; ueqs(2) is unstable
+ if (numroots == 1) then
+    ueq_final = ueqs(1)
+ else
+    if (eni <= ueqs(2)) then
+       ueq_final = ueqs(1)
+    else
+       if (numroots == 2) then
+          ueq_final = kboltz*TmaxJML / (gmw*mass_proton_cgs*(gamma-1)) / unit_ergg
+       elseif (numroots == 3) then
+          ueq_final = ueqs(3)
+       endif
+    endif
+ endif
+
+ ! Isothermal temp of particle
+ tempi = gmw*mass_proton_cgs/kboltz*(gamma-1.)*eni * unit_ergg
+
+ ! Compute the new internal energy
+ LambdaKI = LambdaKI_coef * lambdacoolJML(tempi)/GammaKI_cgs
+ dudti = rhoi*LambdaKI - GammaKI
+ deni = eni - ueq_final
+
+ if (abs(deni) > 0.) then
+     tau = abs(deni/dudti)
+     eni_new = ueq_final + deni*exp(-dt/tau)
+     dudti = -(eni-eni_new)/dt
+ else
+     dudti = -dudti
+ endif
+
+end subroutine cooling_JoungMacLow_implicit
 
 !-----------------------------------------------------------------------
 !
@@ -474,10 +919,12 @@ end subroutine implicit_cooling
 !
 !-----------------------------------------------------------------------
 subroutine energ_cooling(xi,yi,zi,ui,dudt,rho,dt,Trad,mu_in,K2,kappa,Tgas)
- use io, only: fatal
+ use io,   only: fatal
  real, intent(in)           :: xi,yi,zi,ui,rho,dt         ! in code units
  real, intent(in), optional :: Tgas,Trad,mu_in,K2,kappa   ! in cgs units
  real, intent(inout)        :: dudt                       ! in code units
+ integer :: icf
+ real    :: dist(3),magdist,old_dudt
 
  select case (icooling)
  case (3)
@@ -486,10 +933,14 @@ subroutine energ_cooling(xi,yi,zi,ui,dudt,rho,dt,Trad,mu_in,K2,kappa,Tgas)
     call exact_cooling_table(ui,rho,dt,dudt)
  case (5)
     if (present(Tgas)) then
-       call cooling_KoyamaInutuska(rho,Tgas,dudt)
+       call cooling_KoyamaInutuska_explicit(rho,Tgas,dudt)
     else
        call fatal('energ_cooling','Koyama & Inutuska cooling requires gas temperature')
     endif
+ case (6)
+    call cooling_KoyamaInutuska_implicit(ui,rho,dt,dudt)
+ case (7)
+    call cooling_JoungMacLow_implicit(ui,rho,dt,dudt)
  case default
     !call exact_cooling(u, dudt, rho, dt, Trad, mu_in, K2, kappa)
     !call implicit_cooling(u, dudt, rho, dt, Trad, mu_in, K2, kappa)
@@ -499,8 +950,44 @@ subroutine energ_cooling(xi,yi,zi,ui,dudt,rho,dt,Trad,mu_in,K2,kappa,Tgas)
        call fatal('energ_cooling','default requires optional arguments; change icooling or ask D Price or L Siess to patch')
     endif
  end select
+ !
+ ! Temporarily reduce cooling for particles near sne
+ !
+ if (snecoolingoff .and. ncoolingoff >= 1) then
+!    if (xyzh_coolingoff(1,1)>0.) print*, 'xyzh_coolingoff in cooling' , xyzh_coolingoff
+    each_coord: do icf = 1,ncoolingoff
+       dist(1:3) = xyzh_coolingoff(1:3,icf) - (/ xi,yi,zi /)
+       magdist = sqrt(dist(1)**2 + dist(2)**2 + dist(3)**2)
+       if (range_cooloff_useh) range_cooloff = 2*xyzh_coolingoff(4,icf)  ! full radius = 2h
+       if (magdist <= range_cooloff) then
+          old_dudt = dudt
+          ! Scale down dudt by a fraction depending on distance from sn
+          dudt = dudt - dudt*cooloff_frac(magdist,range_cooloff)
+          print*,'reducing cooling: old dudt, new dudt', old_dudt,dudt
+       endif
+    enddo each_coord
+ endif
 
 end subroutine energ_cooling
+
+!
+! Compute the fraction of dudtcool to reduce around supernova
+! Smoothed using cubic spline to avoid discontinuities caused by switching off cooling
+!
+real function cooloff_frac(dist,totrange)
+ real, intent(in) :: dist,totrange
+ real :: r
+
+ r = dist/totrange*2.  ! Scale to range of cubic kernel
+ if (r >= 0. .and. r < 1.) then
+    cooloff_frac = 1 - 3./2.*r**2 + 3./4.*r**3
+ elseif (r >= 1. .and. r < 2.) then
+    cooloff_frac = 1./4.*(2-r)**3
+ elseif (r >= 2) then
+    cooloff_frac = 0.
+ endif
+
+end function cooloff_frac
 
 !-----------------------------------------------------------------------
 !
@@ -691,7 +1178,8 @@ subroutine write_options_cooling(iunit)
        call write_options_h2cooling(iunit)
     endif
  else
-    call write_inopt(icooling,'icooling','cooling function (0=off, 1=explicit, 2=Townsend table, 3=Gammie, 5=KI02)',iunit)
+    call write_inopt(icooling,'icooling','cooling function (0=off, 1=explicit, 2=Townsend table, 3=Gammie,&
+                   & 5=KI02 explicit, 6=KI02 implicit, 7=JML06 implicit)',iunit)
     select case(icooling)
     case(1)
        call write_inopt(icool_radiation_H0,'icool_radiation_H0','H0 cooling on/off',iunit)
@@ -708,6 +1196,7 @@ subroutine write_options_cooling(iunit)
     end select
  endif
  if (icooling > 0) call write_inopt(Tfloor,'Tfloor','temperature floor (K); on if > 0',iunit)
+ if (ufloor > 0.) call write_inopt(ufloor,'ufloor','internal energy floor; on if > 0',iunit)
 
 end subroutine write_options_cooling
 
@@ -768,6 +1257,8 @@ subroutine read_options_cooling(name,valstring,imatch,igotall,ierr)
  case('Tfloor')
     ! not compulsory to read in
     read(valstring,*,iostat=ierr) Tfloor
+case('ufloor')
+    read(valstring,*,iostat=ierr) ufloor
  case default
     imatch = .false.
     if (h2chemistry) then
