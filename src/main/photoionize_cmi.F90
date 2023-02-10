@@ -442,7 +442,7 @@ subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
                 endif
              endif
           endif
-       enddo
+       enddo 
        if (ip_cmi /= npart_cmi) call fatal('photoionize_cmi','number of particles &
          & passed to and from CMI do not match')
 
