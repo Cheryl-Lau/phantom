@@ -80,10 +80,10 @@ module photoionize_cmi
 
  ! Options for extracting cmi-nodes from kdtree
  real,    public :: tree_accuracy_cmi = 0.1
- real,    public :: rcut_opennode = 0.2 !0.10        ! in code units
- real,    public :: rcut_leafpart = 0.1 !0.05        ! in code units
- real,    public :: delta_rcut    = 0.05 ! 0.01        ! in code units
- real,    public :: nHlimit_fac   = 100 !80          ! ionization front resolution; recommend 40-80
+ real,    public :: rcut_opennode = 0.10        ! in code units
+ real,    public :: rcut_leafpart = 0.05        ! in code units
+ real,    public :: delta_rcut    = 0.01        ! in code units
+ real,    public :: nHlimit_fac   = 80          ! ionization front resolution; recommend 40-80
  real,    public :: min_nodesize_toflag = 0.005  ! min node size as a fraction of root node
  logical, public :: auto_opennode = .true.
  logical, public :: auto_tree_acc = .false.
@@ -223,7 +223,8 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
 
  !- For writing xyzhmf output files
  if (maxoutfile > maxoutfile_ult) then
-    call fatal('photoionize_cmi','maxoutfile must be less than 5 digits, or modify line ')
+    call fatal('photoionize_cmi','maxoutfile must be within 5 digits, or modify line &
+                                 & 237,256,452,727')
  endif
  iunit = 4000
  iruncmi = 0
@@ -398,7 +399,7 @@ subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
                    if (vxyzu(4,ip) < u_hii) then
                       vxyzu(4,ip) = u_hii
                    endif
-!                   u_ionized = u_hii*(1.0-nH_site) + u_hi*nH_site  
+!                   u_ionized = u_hii*(1.0-nH_site) + u_hi*nH_site
 !                   if (vxyzu(4,ip) < u_ionized) vxyzu(4,ip) = u_ionized
                 enddo over_parts
              elseif (n == 0 .and. i /= 0) then !- is particle

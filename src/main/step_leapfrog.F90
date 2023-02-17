@@ -631,14 +631,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
 !$omp enddo
 !$omp end parallel
 
-    !- checking
-    do i = 1,npart
-       if (vxyzu(4,i) < 0.) then
-          print*,'negative u in step after leapfrog corrector step',i,vxyzu(4,i)
-          exit
-       endif
-    enddo
-
     if (use_dustgrowth) call check_dustprop(npart,dustprop(1,:))
 
     if (gr) then
@@ -706,14 +698,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
        enddo until_converged
 !$omp end parallel do
 
-      !- checking
-      do i = 1,npart
-         if (vxyzu(4,i) < 0.) then
-            print*,'negative u in step after until_converged',i,vxyzu(4,i)
-            exit
-         endif
-      enddo
-
        if (use_dustgrowth) call check_dustprop(npart,dustprop(1,:))
 
 !
@@ -724,14 +708,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
                      Bpred,dBevol,radpred,drad,radprop,dustproppred,ddustprop,dustpred,ddustevol,dustfrac,&
                      eos_vars,timei,dtsph,dtnew,ppred,dens,metrics)
        if (gr) vxyzu = vpred ! May need primitive variables elsewhere?
-
-       !- checking
-       do i = 1,npart
-          if (vxyzu(4,i) < 0.) then
-             print*,'negative u in step after deriv(2)',i,vxyzu(4,i)
-             exit
-          endif
-       enddo
 
     endif
  enddo iterations

@@ -777,14 +777,11 @@ subroutine cooling_JoungMacLow_implicit(eni,rhoi,dt,dudti)
     !- otherwise, use the nearest root
     numroots = int(numroottable(i))
     if (numroots == 0) call fatal('cooling_JoungMacLow_implicit','no equilibrium solution found')
-
     ueqs = (/ 0., 0., 0. /)
     each_root: do r = 1,numroots
        utable = rhoueqJML_table(2+r,:)
-
        if (utable(j) > 0. .and. utable(j+1) > 0.) then
           ueqs(r) = utable(j) + (rhoi-rhotable(j))*(utable(j+1) - utable(j))/(rhotable(j+1)-rhotable(j))
-
        else
           if (utable(j) == 0. .and. utable(j+1) > 0.) then
              ueqs(r) = utable(j+1)

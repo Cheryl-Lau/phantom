@@ -288,7 +288,7 @@ subroutine getfunc_from_neigh_sum(h,pos_node,node,nnodeneigh,listnodeneigh,xyzca
  wab_sum  = cnormk*h1**3 * wab_sum
  dwdh_sum = -cnormk*h1**4 * dwdh_sum
 
- !- Solves the eqn h = hfact*n^(1/3) where n = sum W_ab(h)
+ !- Solves the eqn h = hfact*n^(-1/3) where n = sum W_ab(h)
  func  = hfact_node*(wab_sum)**(-1./3.) - h
  dfunc = (-1./3.*hfact_node*(wab_sum)**(-4./3.) * dwdh_sum) -1
 

@@ -2784,7 +2784,7 @@ subroutine finish_cell_and_store_results(icall,cell,fxyzu,xyzh,vxyzu,poten,dt,dv
              endif
 
              !--add conductivity and resistive heating
-             fxyz4 = fxyz4 + fac*fsum(idendtdissi)  !- fsum(idendtdissi) can be negative
+             fxyz4 = fxyz4 + fac*fsum(idendtdissi)  !- fsum(idendtdissi) can be positive or negative
 
              if (-0.5*dt*fsum(idendtdissi) > vxyzu(4,i)) print*,'conductivity turns it negative',i,vxyzu(4,i)
 

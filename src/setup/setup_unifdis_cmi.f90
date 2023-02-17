@@ -72,7 +72,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  character(len=20), intent(in)    :: fileprefix
  real,              intent(out)   :: vxyzu(:,:)
  character(len=100) :: filename,infilename,temp_ans
- integer, parameter :: maxrow = 1000000
+ integer, parameter :: maxrow = 1E7
  real    :: xyzh_raw(4,maxrow)
  real    :: vol_box,boxlength,boxsize_fromfile,boxsize_toscale,deltax
  real    :: totmass,temp,pmass_cgs,rhozero_cgs,cs0_cgs,u0,u0_cgs,tmax_cgs,dtmax_cgs
@@ -128,7 +128,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        !
        ! Get glass file
        !
-       glass_filename = 'glassCube_64.dat'
+       glass_filename = 'glassCube_128.dat'
        call prompt('Enter filename of glass cube',glass_filename)
        glass_filename = trim(adjustl(glass_filename))
     endif
@@ -153,8 +153,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Set timestep and end-time
     !
-    dtmax_cgs = 3.15360E8 ! 1E-5 Myr
-    tmax_cgs  = 1.26144E12 ! 0.04  Myr
+    dtmax_cgs = 3.15360E9  ! 1E-4 Myr
+    tmax_cgs  = 4.41504E12 ! 0.14  Myr
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)
@@ -209,7 +209,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Find total number of particles (entries in glass file)
     !
-    open(3000,file='glassCube_64.dat',status='old',iostat=io_file)
+    open(3000,file=glass_filename,status='old',iostat=io_file)
     if (io_file < 0) call fatal('setup_unifdis_cmi','error opening glassfile')
     npart = 0
     do
@@ -313,10 +313,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  ieos      = 2     ! adiabatic eos
  nout      = 10
  nfulldump = 1
- Tfloor    = -1E3 !3.  ! testing
+ Tfloor    = 3.
  ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
  icooling  = 0
- alphau    = 0.1
+ alphau    = 1.0
  ipdv_heating   = 1
  ishock_heating = 1
 

@@ -582,6 +582,9 @@ subroutine evol(infile,logfile,evfile,dumpfile)
     !--Write out log file prematurely (if requested based upon nstep, walltime)
     if ( summary_printnow() ) call summary_printout(iprint,nptmass)
 
+    !
+    ! ???
+    !
     inquire(file='egg.txt',exist=iexist)
     if (iexist .and. .not.egged) then
        call bring_the_egg
