@@ -109,6 +109,7 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
  real(kind=4)                :: t1,tcpu1,tlast,tcpulast
 
  integer :: ip  !! testing
+ real :: u_mean,u_mean_new
 
  t1    = 0.
  tcpu1 = 0.
@@ -147,6 +148,7 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
  call photo_ionize(vxyzu,npart)
 #endif
 
+
 !
 ! calculate density by direct summation
 !
@@ -163,6 +165,7 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
     set_boundaries_to_active = .false.     ! boundary particles are no longer treated as active
     call do_timing('dens',tlast,tcpulast)
  endif
+
 
 #ifdef GR
  call cons2primall(npart,xyzh,metrics,pxyzu,vxyzu,dens,eos_vars)
@@ -208,29 +211,6 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
 #ifdef SINK_RADIATION
  !compute dust temperature
  if (maxvxyzu >= 4) call get_dust_temperature_from_ptmass(npart,xyzh,nptmass,xyzmh_ptmass,dust_temp)
-#endif
-
-
-#ifdef PHOTOION
- !- checking
- print*,'icall',icall
- do ip = 1,npart
-    if (vxyzu(4,ip) < 0.) then
-       print*,'icall; negative u in deriv before cmi',icall,ip,vxyzu(4,ip)
-       exit
-    endif
- enddo
- !- Determine the ionizing sources at current timestep
- call set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
- !- Inject photoionization - calling CMacIonize
- call release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
- !- checking
- do ip = 1,npart
-    if (vxyzu(4,ip) < 0.) then
-       print*,'icall; negative u in deriv after cmi',icall,ip,vxyzu(4,ip)
-       exit
-    endif
- enddo
 #endif
 
 !

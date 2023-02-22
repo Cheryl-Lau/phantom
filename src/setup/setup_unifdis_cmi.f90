@@ -316,7 +316,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  Tfloor    = 3.
  ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
  icooling  = 0
- alphau    = 1.0
+ alphau    = 0.
  ipdv_heating   = 1
  ishock_heating = 1
 

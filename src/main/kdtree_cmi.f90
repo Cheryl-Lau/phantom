@@ -192,6 +192,7 @@ subroutine extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
 
 end subroutine extract_cminodes_from_tree
 
+
 real function mag2(vec)
  real, intent(in) :: vec(3)
 

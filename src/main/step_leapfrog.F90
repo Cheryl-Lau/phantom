@@ -131,6 +131,10 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
  use timing,         only:increment_timer,get_timings
  use derivutils,     only:timer_extf
  use growth,         only:check_dustprop
+#ifdef PHOTOION
+  use photoionize_cmi, only:set_ionizing_source_cmi,release_ionizing_radiation_cmi   !- testing
+  use part,            only:nptmass,xyzmh_ptmass
+#endif
  integer, intent(inout) :: npart
  integer, intent(in)    :: nactive
  real,    intent(in)    :: t,dtsph
@@ -151,6 +155,11 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
 #endif
  integer, parameter :: maxits = 30
  logical            :: converged,store_itype
+
+
+ integer :: ip  !! testing
+ real :: u_mean,u_mean_new
+
 !
 ! set initial quantities
 !
@@ -439,6 +448,43 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
     call decrease_dtmax(npart,maxbins,timei-dtsph,dtmax_ifactor,dtmax,ibin,ibin_wake,ibin_sts,ibin_dts)
  endif
 #endif
+
+
+#ifdef PHOTOION
+  !- checking
+ ! print*,'icall',icall
+ ! if (icall == 1 .or. icall == 2) then
+     u_mean = 0.
+     do ip = 1,npart
+        if (vxyzu(4,ip) < 0.) then
+           print*,'icall; negative u in deriv before cmi',ip,vxyzu(4,ip)
+           exit
+        endif
+        u_mean = u_mean + vxyzu(4,ip)
+     enddo
+     u_mean = u_mean/npart
+
+     !- Determine the ionizing sources at current timestep
+     call set_ionizing_source_cmi(timei,nptmass,xyzmh_ptmass)
+     !- Inject photoionization - calling CMacIonize
+     call release_ionizing_radiation_cmi(timei,npart,xyzh,vxyzu)
+     !- checking
+     u_mean_new = 0.
+     do ip = 1,npart
+        if (vxyzu(4,ip) < 0.) then
+           print*,'icall; negative u in deriv after cmi',ip,vxyzu(4,ip)
+           exit
+        endif
+        u_mean_new = u_mean_new + vxyzu(4,ip)
+     enddo
+     u_mean_new = u_mean_new/npart
+
+     print*,'change in u: ',u_mean,u_mean_new
+     if (u_mean_new <= u_mean) print*,'not heated at all!! '
+!  endif
+#endif
+
+
 !
 !-------------------------------------------------------------------------
 !  leapfrog corrector step: most of the time we should not need to take
@@ -725,6 +771,7 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
 #ifdef GR
  call cons2primall(npart,xyzh,metrics,pxyzu,vxyzu,dens,eos_vars)
 #endif
+
 
  return
 end subroutine step

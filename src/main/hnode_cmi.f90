@@ -203,8 +203,8 @@ subroutine hnode_bisection(node,icminode,pos_na,size_na,ncminode,nnodeneigh,list
  converged = .false.
  ierr  = 0
  niter = 0
- hmin  = hfact_node*0.7*size_na   !- Init search range
- hmax  = hfact_node*5.*size_na
+ hmin  = hfact_node*1E-2*size_na   !- Init search range
+ hmax  = hfact_node*1E2*size_na
 
  do while (.not.converged)
     !- Eval func at hmin
@@ -237,7 +237,7 @@ subroutine hnode_bisection(node,icminode,pos_na,size_na,ncminode,nnodeneigh,list
        endif
     endif
     niter = niter + 1
-    if (niter > 100) exit
+    if (niter > 500) exit
  enddo
  if (.not.converged) ierr = 1
 

@@ -80,8 +80,8 @@ module photoionize_cmi
 
  ! Options for extracting cmi-nodes from kdtree
  real,    public :: tree_accuracy_cmi = 0.1
- real,    public :: rcut_opennode = 0.10        ! in code units
- real,    public :: rcut_leafpart = 0.05        ! in code units
+ real,    public :: rcut_opennode = 0.2        ! in code units
+ real,    public :: rcut_leafpart = 0.1        ! in code units
  real,    public :: delta_rcut    = 0.01        ! in code units
  real,    public :: nHlimit_fac   = 80          ! ionization front resolution; recommend 40-80
  real,    public :: min_nodesize_toflag = 0.005  ! min node size as a fraction of root node
@@ -171,13 +171,12 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
     if (rcut_opennode < rcut_leafpart) call fatal('photoionize_cmi','rcut_leafpart must be &
                                                  & smaller than rcut_opennode')
     compilecond_ok = .false.
-#ifndef PERIODIC
 #ifndef MPI
+#ifndef PERIODIC
     compilecond_ok = .true.
 #endif
 #endif
-    if (.not.compilecond_ok) call fatal('photoionize_cmi','current version does not support &
-                                       & MPI or PERIODIC')
+    if (.not.compilecond_ok) call fatal('photoionize_cmi','current version does not support MPI or PERIODIC')
  endif
 
  !- Convert cgs units to SI units
@@ -378,8 +377,16 @@ subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
  real,    allocatable   :: x(:),y(:),z(:),h(:),m(:),nH(:)
  integer :: ip,ip_cmi,npart_cmi,i,n,ipnode,isite,ncminode
  real    :: nH_part,nH_site
- real    :: u_ionized  ! testing
+ real    :: u_ionized,u_mean  ! testing
  character(len=50) :: xyzhmf_parts_filename,ifile_char
+
+ u_mean = 0.
+ do ip = 1,npart
+    u_mean = u_mean + vxyzu(4,ip)
+ enddo
+ u_mean = u_mean/npart
+! print*,'umean in photo_cmi',u_mean
+
 
  if (nphotosrc >= 1) then
     if (photoionize_tree) then
