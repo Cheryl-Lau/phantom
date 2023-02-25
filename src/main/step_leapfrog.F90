@@ -94,46 +94,45 @@ end subroutine init_step
 !+
 !------------------------------------------------------------
 subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
- use dim,            only:maxp,ndivcurlv,maxvxyzu,maxptmass,maxalpha,nalpha,h2chemistry,&
-                          use_dustgrowth,use_krome,gr
- use io,             only:iprint,fatal,iverbose,id,master,warning
- use options,        only:idamp,iexternalforce,use_dustfrac
- use part,           only:xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,Bevol,dBevol, &
-                          rad,drad,radprop,isdead_or_accreted,rhoh,dhdrho,&
-                          iphase,iamtype,massoftype,maxphase,igas,idust,mhd,&
-                          iamboundary,get_ntypes,npartoftype,&
-                          dustfrac,dustevol,ddustevol,eos_vars,alphaind,nptmass,&
-                          dustprop,ddustprop,dustproppred,ndustsmall,pxyzu,dens,metrics,ics
- use eos,            only:get_spsound
- use cooling,        only:cooling_implicit,ufloor
- use options,        only:avdecayconst,alpha,ieos,alphamax
- use deriv,          only:derivs
- use timestep,       only:dterr,bignumber,tolv
- use mpiutils,       only:reduceall_mpi
- use part,           only:nptmass,xyzmh_ptmass,vxyz_ptmass,fxyz_ptmass,ibin_wake
- use io_summary,     only:summary_printout,summary_variable,iosumtvi,iowake, &
-                          iosumflrp,iosumflrps,iosumflrc
+ use dim,             only:maxp,ndivcurlv,maxvxyzu,maxptmass,maxalpha,nalpha,h2chemistry,&
+                           use_dustgrowth,use_krome,gr
+ use io,              only:iprint,fatal,iverbose,id,master,warning
+ use options,         only:idamp,iexternalforce,use_dustfrac
+ use part,            only:xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,Bevol,dBevol, &
+                           rad,drad,radprop,isdead_or_accreted,rhoh,dhdrho,&
+                           iphase,iamtype,massoftype,maxphase,igas,idust,mhd,&
+                           iamboundary,get_ntypes,npartoftype,&
+                           dustfrac,dustevol,ddustevol,eos_vars,alphaind,nptmass,&
+                           dustprop,ddustprop,dustproppred,ndustsmall,pxyzu,dens,metrics,ics
+ use eos,             only:get_spsound
+ use cooling,         only:cooling_implicit,ufloor
+ use options,         only:avdecayconst,alpha,ieos,alphamax
+ use deriv,           only:derivs
+ use timestep,        only:dterr,bignumber,tolv
+ use mpiutils,        only:reduceall_mpi
+ use part,            only:nptmass,xyzmh_ptmass,vxyz_ptmass,fxyz_ptmass,ibin_wake
+ use io_summary,      only:summary_printout,summary_variable,iosumtvi,iowake, &
+                           iosumflrp,iosumflrps,iosumflrc
 #ifdef KROME
- use part,           only:gamma_chem
+ use part,            only:gamma_chem
 #endif
 #ifdef IND_TIMESTEPS
- use timestep,       only:dtmax,dtmax_ifactor,dtdiff
- use timestep_ind,   only:get_dt,nbinmax,decrease_dtmax,ibinnow
- use timestep_sts,   only:sts_get_dtau_next,use_sts,ibin_sts,sts_it_n
- use part,           only:ibin,ibin_old,twas,iactive
+ use timestep,        only:dtmax,dtmax_ifactor,dtdiff
+ use timestep_ind,    only:get_dt,nbinmax,decrease_dtmax,ibinnow
+ use timestep_sts,    only:sts_get_dtau_next,use_sts,ibin_sts,sts_it_n
+ use part,            only:ibin,ibin_old,twas,iactive
 #endif
 #ifdef GR
- use part,           only:metricderivs
- use metric_tools,   only:imet_minkowski,imetric
- use cons2prim,      only:cons2primall
- use extern_gr,      only:get_grforce_all
+ use part,            only:metricderivs
+ use metric_tools,    only:imet_minkowski,imetric
+ use cons2prim,       only:cons2primall
+ use extern_gr,       only:get_grforce_all
 #endif
- use timing,         only:increment_timer,get_timings
- use derivutils,     only:timer_extf
- use growth,         only:check_dustprop
+ use timing,          only:increment_timer,get_timings
+ use derivutils,      only:timer_extf
+ use growth,          only:check_dustprop
 #ifdef PHOTOION
-  use photoionize_cmi, only:set_ionizing_source_cmi,release_ionizing_radiation_cmi   !- testing
-  use part,            only:nptmass,xyzmh_ptmass
+ use photoionize_cmi, only:fxyzu_beforepred
 #endif
  integer, intent(inout) :: npart
  integer, intent(in)    :: nactive
@@ -155,10 +154,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
 #endif
  integer, parameter :: maxits = 30
  logical            :: converged,store_itype
-
-
- integer :: ip  !! testing
- real :: u_mean,u_mean_new
 
 !
 ! set initial quantities
@@ -186,14 +181,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
  store_itype = (maxphase==maxp .and. ntypes > 1)
  ialphaloc = 2
  nvfloorp  = 0
-
- !- checking
- do i = 1,npart
-    if (vxyzu(4,i) < 0.) then
-       print*,'negative u in step before first predictor',i,vxyzu(4,i)
-       exit
-    endif
- enddo
 
  !$omp parallel do default(none) &
  !$omp shared(npart,xyzh,vxyzu,fxyzu,iphase,hdtsph,store_itype) &
@@ -232,7 +219,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
        if (ufloor > 0.) then
           if (vxyzu(4,i) < ufloor) then
              vxyzu(4,i) = ufloor
-             print*,'ufloored',i,vxyzu(4,i)
              nvfloorp   = nvfloorp + 1
           endif
        endif
@@ -252,14 +238,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
  enddo predictor
  !omp end parallel do
  if (use_dustgrowth) call check_dustprop(npart,dustprop(1,:))
-
- !- checking
- do i = 1,npart
-    if (vxyzu(4,i) < 0.) then
-       print*,'negative u in step after first predictor',i,vxyzu(4,i)
-       exit
-    endif
- enddo
 
 !----------------------------------------------------------------------
 ! substepping with external and sink particle forces, using dtextforce
@@ -286,20 +264,19 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
  call get_timings(t2,tcpu2)
  call increment_timer(timer_extf,t2-t1,tcpu2-tcpu1)
 
+
+#ifdef PHOTOION
+ !- Store current fxyzu; to be subtracted from heated-vpred after deriv to give heated-vxyzu
+ fxyzu_beforepred = fxyzu
+#endif
+
+
  timei = timei + dtsph
  nvfloorps  = 0
 !----------------------------------------------------
 ! interpolation of SPH quantities needed in the SPH
 ! force evaluations, using dtsph
 !----------------------------------------------------
-
- !- checking
- do i = 1,npart
-    if (vxyzu(4,i) < 0.) then
-       print*,'negative u in step before predict_sph',i,vxyzu(4,i)
-       exit
-    endif
- enddo
 
 !$omp parallel do default(none) schedule(guided,1) &
 !$omp shared(maxp,maxphase,maxalpha) &
@@ -362,7 +339,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
        if (ufloor > 0.) then
           if (vpred(4,i) < ufloor) then
              vpred(4,i) = ufloor
-             print*,'ufloored',i,vpred(4,i)
              nvfloorps  = nvfloorps + 1
           endif
        endif
@@ -408,14 +384,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
  !$omp end parallel do
  if (use_dustgrowth) call check_dustprop(npart,dustproppred(1,:))
 
- !- checking
- do i = 1,npart
-    if (vxyzu(4,i) < 0.) then
-       print*,'negative u in step after predict_sph',i,vxyzu(4,i)
-       exit
-    endif
- enddo
-
 !
 ! recalculate all SPH forces, and new timestep
 !
@@ -426,18 +394,37 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
     if (gr) vpred = vxyzu ! Need primitive utherm as a guess in cons2prim
     call derivs(1,npart,nactive,xyzh,vpred,fxyzu,fext,divcurlv,&
                 divcurlB,Bpred,dBevol,radpred,drad,radprop,dustproppred,ddustprop,&
-                dustpred,ddustevol,dustfrac,eos_vars,timei,dtsph,dtnew,&
-                ppred,dens,metrics)
+                dustpred,ddustevol,dustfrac,eos_vars,timei,dtsph,dtnew,ppred,dens,metrics)
     if (gr) vxyzu = vpred ! May need primitive variables elsewhere?
  endif
 
- !- checking
+!
+! Update vxyzu as well using the CMI-heated vpred returned from deriv
+!- BOTH vpred and vxyzu need to be updated by CMI-call such that the heating is effectively
+!  done immediately after substepping i.e. before predict_sph, but actually computed after
+!  the tree-build and density-iterate since photoionize_cmi routines require so.
+!
+#ifdef PHOTOION
+ !$omp parallel do default(none) shared(npart,vpred,vxyzu,xyzh,fxyzu_beforepred) &
+ !$omp shared(hdti) &
+#ifdef IND_TIMESTEPS
+ !$omp shared(twas,timei) &
+#else
+ !$omp shared(dtsph) &
+#endif
+ !$omp private(i)
  do i = 1,npart
-    if (vxyzu(4,i) < 0.) then
-       print*,'negative u in step after deriv(1)',i,vxyzu(4,i)
-       exit
+    if (.not.isdead_or_accreted(xyzh(4,i))) then
+#ifdef IND_TIMESTEPS
+       hdti = timei - twas(i)
+#else
+       hdti = 0.5*dtsph
+#endif
+       vxyzu(4,i) = vpred(4,i) - hdti * fxyzu_beforepred(4,i)
     endif
  enddo
+ !$omp end parallel do
+#endif
 
 !
 ! if using super-timestepping, determine what dt will be used on the next loop
@@ -448,42 +435,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
     call decrease_dtmax(npart,maxbins,timei-dtsph,dtmax_ifactor,dtmax,ibin,ibin_wake,ibin_sts,ibin_dts)
  endif
 #endif
-
-
-#ifdef PHOTOION
-  !- checking
- ! print*,'icall',icall
- ! if (icall == 1 .or. icall == 2) then
-     u_mean = 0.
-     do ip = 1,npart
-        if (vxyzu(4,ip) < 0.) then
-           print*,'icall; negative u in deriv before cmi',ip,vxyzu(4,ip)
-           exit
-        endif
-        u_mean = u_mean + vxyzu(4,ip)
-     enddo
-     u_mean = u_mean/npart
-
-     !- Determine the ionizing sources at current timestep
-     call set_ionizing_source_cmi(timei,nptmass,xyzmh_ptmass)
-     !- Inject photoionization - calling CMacIonize
-     call release_ionizing_radiation_cmi(timei,npart,xyzh,vxyzu)
-     !- checking
-     u_mean_new = 0.
-     do ip = 1,npart
-        if (vxyzu(4,ip) < 0.) then
-           print*,'icall; negative u in deriv after cmi',ip,vxyzu(4,ip)
-           exit
-        endif
-        u_mean_new = u_mean_new + vxyzu(4,ip)
-     enddo
-     u_mean_new = u_mean_new/npart
-
-     print*,'change in u: ',u_mean,u_mean_new
-     if (u_mean_new <= u_mean) print*,'not heated at all!! '
-!  endif
-#endif
-
 
 !
 !-------------------------------------------------------------------------
@@ -506,14 +457,6 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
     pmassi  = massoftype(igas)
     ntypes  = get_ntypes(npartoftype)
     store_itype = (maxphase==maxp .and. ntypes > 1)
-
-    !- checking
-    do i = 1,npart
-       if (vxyzu(4,i) < 0.) then
-          print*,'negative u in step before leapfrog corrector step',i,vxyzu(4,i)
-          exit
-       endif
-    enddo
 
 !$omp parallel default(none) &
 !$omp shared(xyzh,vxyzu,vpred,fxyzu,npart,hdtsph,store_itype) &
@@ -1273,14 +1216,6 @@ subroutine step_extern(npart,ntypes,dtsph,dtextforce,xyzh,vxyzu,fext,fxyzu,time,
        dtextforcenew = min(dtextforcenew,C_force*dtf)
     endif
 
-    !- checking
-    do i = 1,npart
-       if (vxyzu(4,i) < 0.) then
-          print*,'negative u in step before substep predictor',i,vxyzu(4,i)
-          exit
-       endif
-    enddo
-
     !
     ! predictor step for sink-gas and external forces, also recompute sink-gas and external forces
     !
@@ -1457,14 +1392,6 @@ subroutine step_extern(npart,ntypes,dtsph,dtextforce,xyzh,vxyzu,fext,fxyzu,time,
     !$omp enddo
     !$omp end parallel
 
-    !- checking
-    do i = 1,npart
-       if (vxyzu(4,i) < 0.) then
-          print*,'negative u in step after substep predictor',i,vxyzu(4,i)
-          exit
-       endif
-    enddo
-
     if (nptmass > 0 .and. isink_radiation > 0) then
        call get_rad_accel_from_ptmass(nptmass,npart,xyzh,xyzmh_ptmass,fext)
        fextx = fextx + fextrad(1)
@@ -1498,14 +1425,6 @@ subroutine step_extern(npart,ntypes,dtsph,dtextforce,xyzh,vxyzu,fext,fxyzu,time,
     naccreted    = 0
     ibin_wakei   = 0
     dptmass(:,:) = 0.
-
-    !- checking
-    do i = 1,npart
-       if (vxyzu(4,i) < 0.) then
-          print*,'negative u in step before substep accreteloop',i,vxyzu(4,i)
-          exit
-       endif
-    enddo
 
     !$omp parallel default(none) &
     !$omp shared(maxp,maxphase) &
@@ -1567,14 +1486,6 @@ subroutine step_extern(npart,ntypes,dtsph,dtextforce,xyzh,vxyzu,fext,fxyzu,time,
     enddo accreteloop
     !$omp enddo
     !$omp end parallel
-
-    !- checking
-    do i = 1,npart
-       if (vxyzu(4,i) < 0.) then
-          print*,'negative u in step after substep accreteloop',i,vxyzu(4,i)
-          exit
-       endif
-    enddo
 
     !
     ! reduction of sink particle changes across MPI

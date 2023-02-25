@@ -51,7 +51,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use io,           only:master,fatal,warning
  use unifdis,      only:set_unifdis
  use boundary,     only:xmin,ymin,zmin,xmax,ymax,zmax,dxbound,dybound,dzbound,set_boundary
- use part,         only:periodic,abundance
+ use part,         only:periodic
  use part,         only:set_particle_type,igas
  use physcon,      only:pi,mass_proton_cgs,kboltz,years,pc,solarm,micron
  use units,        only:set_units,unit_density,unit_velocity,unit_ergg,utime,select_unit
@@ -71,14 +71,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real,              intent(inout) :: time
  character(len=20), intent(in)    :: fileprefix
  real,              intent(out)   :: vxyzu(:,:)
- character(len=100) :: filename,infilename,temp_ans
+ character(len=100) :: filename,temp_ans
  integer, parameter :: maxrow = 1E7
  real    :: xyzh_raw(4,maxrow)
  real    :: vol_box,boxlength,boxsize_fromfile,boxsize_toscale,deltax
  real    :: totmass,temp,pmass_cgs,rhozero_cgs,cs0_cgs,u0,u0_cgs,tmax_cgs,dtmax_cgs
  real    :: xmini,xmaxi,ymini,ymaxi,zmini,zmaxi
  integer :: i,ierr,io_file,ix,npmax
- logical :: iexist,in_iexist
+ logical :: iexist
 
  !
  !--general parameters
@@ -154,7 +154,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set timestep and end-time
     !
     dtmax_cgs = 3.15360E9  ! 1E-4 Myr
-    tmax_cgs  = 4.41504E12 ! 0.14  Myr
+    tmax_cgs  = 4.41504E12 ! 0.14 Myr
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)
@@ -316,7 +316,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  Tfloor    = 3.
  ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
  icooling  = 0
- alphau    = 0.
+ alphau    = 1.0
  ipdv_heating   = 1
  ishock_heating = 1
 

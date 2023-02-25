@@ -63,16 +63,16 @@ module photoionize_cmi
  logical, public :: sink_ionsrc = .false.
  real,    public :: masscrit_ionize = 7.  ! in code units
  !- or
- ! Manually set location and starting/ending time of ionizing sources
+ ! Manually set location, starting/ending time and luminosity [s^-1] of ionizing sources
  integer, public, parameter :: nsetphotosrc = 1
- real,    public :: xyzt_setphotosrc(5,nsetphotosrc) = reshape((/0.,0.,0.,1E-50,1E50 /),&
-                                                               shape=(/5,nsetphotosrc/))
+ real,    public :: xyztl_setphotosrc(6,nsetphotosrc) = reshape((/0.,0.,0.,1E-50,1E50,1E49 /),&
+                                                                shape=(/6,nsetphotosrc/))
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
  integer, public :: niter_mcrt = 10
  real,    public :: wavelength = 500     ! nm
  real,    public :: temp_hii   = 1E4     ! K
- real,    public :: tol_vsite  = 1E-9    ! in code units
+ real,    public :: tol_vsite  = 1E-2    ! in code units
  logical, public :: lloyd      = .true.
 
  ! Move grid-construction up the tree
@@ -80,13 +80,16 @@ module photoionize_cmi
 
  ! Options for extracting cmi-nodes from kdtree
  real,    public :: tree_accuracy_cmi = 0.1
- real,    public :: rcut_opennode = 0.2        ! in code units
- real,    public :: rcut_leafpart = 0.1        ! in code units
- real,    public :: delta_rcut    = 0.01        ! in code units
- real,    public :: nHlimit_fac   = 80          ! ionization front resolution; recommend 40-80
- real,    public :: min_nodesize_toflag = 0.005  ! min node size as a fraction of root node
+ real,    public :: rcut_opennode = 0.15        ! in code units
+ real,    public :: rcut_leafpart = 0.05        ! in code units
+ real,    public :: delta_rcut    = 0.05        ! in code units
+ real,    public :: nHlimit_fac   = 100         ! ionization front resolution; recommend 40-80
+ real,    public :: min_nodesize_toflag = 0.005 ! min node size as a fraction of root node
  logical, public :: auto_opennode = .true.
  logical, public :: auto_tree_acc = .false.
+
+ ! Stores the fxyzu from step_leapfrog after substep and before 2nd predictor step
+ real,    public,   allocatable   :: fxyzu_beforepred(:,:)
 
  private
 
@@ -112,19 +115,17 @@ module photoionize_cmi
  integer :: nsite_lastgrid
 
  integer, parameter :: maxoutfile_ult = 99999
- integer :: maxoutfile = 5000          !- max number of xyzhmnH output files
+ integer :: maxoutfile = 5000         !- max number of xyzhmnH output files
  integer :: ncall_writefile  = 10     !- interval to write xyzhmnH output file
  integer :: icall,iunit,ifile,iruncmi
  integer :: ncall_checktreewalk = 100
  real    :: xyz_photosrc_si(3,maxphotosrc),lumin_photosrc(maxphotosrc)
  real    :: tree_accuracy_cmi_old
- real    :: solarl_photonsec,freq_photon,u_hii,udist_si,umass_si
+ real    :: solarl_photonsec,freq_photon,u_hi,u_hii,udist_si,umass_si
  real    :: time0_wall,time0_cpu,time_now_wall,time_now_cpu
  real    :: time_ellapsed_wall,time_ellapsed_cpu
  logical :: first_call,warned
  logical :: print_cmi = .false.   ! Print CMI outputs to shell
-
- real :: u_hi ! testing
 
 contains
 
@@ -138,7 +139,7 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  use eos,      only:gmw,gamma
  use io,       only:warning,fatal
  use units,    only:udist,umass,unit_ergg
- use dim,      only:maxvxyzu
+ use dim,      only:maxvxyzu,maxp_hard
  use omp_lib
  integer, intent(in) :: npart
  real,    intent(in) :: xyzh(:,:)
@@ -189,7 +190,7 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  call allocate_cmi_inputs_history
  call reset_cmi_inputs_history
 
- ! Init array to store memory for tree-walk
+ !- Init array to store memory for tree-walk
  nnextopen = 0
  nnextopen_updatewalk = 0
  do inode = 1,maxnode_open
@@ -197,6 +198,14 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
     nxyzrs_nextopen_updatewalk(1:6,inode) = (/ 0.,0.,0.,0.,0.,0. /)
  enddo
  tree_accuracy_cmi_old = tree_accuracy_cmi
+
+ !- Init array to store vxyzu before predictor in stepping
+ !$omp parallel do default(none) shared(fxyzu_beforepred) &
+ !$omp private(ip)
+ do ip = 1,maxp_hard
+    fxyzu_beforepred(1:4,ip) = (/ 0.,0.,0.,0. /)
+ enddo
+ !$omp end parallel do
 
  !- Internal energy u of ionized particles
  gmw0 = gmw
@@ -231,7 +240,7 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
 
  if (photoionize_tree) then
     !- Set starting val of ifile by finding the last nixyzhmf_* saved
-    ifile_search = 1000
+    ifile_search = maxoutfile
     lastfile_found = .false.
     do while (.not.lastfile_found)
        write(ifile_search_char,'(i5.5)') ifile_search
@@ -250,7 +259,7 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
     print*,'Start with file nixyzhmf_',ifile
  else
     !- Set starting val of ifile by finding the last xyzhmf_* saved
-    ifile_search = 1000
+    ifile_search = maxoutfile
     lastfile_found = .false.
     do while (.not.lastfile_found)
        write(ifile_search_char,'(i5.5)') ifile_search
@@ -320,16 +329,14 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
     enddo
  elseif (.not.sink_ionsrc) then !- Check time
     do isrc = 1,nsetphotosrc
-       time_startsrc = xyzt_setphotosrc(4,isrc)
-       time_endsrc   = xyzt_setphotosrc(5,isrc)
+       time_startsrc = xyztl_setphotosrc(4,isrc)
+       time_endsrc   = xyztl_setphotosrc(5,isrc)
        if (time > time_startsrc .and. time < time_endsrc) then
           nphotosrc = nphotosrc + 1
           if (nphotosrc > maxphotosrc) call fatal('photoionize_cmi','number of sources &
                                                  & exceeded maxphotosrc')
-          xyz_photosrc(1:3,nphotosrc) = xyzt_setphotosrc(1:3,isrc)
-          !- Assume fixed luminosity
-          mass_8solarm = (8.*solarm)/umass
-          lumin_photosrc(nphotosrc) = get_lumin(mass_8solarm)
+          xyz_photosrc(1:3,nphotosrc) = xyztl_setphotosrc(1:3,isrc)
+          lumin_photosrc(nphotosrc)   = xyztl_setphotosrc(6,isrc)
        endif
     enddo
  endif
@@ -377,18 +384,13 @@ subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
  real,    allocatable   :: x(:),y(:),z(:),h(:),m(:),nH(:)
  integer :: ip,ip_cmi,npart_cmi,i,n,ipnode,isite,ncminode
  real    :: nH_part,nH_site
- real    :: u_ionized,u_mean  ! testing
+ real    :: u_ionized
  character(len=50) :: xyzhmf_parts_filename,ifile_char
 
- u_mean = 0.
- do ip = 1,npart
-    u_mean = u_mean + vxyzu(4,ip)
- enddo
- u_mean = u_mean/npart
-! print*,'umean in photo_cmi',u_mean
-
-
  if (nphotosrc >= 1) then
+    !
+    ! Pass tree nodes as pseudo-particles to CMI
+    !
     if (photoionize_tree) then
        !- Walk tree and run CMI
        call treewalk_run_cmi_iterate(time,xyzh,ncminode)
@@ -403,18 +405,16 @@ subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
              if (n /= 0 .and. i == 0) then !- is node
                 over_parts: do ipnode = inoderange(1,n),inoderange(2,n)
                    ip = abs(inodeparts(ipnode))
+!                   u_ionized = u_hii*(1.0-nH_site) + u_hi*nH_site
                    if (vxyzu(4,ip) < u_hii) then
                       vxyzu(4,ip) = u_hii
                    endif
-!                   u_ionized = u_hii*(1.0-nH_site) + u_hi*nH_site
-!                   if (vxyzu(4,ip) < u_ionized) vxyzu(4,ip) = u_ionized
                 enddo over_parts
              elseif (n == 0 .and. i /= 0) then !- is particle
+!                u_ionized = u_hii*(1.0-nH_site) + u_hi*nH_site
                 if (vxyzu(4,i) < u_hii) then
                    vxyzu(4,i) = u_hii
                 endif
-!                u_ionized = u_hii*(1.0-nH_site) + u_hi*nH_site
-!                if (vxyzu(4,i) < u_ionized) vxyzu(4,i) = u_ionized
              else
                 call fatal('photoionize_cmi','unidentified site')
              endif
@@ -422,7 +422,10 @@ subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
        enddo over_entries
        call reset_cminode
 
-    else ! Pass all particles to grid-construction and density mapping
+    else
+       !
+       ! Pass all particles to grid-construction and density mapping
+       !
        call allocate_cmi_inoutputs(x,y,z,h,m,nH)
        npart_cmi = 0
        do ip = 1,npart
@@ -445,6 +448,7 @@ subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
              nH_part = nH(ip_cmi)
              if (nH_part < 0.) call fatal('photoionize_cmi','invalid nH')
              if (nH_part < 0.5) then
+!                u_ionized = u_hii*(1.0-nH_part) + u_hi*nH_part
                 if (vxyzu(4,ip) < u_hii) then
                    vxyzu(4,ip) = u_hii
                 endif
@@ -452,9 +456,10 @@ subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
           endif
        enddo
        if (ip_cmi /= npart_cmi) call fatal('photoionize_cmi','number of particles &
-         & passed to and from CMI do not match')
-
-       !- Write xyzhmf of particle to a snapshot file
+                                                            & passed to and from CMI do not match')
+       !
+       ! Write xyzhmf of particle to a snapshot file
+       !
        if (iunit < maxoutfile) then
           if (mod(iruncmi,ncall_writefile) == 0) then
              write(ifile_char,'(i5.5)') ifile
@@ -481,13 +486,14 @@ subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
              warned = .true.
           endif
        endif
-
        call deallocate_cmi_inoutputs(x,y,z,h,m,nH)
     endif
 
     iruncmi = iruncmi + 1
 
-    !- Time the simulations
+    !
+    ! Time the simulations
+    !
     call cpu_time(time_now_cpu)
     time_now_wall = omp_get_wtime()
     time_ellapsed_wall = time_now_wall - time0_wall
@@ -538,7 +544,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
     icall = icall + 1
     if (icall == ncall_checktreewalk) then
        if (nnextopen_updatewalk > 0) then
-          call remove_unnecessary_opennode(nHlimit_fac,ncminode,min_nodesize_toflag)
+!          call remove_unnecessary_opennode(nHlimit_fac,ncminode,min_nodesize_toflag)
        endif
        icall = 0
     endif
@@ -643,7 +649,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
                    !- Store to nnode_needopen for next iteration
                    nneedopen = nneedopen + 1
                    if (nneedopen > maxnode_open) call fatal('photoionize_cmi','too many nodes &
-                                                 need to be resolved')
+                                                             need to be resolved')
                    nnode_needopen(nneedopen) = n
                    node_checks_passed = .false.
 
@@ -827,10 +833,10 @@ subroutine collect_and_combine_cminodes(ncminode,nleafparts,ncloseleaf)
 
  !- Add leaf-particles onto the list and extend ncminode
  over_parts: do ip = 1,nleafparts
-   ncminode = ncminode + 1
-   if (ncminode > maxcminode) call fatal('photoionize_cmi','number of nodes+particles exceeded maxcminode')
-   nixyzhmf_cminode(1,ncminode)   = 0
-   nixyzhmf_cminode(2:7,ncminode) = ixyzhm_leafparts(1:6,ip)
+    ncminode = ncminode + 1
+    if (ncminode > maxcminode) call fatal('photoionize_cmi','number of nodes+particles exceeded maxcminode')
+    nixyzhmf_cminode(1,ncminode)   = 0
+    nixyzhmf_cminode(2:7,ncminode) = ixyzhm_leafparts(1:6,ip)
  enddo over_parts
 
  write(*,'(2x,a33,i8)') 'Total number of pseudo-particles:',ncminode
@@ -858,6 +864,7 @@ end subroutine collect_and_combine_cminodes
 ! Check all nodes which were previously opened to resolve into the ionization front;
 ! If they are no longer heavily ionized [determine this with the currrent nixyzhmf_cminode],
 ! move the tree back up by removing entries in nxyzrs_nextopen(_updatewalk).
+!!!!!!!!!!!! NEED TO TEST THIS !!!!!!!!!!!!!!!!!!
 !+
 !----------------------------------------------------------------
 subroutine remove_unnecessary_opennode(nHlimit_fac,ncminode,min_nodesize_toflag)
@@ -871,7 +878,7 @@ subroutine remove_unnecessary_opennode(nHlimit_fac,ncminode,min_nodesize_toflag)
  real    :: nH,size,nH_limit,nHlimit_fac_rev
 
  nnextopen_old = nnextopen
- call allocate_array('nHmin',nHmin,nnextopen_old )
+ call allocate_array('nHmin',nHmin,nnextopen_old)
  !
  ! Find the lowest nH in each of the stored regions in nxyzrs_nextopen (which can overlap)
  !
@@ -1171,6 +1178,7 @@ end subroutine write_cmi_infiles
 !-----------------------------------------------------------------------
 subroutine allocate_cminode
  use allocutils, only:allocate_array
+ use dim,        only:maxp_hard
 
  call allocate_array('nxyzm_treetocmi',nxyzm_treetocmi,5,maxcminode+1)
  call allocate_array('h_solvertocmi',h_solvertocmi,maxcminode+1)
@@ -1180,6 +1188,7 @@ subroutine allocate_cminode
  call allocate_array('nnode_needopen',nnode_needopen,maxnode_open)
  call allocate_array('nxyzrs_nextopen',nxyzrs_nextopen,6,maxnode_open)
  call allocate_array('nxyzrs_nextopen_updatewalk',nxyzrs_nextopen_updatewalk,6,maxnode_open)
+ call allocate_array('fxyzu_beforepred',fxyzu_beforepred,4,maxp_hard)
 
 end subroutine allocate_cminode
 

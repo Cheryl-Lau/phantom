@@ -148,7 +148,6 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
  call photo_ionize(vxyzu,npart)
 #endif
 
-
 !
 ! calculate density by direct summation
 !
@@ -166,20 +165,44 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
     call do_timing('dens',tlast,tcpulast)
  endif
 
+#ifdef PHOTOION
+ !- checking
+ print*,'icall',icall
+ if (icall == 1 .or. icall == 0) then
+    u_mean = 0.
+    do ip = 1,npart
+       if (vxyzu(4,ip) < 0.) then
+          print*,'icall; negative u in deriv before cmi',ip,vxyzu(4,ip)
+          exit
+       endif
+       u_mean = u_mean + vxyzu(4,ip)
+    enddo
+    u_mean = u_mean/npart
+
+    !- Determine the ionizing sources at current timestep
+    call set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
+    !- Inject photoionization - calling CMacIonize
+    call release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
+
+    !- checking
+    u_mean_new = 0.
+    do ip = 1,npart
+       if (vxyzu(4,ip) < 0.) then
+          print*,'icall; negative u in deriv after cmi',ip,vxyzu(4,ip)
+          exit
+       endif
+       u_mean_new = u_mean_new + vxyzu(4,ip)
+    enddo
+    u_mean_new = u_mean_new/npart
+    print*,'change in u: ',u_mean,u_mean_new
+ endif
+#endif
 
 #ifdef GR
  call cons2primall(npart,xyzh,metrics,pxyzu,vxyzu,dens,eos_vars)
 #else
  call cons2prim_everything(npart,xyzh,vxyzu,dvdx,rad,eos_vars,radprop,gamma_chem,Bevol,Bxyz,dustevol,dustfrac,alphaind)
 #endif
-
- !- checking
- do ip = 1,npart
-   if (vxyzu(4,ip) < 0.) then
-      print*,'icall; negative u in deriv after cons2prim_everything',icall,ip,vxyzu(4,ip)
-      exit
-   endif
- enddo
 
 !
 ! compute forces
@@ -194,14 +217,6 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
             rad,drad,radprop,dustprop,dustgasprop,dustfrac,ddustevol,&
             ipart_rhomax,dt,stressmax,eos_vars,dens,metrics)
  call do_timing('force',tlast,tcpulast)
-
- !- checking
- do ip = 1,npart
-   if (vxyzu(4,ip) < 0.) then
-      print*,'icall; negative u in deriv after force',icall,ip,vxyzu(4,ip)
-      exit
-   endif
- enddo
 
 #ifdef DUSTGROWTH
  ! compute growth rate of dust particles

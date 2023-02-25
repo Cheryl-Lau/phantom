@@ -30,7 +30,7 @@ module easter_egg
 
  contains
 
- subroutine bring_the_egg()
+ subroutine bring_the_egg
   integer, allocatable :: grid_real(:,:),grid_mask(:,:)
   integer, allocatable :: grid_mem(:,:,:)
   integer :: ndim,idir,iter,istore
@@ -114,8 +114,8 @@ module easter_egg
   if (len(trim(adjustl(ndim_in))) == 0) then
      ndim = 4
   else
- 	  read(ndim_in,*) ndim
- 	  ndim = max(ndim,3)
+     read(ndim_in,*) ndim
+     ndim = max(ndim,3)
      ndim = min(ndim,5)
   endif
   allocate(grid_real(ndim,ndim))
@@ -123,8 +123,8 @@ module easter_egg
   allocate(grid_mem(2,ndim,ndim))
   do i = 1,ndim
      do j = 1,ndim
-	     grid_real(i,j) = -1
-	  enddo
+        grid_real(i,j) = -1
+     enddo
   enddo
   call add_extra(ndim,grid_real)
 
@@ -199,11 +199,11 @@ module easter_egg
  subroutine add_extra(ndim,grid)
   use random, only:ran2
   use io,     only:fatal
-  integer, intent(in)	 :: ndim
+  integer, intent(in)    :: ndim
   integer, intent(inout) :: grid(ndim,ndim)
   integer :: num_to_add,niter,i,j
-  real 	 :: rani,ranj,prob
-  real	 :: probof2 = 0.9
+  real    :: rani,ranj,prob
+  real    :: probof2 = 0.9
   logical :: got_it
 
   niter = 0
@@ -211,19 +211,19 @@ module easter_egg
   do while (.not.got_it)
      rani = ran2(iseed)
      ranj = ran2(iseed)
-	  i = floor(rani*ndim)+1
-	  j = floor(ranj*ndim)+1
-	  i = min(i,ndim)
-	  j = min(j,ndim)
-	  if (grid(i,j) == -1) then
+     i = floor(rani*ndim)+1
+     j = floor(ranj*ndim)+1
+     i = min(i,ndim)
+     j = min(j,ndim)
+     if (grid(i,j) == -1) then
         prob = ran2(iseed)
-		  num_to_add = 4
-		  if (prob < probof2) num_to_add = 2
-		  grid(i,j) = num_to_add
-		  got_it = .true.
-	  endif
-	  niter = niter + 1
-	  if (niter > 100) call fatal('egg.f90','broken egg :( ')
+        num_to_add = 4
+        if (prob < probof2) num_to_add = 2
+        grid(i,j) = num_to_add
+        got_it = .true.
+     endif
+     niter = niter + 1
+     if (niter > 100) call fatal('egg.f90','broken egg :( ')
   enddo
 
  end subroutine add_extra

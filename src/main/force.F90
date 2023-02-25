@@ -2523,10 +2523,12 @@ subroutine finish_cell_and_store_results(icall,cell,fxyzu,xyzh,vxyzu,poten,dt,dv
  integer               :: ii,ia,ib,ic,ierror
  integer               :: in,ipartnocool
 
- real, parameter :: vsmall = epsilon(vsmall)    !!! for checking dtcool
  real, parameter :: dlog2 = 1.4426950408889634d0
- real :: distvec(3),dist
+ real    :: distvec(3),dist
  integer :: ibinnew
+
+ real    :: vsmall   !- for checking dtcool
+
 
  eni = 0.
  realviscosity = (irealvisc > 0)
@@ -2866,16 +2868,16 @@ subroutine finish_cell_and_store_results(icall,cell,fxyzu,xyzh,vxyzu,poten,dt,dv
        ! cooling timestep dt < fac*u/(du/dt)
        if (maxvxyzu >= 4 .and. .not.gr) then
 
-!          Try: only consider contributions from cooling and not heating
-!          if (eni + dtc*fxyzu(4,i) < epsilon(0.) .and. eni > epsilon(0.)) dtcool = C_cool*abs(eni/fxyzu(4,i))
-          if (abs(fxyzu(4,i)) > epsilon(0.) .and. eni > epsilon(0.)) dtcool = C_cool*abs(eni/fxyzu(4,i))
+          if (abs(fxyzu(4,i)) > epsilon(0.) .and. eni > epsilon(0.)) then   ! original
+             dtcool = C_cool*abs(eni/fxyzu(4,i))
+          endif
 
-!          if (abs(fxyzu(4,i)) > epsilon(0.) .and. eni > epsilon(0.) .and. &
-!              abs(eni/fxyzu(4,i)) > 1./C_cool*dtmax/2**maxbins) then
-!              dtcool = C_cool*abs(eni/fxyzu(4,i))
+          !- Try: only consider contributions from cooling and not heating
+!          if (eni + dtc*fxyzu(4,i) < epsilon(0.) .and. eni > epsilon(0.)) then
+!             dtcool = C_cool*abs(eni/fxyzu(4,i))
 !          endif
 
-          !!!! To test dtcool !!!
+          !- Catch particles with dtcool above ind. timestep maxbin
           ibinnew = max(int(log(2.*dtmax/dtcool)*dlog2-epsilon(vsmall)),0)
           if (ibinnew > 30) then
              nexceedmaxbin = nexceedmaxbin + 1
