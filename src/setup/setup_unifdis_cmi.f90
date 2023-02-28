@@ -7,17 +7,23 @@
 module setup
 !
 ! Setup routine for uniform distribution in StarBench test
+!- Particle positions can be done through importing a glass cube (specifying xyzh)
+!- or calling setup_unifdis
 !
 ! :References: None
 !
 ! :Owner: Cheryl Lau
 !
 ! :Runtime parameters:
-!   - dist_unit   : *distance unit (e.g. au)*
-!   - mass_unit   : *mass unit (e.g. solarm)*
-!   - npart       : *number of particles (if not using glass)*
-!   - pmass       :: *particle mass in code units*
-!   - cs0         : *initial sound speed in code units*
+!   - dist_unit      : *distance unit (e.g. au)*
+!   - mass_unit      : *mass unit (e.g. solarm)*
+!   - np_req         : *requested number of particles (if not using glass)*
+!   - pmass          : *particle mass in code units*
+!   - rhozero        : *density of box in code units*
+!   - cs0            : *initial sound speed in code units*
+!   - tmax           : *end time of simulation in code units*
+!   - dtmax          : *maximum timestep of simulation in code units*
+!   - glass_filename : *filename of glass cube to be imported*
 !
 ! :Dependencies: boundary, dim, domain, eos, infile_utils, io, options, part,
 !   physcon, prompting, setup_params, timestep, unifdis, units
@@ -30,7 +36,7 @@ module setup
 
  private
 
- integer :: np
+ integer :: np_req
  real    :: pmass,cs0
  real(kind=8)       :: udist,umass
  character(len=20)  :: dist_unit,mass_unit
@@ -39,7 +45,6 @@ module setup
  logical :: use_glass = .true.
 
 contains
-
 !----------------------------------------------------------------
 !+
 !  setup for uniform particle distributions
@@ -47,16 +52,14 @@ contains
 !----------------------------------------------------------------
 subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,time,fileprefix)
  use dim,          only:maxvxyzu
- use setup_params, only:npart_total
  use io,           only:master,fatal,warning
- use unifdis,      only:set_unifdis
- use boundary,     only:xmin,ymin,zmin,xmax,ymax,zmax,dxbound,dybound,dzbound,set_boundary
- use part,         only:periodic
+ use boundary,     only:xmin,ymin,zmin,xmax,ymax,zmax,set_boundary
  use part,         only:set_particle_type,igas
  use physcon,      only:pi,mass_proton_cgs,kboltz,years,pc,solarm,micron
  use units,        only:set_units,unit_density,unit_velocity,unit_ergg,utime,select_unit
- use domain,       only:i_belong
  use eos,          only:gmw,ieos
+ use part,         only:periodic
+ use unifdis,      only:set_unifdis
  use options,      only:alpha,alphau,nfulldump,icooling,ipdv_heating,ishock_heating
  use cooling,      only:ufloor,Tfloor
  use timestep,     only:nout
@@ -71,13 +74,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real,              intent(inout) :: time
  character(len=20), intent(in)    :: fileprefix
  real,              intent(out)   :: vxyzu(:,:)
- character(len=100) :: filename,temp_ans
+ character(len=100) :: filename,temp_ans,dens_ans
  integer, parameter :: maxrow = 1E7
  real    :: xyzh_raw(4,maxrow)
  real    :: vol_box,boxlength,boxsize_fromfile,boxsize_toscale,deltax
- real    :: totmass,temp,pmass_cgs,rhozero_cgs,cs0_cgs,u0,u0_cgs,tmax_cgs,dtmax_cgs
+ real    :: boxsize_setunifdis,boxsize_sample,rho_sample,rho_sample_cgs,rho_fracdiff
+ real    :: totmass,totmass_req,temp,pmass_cgs,rhozero_cgs,cs0_cgs,u0,u0_cgs,tmax_cgs,dtmax_cgs
  real    :: xmini,xmaxi,ymini,ymaxi,zmini,zmaxi
- integer :: i,ierr,io_file,ix,npmax
+ integer :: i,ierr,io_file,ix,npmax,npart_sample
  logical :: iexist
 
  !
@@ -118,12 +122,12 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
     if (.not.use_glass) then
        !
-       ! Set number of particles
+       ! Set number of particles (to be updated after set_unifdis)
        !
-       npmax = int(2.0/3.0*size(xyzh(1,:))) ! approx max number allowed in sphere given size(xyzh(1,:))
-       np = 1E6
-       call prompt('Enter total number of particles',np,1)
-       if (np > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
+       npmax = int(2.0/3.0*size(xyzh(1,:)))
+       np_req = 2E6
+       call prompt('Enter total number of particles',np_req,1)
+       if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
     else
        !
        ! Get glass file
@@ -175,32 +179,65 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  if (.not.use_glass) then
     !
-    ! Calculate total mass required
+    ! Calculate total mass required with npart_requested
     !
-    totmass = np*pmass
+    totmass_req = np_req*pmass
     !
     ! Calculate volume needed
     !
+    vol_box   = totmass_req/rhozero
+    boxlength = vol_box**(1./3.)
+    xmini = -0.5*boxlength; xmaxi = 0.5*boxlength
+    ymini = -0.5*boxlength; ymaxi = 0.5*boxlength
+    zmini = -0.5*boxlength; zmaxi = 0.5*boxlength
+    !
+    ! Set particle distribution
+    !
+    npart = 0
+    deltax = (xmaxi-xmini)/np_req**(1./3.)
+    call set_unifdis('closepacked',id,master,xmini,xmaxi,ymini,ymaxi,zmini,zmaxi,deltax,hfact,&
+                     npart,xyzh_raw,periodic)
+    !
+    ! Update totmass with the new npart
+    !
+    totmass = npart*pmass
+    !
+    ! Update box volume
+    !
     vol_box   = totmass/rhozero
     boxlength = vol_box**(1./3.)
+    !
+    ! Find box size of xyzh_raw from set_unifdis
+    !
+    boxsize_setunifdis = epsilon(boxsize_setunifdis)
+    do i = 1,npart
+       do ix = 1,3
+          boxsize_setunifdis = max(boxsize_setunifdis,abs(xyzh_raw(ix,i)))
+       enddo
+    enddo
+    boxsize_setunifdis = 2.*boxsize_setunifdis
+    boxsize_toscale = boxlength/boxsize_setunifdis
+    !
+    ! Scale xyzh to the required boxlength
+    !
+    do i = 1,npart
+       do ix = 1,4
+          xyzh(ix,i) = xyzh_raw(ix,i) * boxsize_toscale
+       enddo
+    enddo
+    !
+    ! Set boundaries
+    !
     xmini = -0.5*boxlength; xmaxi = 0.5*boxlength
     ymini = -0.5*boxlength; ymaxi = 0.5*boxlength
     zmini = -0.5*boxlength; zmaxi = 0.5*boxlength
     call set_boundary(xmini,xmaxi,ymini,ymaxi,zmini,zmaxi)
     !
-    ! Set particle distribution and update final npart
-    !
-    deltax = dxbound/(np**(1./3.))
-    npart = 0
-    npart_total = 0
-    call set_unifdis('closepacked',id,master,xmin,xmax,ymin,ymax,zmin,zmax,deltax,hfact,&
-                     npart,xyzh,periodic,nptot=npart_total,mask=i_belong)
-    !
     ! Set particle properties
     !
     npartoftype(:) = 0
     npartoftype(igas) = npart
-    massoftype(igas)  = totmass/npart_total
+    massoftype(igas)  = pmass
     do i = 1,npartoftype(igas)
        call set_particle_type(i,igas)
     enddo
@@ -241,12 +278,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     vol_box   = totmass/rhozero
     boxlength = vol_box**(1./3.)
-    xmini = -0.5*boxlength; xmaxi = 0.5*boxlength
-    ymini = -0.5*boxlength; ymaxi = 0.5*boxlength
-    zmini = -0.5*boxlength; zmaxi = 0.5*boxlength
-    call set_boundary(xmini,xmaxi,ymini,ymaxi,zmini,zmaxi)
     !
-    ! Read in glass file
+    ! Read in glass file and find its box size
     !
     rewind(3000)
     boxsize_fromfile = epsilon(boxsize_fromfile)
@@ -255,25 +288,70 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        boxsize_fromfile = max(boxsize_fromfile,abs(xyzh_raw(1,i)),abs(xyzh_raw(2,i)),abs(xyzh_raw(3,i)))
     enddo
     close(3000)
-
     !- catch NaN or 0.
     if (xyzh_raw(1,10) /= xyzh_raw(1,10) .or. xyzh_raw(1,100) == 0.) then
        call fatal('setup_unifdis_cmi','invalid xyzh imported from glass file')
     endif
 
-    boxsize_fromfile = 2.*boxsize_fromfile
-    if (boxsize_fromfile >= 1.) print*,'glass cube supposed to be within 1.?'
+    boxsize_fromfile = 2.*(boxsize_fromfile + epsilon(boxsize_fromfile))
     boxsize_toscale = boxlength/boxsize_fromfile
     !
     ! Scale positions to box size needed and assign them to particles
     !
     do i = 1,npart
        do ix = 1,4
-          xyzh(ix,i) = xyzh_raw(ix,i) * 0.5*boxsize_toscale
+          xyzh(ix,i) = xyzh_raw(ix,i) * boxsize_toscale
        enddo
     enddo
+    !
+    ! Set boundaries
+    !
+    xmini = -0.5*boxlength; xmaxi = 0.5*boxlength
+    ymini = -0.5*boxlength; ymaxi = 0.5*boxlength
+    zmini = -0.5*boxlength; zmaxi = 0.5*boxlength
+    call set_boundary(xmini,xmaxi,ymini,ymaxi,zmini,zmaxi)
  endif
 
+ !
+ ! Check that the density of xyzh matches the input rhozero_cgs
+ !
+ boxsize_sample = 1.5*xmaxi
+ npart_sample = 0
+ do i = 1,npart
+    if (xyzh(1,i) >= -0.5*boxsize_sample .and. xyzh(1,i) <= 0.5*boxsize_sample .and. &
+        xyzh(2,i) >= -0.5*boxsize_sample .and. xyzh(2,i) <= 0.5*boxsize_sample .and. &
+        xyzh(3,i) >= -0.5*boxsize_sample .and. xyzh(3,i) <= 0.5*boxsize_sample) then
+       npart_sample = npart_sample + 1
+    endif
+ enddo
+ if (npart_sample == 0) call fatal('setup_unifdis_cmi','no particles within sampling box')
+
+ rho_sample     = npart_sample*massoftype(igas) / boxsize_sample**3.
+ rho_sample_cgs = rho_sample*unit_density
+ rhozero_cgs    = rhozero*unit_density   !- re-define since it's not written to .setup file
+ print*,'required density:  ',rhozero_cgs,'g cm^-3'
+ print*,'density from xyzh: ',rho_sample_cgs,'g cm^-3'
+
+ rho_fracdiff = abs(rho_sample_cgs - rhozero_cgs)/rhozero_cgs
+ if (rho_fracdiff > 1E-1) then
+    call fatal('setup_unifdis_cmi','box density does not match the input value')
+ elseif (rho_fracdiff > 1E-3) then
+    write(*,'(a15,f3.1,a58)',advance='no') 'Box density is ',rho_fracdiff*100.,'% off from &
+             &input value, would you like to proceed ([y]/n)?'
+    read(*,'(a)') dens_ans
+    if (len(trim(adjustl(dens_ans))) /= 0) then
+       if (trim(adjustl(dens_ans)) == 'n') then
+          print*,'stopping program - try adjust boxsize_sample'
+          stop
+       elseif (trim(adjustl(dens_ans)) == 'y') then
+          print*,'y - proceeding...'
+       else
+          print*,'Invalid input'
+       endif
+    else
+       print*,'y - proceeding...'
+    endif
+ endif
  !
  ! Calculate temperature from input sound speed
  !
@@ -285,6 +363,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     if (trim(adjustl(temp_ans)) == 'n') then
        print*,'stopping program - adjust gamma, gmw or cs0'
        stop
+    elseif (trim(adjustl(temp_ans)) == 'y') then
+       print*,'y - proceeding...'
+    else
+       print*,'Invalid input'
     endif
  else
     print*,'y - proceeding...'
@@ -300,13 +382,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
      vxyzu(4,i) = u0
    end if
  enddo
-
+ !
+ ! Polytropic constant
+ !
  if (maxvxyzu < 4 .or. gamma <= 1.) then
     polyk = cs0**2
  else
     polyk = 0.
  endif
-
  !
  ! Set runtime parameters
  !
@@ -319,7 +402,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  alphau    = 1.0
  ipdv_heating   = 1
  ishock_heating = 1
-
 
  !- Print summary - for checking
  print*,' -SUMMARY- '
@@ -360,7 +442,7 @@ subroutine write_setupfile(filename)
  !
  write(iunit,"(/,a)") '# setup'
  if (.not.use_glass) then
-    call write_inopt(np,'np','total number of particles',iunit)
+    call write_inopt(np_req,'np_req','total number of particles requested',iunit)
  else
     call write_inopt(glass_filename,'glass_filename','filename of glass cube',iunit)
  endif
@@ -402,7 +484,7 @@ subroutine read_setupfile(filename,ierr)
  ! other parameters
  !
  if (.not.use_glass) then
-    call read_inopt(np,'np',db,min=8,errcount=nerr)
+    call read_inopt(np_req,'np_req',db,min=8,errcount=nerr)
  else
     call read_inopt(glass_filename,'glass_filename',db,errcount=nerr)
  endif

@@ -70,9 +70,9 @@ module photoionize_cmi
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
  integer, public :: niter_mcrt = 10
- real,    public :: wavelength = 500     ! nm
+ real,    public :: wavelength = 90      ! nm
  real,    public :: temp_hii   = 1E4     ! K
- real,    public :: tol_vsite  = 1E-2    ! in code units
+ real,    public :: tol_vsite  = 1E-3    ! in code units
  logical, public :: lloyd      = .true.
 
  ! Move grid-construction up the tree
@@ -80,8 +80,8 @@ module photoionize_cmi
 
  ! Options for extracting cmi-nodes from kdtree
  real,    public :: tree_accuracy_cmi = 0.1
- real,    public :: rcut_opennode = 0.15        ! in code units
- real,    public :: rcut_leafpart = 0.05        ! in code units
+ real,    public :: rcut_opennode = 0.40        ! in code units
+ real,    public :: rcut_leafpart = 0.30        ! in code units
  real,    public :: delta_rcut    = 0.05        ! in code units
  real,    public :: nHlimit_fac   = 100         ! ionization front resolution; recommend 40-80
  real,    public :: min_nodesize_toflag = 0.005 ! min node size as a fraction of root node
@@ -145,7 +145,7 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  real,    intent(in) :: xyzh(:,:)
  integer :: inode,ip,io_file,ifile_search
  real    :: h_avg,psep,wavelength_cgs,energ_photon
- real    :: gmw0,csi_cgs,temp_hii_fromcsi
+ real    :: gmw0,csi_cgs,temp_hii_fromcsi,csi_cgs_req
  logical :: compilecond_ok,lastfile_found,iexist
  character(len=20) :: ifile_search_char,nixyzhmf_search_filename
  character(len=20) :: xyzhmf_search_filename
@@ -163,8 +163,8 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
     h_avg = h_avg + xyzh(4,ip)
  enddo
  h_avg = h_avg/npart
- psep = 2*h_avg / (57.9)**(1./3.)
- if (tol_vsite > 0.1*psep) call warning('photoionize_cmi','tol_vsite might be too large')
+ psep = 2.*h_avg / (57.9)**(1./3.)
+ if (tol_vsite > 10.*psep) call warning('photoionize_cmi','tol_vsite might be too large')
 
  !- Check pick-nodes settings
  if (photoionize_tree) then
@@ -212,7 +212,8 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  gmw = 0.5  !- temporarily change the mean molecular weight of ionized particles
  u_hii = kboltz * temp_hii / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
  csi_cgs = sqrt(temp_hii*(gamma*kboltz)/(gmw*mass_proton_cgs))
- temp_hii_fromcsi = (12.85E5)**2*gmw*mass_proton_cgs/(gamma*kboltz)
+ csi_cgs_req = 12.85E5
+ temp_hii_fromcsi = (csi_cgs_req)**2*gmw*mass_proton_cgs/(gamma*kboltz)
  print*,' -Ionized gas properties- '
  print*,' internal energy: ',u_hii*unit_ergg,'erg/g'
  print*,' sound speed:     ',csi_cgs,'cm/s'

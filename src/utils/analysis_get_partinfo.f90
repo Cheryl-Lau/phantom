@@ -39,8 +39,11 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
  filename = 'partinfo_'//TRIM(dumpfile)//'.dat'
  open(unit=2024,file=filename)
+ write(2024,'(2a10)') 'time','npart'
+ write(2024,*) time, npart
+ write(2024,'(10a10)') 'id','x','y','z','h','m','vx','vy','vz','u'
  do i = 1,npart
-    write(2024,*) i,xyzh(1:4,i),vxyzu(1:4,i)
+    write(2024,*) i,xyzh(1:4,i),particlemass,vxyzu(1:4,i)
  enddo
  close(2024)
 
