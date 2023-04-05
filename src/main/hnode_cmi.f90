@@ -6,7 +6,7 @@
 !--------------------------------------------------------------------------!
 module hnode_cmi
 !
-! The CMI suite: photoionize_cmi.f90 kdtree_cmi.f90 *hnode_cmi.f90*
+! The CMI suite: photoionize_cmi.f90 kdtree_cmi.f90 *hnode_cmi.f90* heating_cooling_cmi.f90
 ! This module contains all the subroutines necessary for solving the smoothing lengths
 ! of cmi-nodes picked from walking the kd-tree.
 !
@@ -455,7 +455,7 @@ end subroutine get_nodeneigh
 
 
 real function mag2(vec)
- real, intent(in) :: vec(3)
+ real,   intent(in) :: vec(3)
 
  mag2 = vec(1)**2 + vec(2)**2 + vec(3)**2
 

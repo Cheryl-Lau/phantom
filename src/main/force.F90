@@ -2448,6 +2448,10 @@ subroutine finish_cell_and_store_results(icall,cell,fxyzu,xyzh,vxyzu,poten,dt,dv
  use dust,           only:idrag,get_ts
  use part,           only:Omega_k
 #endif
+#ifdef PHOTOION
+ use photoionize_cmi,only:implicit_cmi,dudt_cmi
+ use heatcool_cmi,   only:stop_cooling
+#endif
  use io,             only:warning
  use physcon,        only:c
  use units,          only:unit_velocity
@@ -2788,8 +2792,6 @@ subroutine finish_cell_and_store_results(icall,cell,fxyzu,xyzh,vxyzu,poten,dt,dv
              !--add conductivity and resistive heating
              fxyz4 = fxyz4 + fac*fsum(idendtdissi)  !- fsum(idendtdissi) can be positive or negative
 
-             if (-0.5*dt*fsum(idendtdissi) > vxyzu(4,i)) print*,'conductivity turns it negative',i,vxyzu(4,i)
-
              if (cooling_explicit) then
                 dudtcool = 0.
                 call energ_cooling(xi,yi,zi,vxyzu(4,i),dudtcool,rhoi,0.,Tgas=tempi)
@@ -2802,6 +2804,9 @@ subroutine finish_cell_and_store_results(icall,cell,fxyzu,xyzh,vxyzu,poten,dt,dv
                       if (i == ipartnocool) dudtcool = 0
                    enddo
                 endif
+#ifdef PHOTOION
+                if (stop_cooling) dudtcool = 0.
+#endif
                 fxyz4 = fxyz4 + fac*dudtcool
              endif
              ! extra terms in du/dt from one fluid dust
@@ -2809,6 +2814,10 @@ subroutine finish_cell_and_store_results(icall,cell,fxyzu,xyzh,vxyzu,poten,dt,dv
                 !fxyz4 = fxyz4 + 0.5*fac*rho1i*fsum(idudtdusti)
                 fxyz4 = fxyz4 + 0.5*fac*rho1i*sum(fsum(idudtdusti:idudtdustiend))
              endif
+#ifdef PHOTOION
+             ! Apply photoionization explicit u-update
+             if (.not.implicit_cmi) fxyz4 = fxyz4 + dudt_cmi(i)
+#endif
           endif
           if (maxvxyzu >= 4) fxyzu(4,i) = fxyz4
        endif

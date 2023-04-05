@@ -55,6 +55,7 @@ module cooling
  public :: init_cooling,calc_cooling_rate,energ_cooling
  public :: write_options_cooling, read_options_cooling
  public :: find_in_table, implicit_cooling, exact_cooling
+ public :: lambdacoolJML,lambdacoolDR
  logical, public :: calc_Teq
 
  logical, public :: cooling_implicit
@@ -417,6 +418,46 @@ real function lambdacoolJML(temp)
  lambdacoolJML = lambdagamma * GammaKI_cgs
 
 end function lambdacoolJML
+
+!
+! Alternative form of the lambdacoolJML cooling curve mimicking curve from DeRijcke2013
+!
+real function lambdacoolDR(temp)
+ real, intent(in) :: temp
+ real  :: lambdagamma1,lambdagamma2,lambdagamma
+
+ if (temp > 10**4.15) then
+    lambdagamma1 = 4.69414E-4 * 1E7 * exp(-1.184E5 * 1.15983E6 / ((temp*10**(-0.08))**2.68935 + 1000))
+ else
+    lambdagamma1 = 1E7 * exp(-1.184E5 / ((temp*10**(-0.16)) + 1000))* temp**0.18
+ endif
+
+ lambdagamma2 = 0.115 * 0.014 * (temp*10**(-0.75))**0.60 * exp(-72/(temp*10**(-0.12)))
+ lambdagamma2 = lambdagamma2 * temp**(0.15)
+
+ lambdagamma = (lambdagamma1 + lambdagamma2) * 10**(0.95)
+
+ if (temp < 10**3.7) then
+    lambdagamma = lambdagamma * 10**1.665 * temp**(-0.45)
+ endif
+
+ if (temp > 10**5.3) then
+    if (temp < 10**6.5) then
+        lambdagamma = lambdagamma * 10**5.3 * temp**(-1.)
+    else
+        lambdagamma = lambdagamma * 10**0.425 * temp**(-0.25)
+    endif
+ endif
+
+ if (temp > 10**7.5) then
+    lambdagamma = lambdagamma * 10**(-5.25) * temp**(0.7)
+ endif
+
+ lambdacoolDR = lambdagamma * GammaKI_cgs
+
+end function lambdacoolDR
+
+
 
 !
 ! Thermal equilibium: f_T = n*lambda(T) - gamma

@@ -132,7 +132,8 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
  use derivutils,      only:timer_extf
  use growth,          only:check_dustprop
 #ifdef PHOTOION
- use photoionize_cmi, only:fxyzu_beforepred
+ use photoionize_cmi, only:set_ionizing_source_cmi
+ use photoionize_cmi, only:implicit_cmi,vxyzu_beforepred,du_cmi
 #endif
  integer, intent(inout) :: npart
  integer, intent(in)    :: nactive
@@ -151,6 +152,9 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
  logical, parameter :: allow_waking = .true.
 #else
  integer(kind=1), parameter :: nbinmax = 0
+#endif
+#ifdef PHOTOION
+ real               :: timenow
 #endif
  integer, parameter :: maxits = 30
  logical            :: converged,store_itype
@@ -239,6 +243,18 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
  !omp end parallel do
  if (use_dustgrowth) call check_dustprop(npart,dustprop(1,:))
 
+
+
+#ifdef PHOTOION
+ !- Determine if there are any ionizing sources at current timestep
+ ! Note- Done before going into step_extern in order to flag and
+ !       stop the implicit cooling
+ timenow = timei + dtsph
+ call set_ionizing_source_cmi(timenow,nptmass,xyzmh_ptmass)
+#endif
+
+
+
 !----------------------------------------------------------------------
 ! substepping with external and sink particle forces, using dtextforce
 ! accretion onto sinks/potentials also happens during substepping
@@ -266,8 +282,8 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
 
 
 #ifdef PHOTOION
- !- Store current fxyzu; to be subtracted from heated-vpred after deriv to give heated-vxyzu
- fxyzu_beforepred = fxyzu
+ !- Store current vxyzu; to be used for computing implicit cooling in photoionize_cmi
+ vxyzu_beforepred = vxyzu
 #endif
 
 
@@ -399,31 +415,22 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
  endif
 
 !
-! Update vxyzu as well using the CMI-heated vpred returned from deriv
+! Update vxyzu as well using the du_cmi(:) returned from photoionize_cmi
 !- BOTH vpred and vxyzu need to be updated by CMI-call such that the heating is effectively
-!  done immediately after substepping i.e. before predict_sph, but actually computed after
+!  done at the location of implicit cooling i.e. before predict_sph, but actually computed after
 !  the tree-build and density-iterate since photoionize_cmi routines require so.
 !
 #ifdef PHOTOION
- !$omp parallel do default(none) shared(npart,vpred,vxyzu,xyzh,fxyzu_beforepred) &
- !$omp shared(hdti) &
-#ifdef IND_TIMESTEPS
- !$omp shared(twas,timei) &
-#else
- !$omp shared(dtsph) &
-#endif
- !$omp private(i)
- do i = 1,npart
-    if (.not.isdead_or_accreted(xyzh(4,i))) then
-#ifdef IND_TIMESTEPS
-       hdti = timei - twas(i)
-#else
-       hdti = 0.5*dtsph
-#endif
-       vxyzu(4,i) = vpred(4,i) - hdti * fxyzu_beforepred(4,i)
-    endif
- enddo
- !$omp end parallel do
+ if (implicit_cmi) then
+    !$omp parallel do default(none) shared(npart,vpred,vxyzu,xyzh,du_cmi) &
+    !$omp private(i)
+    do i = 1,npart
+       if (.not.isdead_or_accreted(xyzh(4,i))) then
+          vxyzu(4,i) = vxyzu(4,i) + du_cmi(i)
+       endif
+    enddo
+    !$omp end parallel do
+ endif
 #endif
 
 !
@@ -1119,6 +1126,9 @@ subroutine step_extern(npart,ntypes,dtsph,dtextforce,xyzh,vxyzu,fext,fxyzu,time,
  use krome_interface, only: update_krome
  use eos,             only: get_local_u_internal
 #endif
+#ifdef PHOTOION
+ use heatcool_cmi,    only:stop_cooling
+#endif
  integer,         intent(in)    :: npart,ntypes,nptmass
  real,            intent(in)    :: dtsph,time
  real,            intent(inout) :: dtextforce
@@ -1234,6 +1244,9 @@ subroutine step_extern(npart,ntypes,dtsph,dtextforce,xyzh,vxyzu,fext,fxyzu,time,
 #endif
 #ifdef KROME
     !$omp shared(gamma_chem,mu_chem,T_chem,dudt_chem) &
+#endif
+#ifdef PHOTOION
+    !$omp shared(stop_cooling) &
 #endif
     !$omp private(dphot,abundi,gmwvar) &
     !$omp private(fextrad,ui) &
@@ -1379,9 +1392,12 @@ subroutine step_extern(npart,ntypes,dtsph,dtextforce,xyzh,vxyzu,fext,fxyzu,time,
                 if (part_nocooling .and. npartnocool > 0) then
                    do in = 1,npartnocool
                       ipartnocool = ipart_nocooling(in)
-                      if (i == ipartnocool) dudtcool = 0
+                      if (i == ipartnocool) dudtcool = 0.
                    enddo
                 endif
+#ifdef PHOTOION
+                if (stop_cooling) dudtcool = 0.
+#endif
              endif
 #endif
              ! update internal energy

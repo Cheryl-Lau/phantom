@@ -6,7 +6,7 @@
 !--------------------------------------------------------------------------!
 module photoionize_cmi
 !
-! The CMI suite: *photoionize_cmi.f90* kdtree_cmi.f90 hnode_cmi.f90
+! The CMI suite: *photoionize_cmi.f90* kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90
 ! This module contains all the subroutines necessary for doing photoionization
 ! using the Monte Carlo Radiative Transfer code CMacIonize
 !
@@ -21,6 +21,7 @@ module photoionize_cmi
 !     nHlimit_fac, min_nodesize_toflag and tree_accuracy_cmi for best results.
 !
 ! :References: Petkova,et.al,2021,MNRAS,507,858
+!              Bisbas,et.al,2015,MNRAS,453,1324
 !
 ! :Owner: Cheryl Lau (adapted from Maya Petkova's analysis mod)
 !
@@ -43,15 +44,19 @@ module photoionize_cmi
 !   - delta_rcut          : *Increase in rcut_opennode and rcut_leafpart in an iteration step*
 !   - nHlimit_fac         : *Parameter which controls the resolution of the ionization front*
 !   - min_nodesize_toflag : *Minimum node size (relative to root node) to check neutral frac*
+!   - fix_temp_hii        : *Heats ionized particles to temp_hii, else computes heating and cooling*
+!   - implicit_cmi        : *Update internal energy of particles with implicit method, else explicit*
 !
-! :Dependencies: infile_utils, physcon, units, io, dim, boundaries, eos, part, kdtree
+! :Dependencies: infile_utils, physcon, units, io, dim, boundaries, eos, part, kdtree,
+!                kdtree_cmi,hnode_cmi,heatcool_cmi
 !
 !
  use cmi_fortran_library
 
  implicit none
 
- public :: init_ionizing_radiation_cmi,set_ionizing_source_cmi,release_ionizing_radiation_cmi
+ public :: init_ionizing_radiation_cmi,set_ionizing_source_cmi,compute_ionization_cmi
+ public :: energ_implicit_cmi,energ_explicit_cmi
  public :: read_options_photoionize,write_options_photoionize
 
  ! Position of sources emitting radiation at current time
@@ -66,7 +71,7 @@ module photoionize_cmi
  ! Manually set location, starting/ending time and luminosity [s^-1] of ionizing sources
  integer, public, parameter :: nsetphotosrc = 1
  real,    public :: xyztl_setphotosrc(6,nsetphotosrc) = reshape((/0.,0.,0.,1E-50,1E50,1E49 /),&
-                                                                shape=(/6,nsetphotosrc/))
+                                                                 shape=(/6,nsetphotosrc/))
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
  integer, public :: niter_mcrt = 10
@@ -80,30 +85,36 @@ module photoionize_cmi
 
  ! Options for extracting cmi-nodes from kdtree
  real,    public :: tree_accuracy_cmi = 0.1
- real,    public :: rcut_opennode = 0.40        ! in code units
- real,    public :: rcut_leafpart = 0.30        ! in code units
- real,    public :: delta_rcut    = 0.05        ! in code units
+ real,    public :: rcut_opennode = 1.5         ! in code units
+ real,    public :: rcut_leafpart = 0.7         ! in code units
+ real,    public :: delta_rcut    = 0.1         ! in code units
  real,    public :: nHlimit_fac   = 100         ! ionization front resolution; recommend 40-80
  real,    public :: min_nodesize_toflag = 0.005 ! min node size as a fraction of root node
- logical, public :: auto_opennode = .true.
+ logical, public :: auto_opennode = .false.
  logical, public :: auto_tree_acc = .false.
 
- ! Stores the fxyzu from step_leapfrog after substep and before 2nd predictor step
- real,    public,   allocatable   :: fxyzu_beforepred(:,:)
+ ! Options for heating/cooling method
+ logical, public :: fix_temp_hii = .false.      ! else computes heating and cooling
+ logical, public :: implicit_cmi = .true.       ! else updates u explicitly
+
+ ! Global storages required for updating u
+ real,    public,   allocatable :: vxyzu_beforepred(:,:)  ! u before predictor step
+ real,    public,   allocatable :: du_cmi(:)              ! to heat implicitly in step_leapfrog
+ real,    public,   allocatable :: dudt_cmi(:)            ! to heat explicitly in force
 
  private
 
- ! Init arrays to store properties of nodes
+ ! Arrays to store properties of nodes
  integer, parameter   :: maxcminode   = 1E8
  integer, parameter   :: maxleafparts = 1E8
  real,    allocatable :: nxyzm_treetocmi(:,:),ixyzhm_leafparts(:,:)
  integer, allocatable :: nnode_toreplace(:)
  real,    allocatable :: h_solvertocmi(:)
 
- ! Init array to store properties of all sites
+ ! Array to store properties of all sites
  real,    allocatable :: nixyzhmf_cminode(:,:)
 
- ! Init arrays to control subsequent tree-walks
+ ! Arrays to control subsequent tree-walks
  integer, parameter   :: maxnode_open = 1E6
  integer, allocatable :: nnode_needopen(:)    !- for next iteration
  real,    allocatable :: nxyzrs_nextopen(:,:) !- for next timestep
@@ -111,7 +122,11 @@ module photoionize_cmi
  integer :: nnextopen,nnextopen_updatewalk
  integer :: ncminode_previter
 
- real, allocatable :: x_old(:),y_old(:),z_old(:)
+ ! Arrays to store CMI outputs for computing du_cmi/dudt_cmi
+ real,    allocatable :: nH_allparts(:)
+
+ ! Arrays to store Voronoi grid
+ real,    allocatable :: x_old(:),y_old(:),z_old(:)
  integer :: nsite_lastgrid
 
  integer, parameter :: maxoutfile_ult = 99999
@@ -121,7 +136,7 @@ module photoionize_cmi
  integer :: ncall_checktreewalk = 100
  real    :: xyz_photosrc_si(3,maxphotosrc),lumin_photosrc(maxphotosrc)
  real    :: tree_accuracy_cmi_old
- real    :: solarl_photonsec,freq_photon,u_hi,u_hii,udist_si,umass_si
+ real    :: totlumin,solarl_photonsec,freq_photon,u_hi,u_hii,udist_si,umass_si
  real    :: time0_wall,time0_cpu,time_now_wall,time_now_cpu
  real    :: time_ellapsed_wall,time_ellapsed_cpu
  logical :: first_call,warned
@@ -129,17 +144,18 @@ module photoionize_cmi
 
 contains
 
-!----------------------------------------------------------------
+!------------------------------------------------------------------------------
 !+
-! Check params and initialize variables to prepare for CMI call
+! Initializations to prepare for CMI call
 !+
-!----------------------------------------------------------------
+!------------------------------------------------------------------------------
 subroutine init_ionizing_radiation_cmi(npart,xyzh)
  use physcon,  only:mass_proton_cgs,kboltz,c,planckh,solarl
  use eos,      only:gmw,gamma
  use io,       only:warning,fatal
- use units,    only:udist,umass,unit_ergg
+ use units,    only:udist,umass,utime,unit_ergg,unit_energ
  use dim,      only:maxvxyzu,maxp_hard
+ use heatcool_cmi, only:init_ueq_table,precompute_uterms
  use omp_lib
  integer, intent(in) :: npart
  real,    intent(in) :: xyzh(:,:)
@@ -153,6 +169,9 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  print*,'Radiation-hydrodynamics: Phantom is coupled to photoionization code CMacIonize'
  print*,'Injecting ionizing radiation with MCRT method'
 
+ !
+ ! User input checking
+ !
  if (.not.photoionize_tree .and. maxcminode < npart) call fatal('photoionize_cmi',&
                                                    & 'maxcminode has to be greater than npart')
  if (maxvxyzu < 4) call fatal('photoionize_cmi','Not suitable for isothermal simulations')
@@ -171,6 +190,7 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
     if (tree_accuracy_cmi == 0) call warning('photoionize_cmi','extracting only leaf nodes')
     if (rcut_opennode < rcut_leafpart) call fatal('photoionize_cmi','rcut_leafpart must be &
                                                  & smaller than rcut_opennode')
+    !- Check compile conditions
     compilecond_ok = .false.
 #ifndef MPI
 #ifndef PERIODIC
@@ -184,43 +204,40 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  udist_si = udist/1E2
  umass_si = umass/1E3
 
- !- Init memory
+ !
+ ! Memory allocations and initialization for adaptive tree-walk system
+ !
  call allocate_cminode
  call reset_cminode
  call allocate_cmi_inputs_history
  call reset_cmi_inputs_history
-
- !- Init array to store memory for tree-walk
  nnextopen = 0
  nnextopen_updatewalk = 0
- do inode = 1,maxnode_open
-    nxyzrs_nextopen(1:6,inode) = (/ 0.,0.,0.,0.,0.,0. /)
-    nxyzrs_nextopen_updatewalk(1:6,inode) = (/ 0.,0.,0.,0.,0.,0. /)
- enddo
+ nxyzrs_nextopen = 0.
+ nxyzrs_nextopen_updatewalk = 0.
  tree_accuracy_cmi_old = tree_accuracy_cmi
 
- !- Init array to store vxyzu before predictor in stepping
- !$omp parallel do default(none) shared(fxyzu_beforepred) &
- !$omp private(ip)
- do ip = 1,maxp_hard
-    fxyzu_beforepred(1:4,ip) = (/ 0.,0.,0.,0. /)
- enddo
- !$omp end parallel do
-
- !- Internal energy u of ionized particles
- gmw0 = gmw
- gmw = 0.5  !- temporarily change the mean molecular weight of ionized particles
- u_hii = kboltz * temp_hii / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
- csi_cgs = sqrt(temp_hii*(gamma*kboltz)/(gmw*mass_proton_cgs))
- csi_cgs_req = 12.85E5
- temp_hii_fromcsi = (csi_cgs_req)**2*gmw*mass_proton_cgs/(gamma*kboltz)
- print*,' -Ionized gas properties- '
- print*,' internal energy: ',u_hii*unit_ergg,'erg/g'
- print*,' sound speed:     ',csi_cgs,'cm/s'
- print*,' temperature:     ',temp_hii_fromcsi,'K'
- gmw = gmw0  !- reset
-
- u_hi = kboltz * 1E2 / (gmw*mass_proton_cgs*(gamma-1.))/unit_ergg  ! testing
+ !
+ ! Internal energy of ionized particles
+ !
+ if (fix_temp_hii) then
+    print*,'Photoionization heating/cooling disabled: Ionized particles will be heated to temp_hii'
+    if (.not.implicit_cmi) then
+       print*,' Implicit method is required if using a fixed u_hii. Setting implicit_cmi flag to T.'
+       implicit_cmi = .true.
+    endif
+    gmw0 = gmw
+    gmw  = 0.5  !- temporarily change the mean molecular weight of ionized particles
+    u_hii = kboltz * temp_hii / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
+    csi_cgs = sqrt(temp_hii*(gamma*kboltz)/(gmw*mass_proton_cgs))
+    csi_cgs_req = 12.85E5  !- ref: Bisbas15
+    temp_hii_fromcsi = (csi_cgs_req)**2*gmw*mass_proton_cgs/(gamma*kboltz)
+    print*,' -Ionized gas properties- '
+    print*,' internal energy: ',u_hii*unit_ergg,'erg/g'
+    print*,' sound speed:     ',csi_cgs,'cm/s'
+    print*,' temperature:     ',temp_hii_fromcsi,'K'
+    gmw = gmw0  !- reset
+ endif
 
  !- Calculate solar luminosity [photon/sec]
  wavelength_cgs = wavelength*1E-7
@@ -230,15 +247,18 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  !- Calculate photon frequency [Hz]
  freq_photon = c/wavelength_cgs
 
- !- For writing xyzhmf output files
- if (maxoutfile > maxoutfile_ult) then
-    call fatal('photoionize_cmi','maxoutfile must be within 5 digits, or modify line &
-                                 & 237,256,452,727')
- endif
+ !- Init for photoionization heating-cooling routines
+ call reset_energ
+ call precompute_uterms
+ if (implicit_cmi) call init_ueq_table
+
+ !
+ ! Prepare for writing outputs
+ !
+ if (maxoutfile > maxoutfile_ult) call fatal('photoionize_cmi','maxoutfile must be within 5 digits')
  iunit = 4000
  iruncmi = 0
  warned = .false.
-
  if (photoionize_tree) then
     !- Set starting val of ifile by finding the last nixyzhmf_* saved
     ifile_search = maxoutfile
@@ -294,13 +314,14 @@ end subroutine init_ionizing_radiation_cmi
 !----------------------------------------------------------------
 !+
 ! Dynamically set the locations of the sources at current timestep
-! Updates nphotosrc and xyz_photosrc
+! Updates nphotosrc and xyz_photosrc (also used for controlling cooling)
 !+
 !----------------------------------------------------------------
 subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
  use io,       only:fatal
  use physcon,  only:solarm
  use units,    only:umass
+ use heatcool_cmi, only:check_to_stop_cooling
  integer, intent(in) :: nptmass
  real,    intent(in) :: time
  real,    intent(in) :: xyzmh_ptmass(:,:)
@@ -309,10 +330,9 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
 
  !- Init/Reset
  nphotosrc = 0
- do isrc = 1,maxphotosrc
-    xyz_photosrc(1:3,isrc) = (/ 0.,0.,0. /)
-    lumin_photosrc(isrc)   = 0.
- enddo
+ xyz_photosrc   = 0.
+ lumin_photosrc = 0.
+
  !
  ! Extract sources which currently emit radiation
  !
@@ -351,6 +371,12 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
     enddo
  endif
 
+ !- If going to inject radiation at current step, disable original cooling
+ if (.not.fix_temp_hii) call check_to_stop_cooling(nphotosrc)
+
+ !- About to rerun CMI - reset all storages for energy computation
+ if (nphotosrc >= 1) call reset_energ
+
 end subroutine set_ionizing_source_cmi
 
 !
@@ -369,11 +395,10 @@ end function get_lumin
 
 !----------------------------------------------------------------
 !+
-! Wrapper for updating particle energies
-! (assumes particle is ionized if neutral fraction nH falls below 0.5)
+! Wrapper for computing nH of all particles at current timestep
 !+
 !----------------------------------------------------------------
-subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
+subroutine compute_ionization_cmi(time,npart,xyzh)
  use part,     only:massoftype,igas,isdead_or_accreted
  use kdtree,   only:inodeparts,inoderange
  use units,    only:utime
@@ -381,7 +406,7 @@ subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
  use omp_lib
  integer, intent(inout) :: npart
  real,    intent(in)    :: time
- real,    intent(inout) :: xyzh(:,:),vxyzu(:,:)
+ real,    intent(inout) :: xyzh(:,:)
  real,    allocatable   :: x(:),y(:),z(:),h(:),m(:),nH(:)
  integer :: ip,ip_cmi,npart_cmi,i,n,ipnode,isite,ncminode
  real    :: nH_part,nH_site
@@ -396,33 +421,24 @@ subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
        !- Walk tree and run CMI
        call treewalk_run_cmi_iterate(time,xyzh,ncminode)
 
-       !- Update u of all particles beneath each node using the final nixyzhmf_cminode
+       !- Assign nH to all particles beneath each node using the final nixyzhmf_cminode
        over_entries: do isite = 1,ncminode
           nH_site = nixyzhmf_cminode(8,isite)
           if (nH_site < 0. .or. nH_site > 1.) call fatal('photoionize_cmi','invalid nH')
-          if (nH_site < 0.5) then
-             n = int(nixyzhmf_cminode(1,isite))
-             i = int(nixyzhmf_cminode(2,isite))
-             if (n /= 0 .and. i == 0) then !- is node
-                over_parts: do ipnode = inoderange(1,n),inoderange(2,n)
-                   ip = abs(inodeparts(ipnode))
-!                   u_ionized = u_hii*(1.0-nH_site) + u_hi*nH_site
-                   if (vxyzu(4,ip) < u_hii) then
-                      vxyzu(4,ip) = u_hii
-                   endif
-                enddo over_parts
-             elseif (n == 0 .and. i /= 0) then !- is particle
-!                u_ionized = u_hii*(1.0-nH_site) + u_hi*nH_site
-                if (vxyzu(4,i) < u_hii) then
-                   vxyzu(4,i) = u_hii
-                endif
-             else
-                call fatal('photoionize_cmi','unidentified site')
-             endif
+          n = int(nixyzhmf_cminode(1,isite))
+          i = int(nixyzhmf_cminode(2,isite))
+          if (n /= 0 .and. i == 0) then !- is node
+             over_parts: do ipnode = inoderange(1,n),inoderange(2,n)
+                ip = abs(inodeparts(ipnode))
+                nH_allparts(ip) = nH_site
+             enddo over_parts
+          elseif (n == 0 .and. i /= 0) then !- is particle
+             nH_allparts(i) = nH_site
+          else
+             call fatal('photoionize_cmi','unidentified site')
           endif
        enddo over_entries
        call reset_cminode
-
     else
        !
        ! Pass all particles to grid-construction and density mapping
@@ -441,19 +457,14 @@ subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
        enddo
        call run_cmacionize(npart_cmi,x,y,z,h,m,nH)
 
-       !- Update u of particles using the computed neutral frac
+       !- Collect nH of all alive particles
        ip_cmi = 0
        do ip = 1,npart
           if (.not.isdead_or_accreted(xyzh(4,ip))) then
              ip_cmi = ip_cmi + 1
              nH_part = nH(ip_cmi)
              if (nH_part < 0.) call fatal('photoionize_cmi','invalid nH')
-             if (nH_part < 0.5) then
-!                u_ionized = u_hii*(1.0-nH_part) + u_hi*nH_part
-                if (vxyzu(4,ip) < u_hii) then
-                   vxyzu(4,ip) = u_hii
-                endif
-             endif
+             nH_allparts(ip) = nH_part
           endif
        enddo
        if (ip_cmi /= npart_cmi) call fatal('photoionize_cmi','number of particles &
@@ -504,7 +515,148 @@ subroutine release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
     close(2050)
  endif
 
-end subroutine release_ionizing_radiation_cmi
+end subroutine compute_ionization_cmi
+
+!--------------------------------------------------------------------------------
+!+
+! Routines for updating the internal energy of particles using the final nH_parts(:)
+! returned from CMI
+!- Note:  u-update needs to be separated from nH computation routines since CMI-call and
+!-        implicit update are only done during 1st call of deriv, whereas explicit update
+!-        needs to be done in both calls.
+!- Note2: nH_allparts(i) = -1 denotes dead/non-existing particles, if nH >= -epsilon
+!         means particle has been dealt by CMI.
+!- Note3: As the original cooling is being switched off, particles which are not heated
+!         by photoionization would still go through these routines to cool.
+!+
+!--------------------------------------------------------------------------------
+!
+! Computes du_cmi(:); to be heated in step_leapfrog
+! also updates the vxyzu (i.e. vpred from derivs)
+!
+subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
+ use heatcool_cmi, only:compute_heating_term,compute_cooling_term,get_ueq,compute_du
+ use part,         only:rhoh,massoftype,igas
+ use physcon,      only:kboltz,mass_proton_cgs
+ use eos,          only:gamma,gmw
+ use units,        only:unit_ergg
+ integer, intent(in)    :: npart
+ real,    intent(in)    :: dt
+ real,    intent(in)    :: xyzh(:,:)
+ real,    intent(inout) :: vxyzu(:,:)
+ integer :: ip,npart_heated
+ real    :: nH,ui,ueq,pmass,gammaheat,lambda,rhoi,du
+ real    :: ueq_mean,temp_ueq,gmw0
+
+ gmw0 = gmw
+ gmw = 0.5
+
+ pmass = massoftype(igas)
+
+ ueq_mean = 0.
+ npart_heated = 0
+ !$omp parallel do default(none) shared(npart,nH_allparts,xyzh,vxyzu) &
+ !$omp shared(vxyzu_beforepred,pmass,dt,du_cmi) &
+ !$omp shared(totlumin,nphotosrc,freq_photon,fix_temp_hii,u_hii) &
+ !$omp private(ip,nH,rhoi,ui,ueq,gammaheat,lambda,du) &
+ !$omp reduction(+:ueq_mean,npart_heated)
+ do ip = 1,npart
+    nH = nH_allparts(ip)
+    ui = vxyzu_beforepred(4,ip)  !- take vxyzu from before predictor as current u
+    if (nH > -epsilon(nH)) then
+       du = 0.
+       if (fix_temp_hii) then
+          if (nH < 0.5 .and. ui < u_hii) then
+             du = u_hii - ui     !- instantly heat particle to 10^4 K
+          endif
+       else
+          if (nH > -epsilon(nH)) then
+             rhoi = rhoh(xyzh(4,ip),pmass)
+             call compute_heating_term(nH,rhoi,ui,totlumin,nphotosrc,freq_photon,gammaheat)
+             call compute_cooling_term(ui,lambda)  !- for calculating timescale
+             call get_ueq(rhoi,gammaheat,ui,ueq)
+             call compute_du(dt,rhoi,ui,ueq,gammaheat,lambda,du)
+             !- checking
+             if (nH < 0.5) then
+                npart_heated = npart_heated + 1
+                ueq_mean     = ueq_mean + ueq
+             endif
+          endif
+       endif
+       !- update vpred
+       vxyzu(4,ip) = vxyzu(4,ip) + du
+       !- store du into array
+       du_cmi(ip) = du
+    endif
+ enddo
+ !$omp end parallel do
+
+ if (.not.fix_temp_hii) then
+    ueq_mean = ueq_mean/npart_heated
+    temp_ueq = ueq_mean/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
+    print*,'Drifting HII region to temp [K]: ',temp_ueq
+ endif
+
+ gmw = gmw0
+
+end subroutine energ_implicit_cmi
+
+!
+! Computes dudt_cmi(:); to be heated in force
+!
+subroutine energ_explicit_cmi(npart,xyzh,vxyzu)
+ use heatcool_cmi, only:compute_heating_term,compute_cooling_term,compute_dudt
+ use part,         only:rhoh,massoftype,igas
+ use physcon,      only:kboltz,mass_proton_cgs
+ use eos,          only:gamma,gmw
+ use units,        only:unit_ergg
+ integer, intent(in) :: npart
+ real,    intent(in) :: xyzh(:,:)
+ real,    intent(in) :: vxyzu(:,:)
+ integer :: ip,npart_heated
+ real    :: nH,ui,pmass,gammaheat,lambda,rhoi,dudt
+ real    :: u_ionized,uhii_mean,temp_ionized,gmw0
+
+ pmass = massoftype(igas)
+ uhii_mean = 0.
+ npart_heated = 0
+
+ gmw0 = gmw
+ gmw = 0.5
+
+ !$omp parallel do default(none) shared(npart,nH_allparts,xyzh,vxyzu) &
+ !$omp shared(totlumin,nphotosrc,freq_photon) &
+ !$omp shared(pmass,dudt_cmi) &
+ !$omp private(ip,nH,rhoi,ui,gammaheat,lambda,dudt) &
+ !$omp private(u_ionized) &
+ !$omp reduction(+:npart_heated,uhii_mean)
+ do ip = 1,npart
+    nH = nH_allparts(ip)
+    if (nH > -epsilon(nH)) then
+       rhoi = rhoh(xyzh(4,ip),pmass)
+       ui   = vxyzu(4,ip)
+       call compute_heating_term(nH,rhoi,ui,totlumin,nphotosrc,freq_photon,gammaheat)
+       call compute_cooling_term(ui,lambda)
+       call compute_dudt(rhoi,gammaheat,lambda,dudt)
+       !- store dudt into array
+       dudt_cmi(ip) = dudt
+       !- checking
+       if (nH < 0.5) then
+          u_ionized = vxyzu(4,ip)
+          npart_heated = npart_heated + 1
+          uhii_mean    = uhii_mean + u_ionized
+       endif
+    endif
+ enddo
+ !$omp end parallel do
+
+ uhii_mean = uhii_mean/npart_heated
+ temp_ionized = uhii_mean/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
+ print*,'Current temp of HII region [K]: ',temp_ionized
+
+ gmw = gmw0
+
+end subroutine energ_explicit_cmi
 
 !----------------------------------------------------------------
 !+
@@ -650,7 +802,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
                    !- Store to nnode_needopen for next iteration
                    nneedopen = nneedopen + 1
                    if (nneedopen > maxnode_open) call fatal('photoionize_cmi','too many nodes &
-                                                             need to be resolved')
+                                                           & need to be resolved')
                    nnode_needopen(nneedopen) = n
                    node_checks_passed = .false.
 
@@ -996,7 +1148,6 @@ subroutine write_cmi_infiles(nsite,x,y,z,h,m)
  integer :: i,isrc
  real    :: xmin,xmax,ymin,ymax,zmin,zmax,dx,dy,dz,space_fac
  real    :: xmin_si,ymin_si,zmin_si,dx_si,dy_si,dz_si
- real    :: totlumin
  logical :: redo_grid
  !
  ! Set boundaries only around the given sites
@@ -1180,7 +1331,6 @@ end subroutine write_cmi_infiles
 subroutine allocate_cminode
  use allocutils, only:allocate_array
  use dim,        only:maxp_hard
-
  call allocate_array('nxyzm_treetocmi',nxyzm_treetocmi,5,maxcminode+1)
  call allocate_array('h_solvertocmi',h_solvertocmi,maxcminode+1)
  call allocate_array('ixyzhm_leafparts',ixyzhm_leafparts,6,maxleafparts+1)
@@ -1189,84 +1339,59 @@ subroutine allocate_cminode
  call allocate_array('nnode_needopen',nnode_needopen,maxnode_open)
  call allocate_array('nxyzrs_nextopen',nxyzrs_nextopen,6,maxnode_open)
  call allocate_array('nxyzrs_nextopen_updatewalk',nxyzrs_nextopen_updatewalk,6,maxnode_open)
- call allocate_array('fxyzu_beforepred',fxyzu_beforepred,4,maxp_hard)
-
+ call allocate_array('vxyzu_beforepred',vxyzu_beforepred,4,maxp_hard)
+ call allocate_array('du_cmi',du_cmi,maxp_hard)
+ call allocate_array('dudt_cmi',dudt_cmi,maxp_hard)
+ call allocate_array('nH_allparts',nH_allparts,maxp_hard)
 end subroutine allocate_cminode
 
-
 subroutine reset_cminode
- integer :: inode,ip
-
- !$omp parallel do default(none) shared(nxyzm_treetocmi,ixyzhm_leafparts) &
- !$omp shared(nnode_toreplace,h_solvertocmi,nixyzhmf_cminode) &
- !$omp private(inode)
- do inode = 1,maxcminode
-    nxyzm_treetocmi(1:5,inode)  = (/ 0.,0.,0.,0.,0./)
-    h_solvertocmi(inode)        = 0.
-    nnode_toreplace(inode)      = 0
-    nixyzhmf_cminode(1:8,inode) = (/ 0.,0.,0.,0.,0.,0.,0.,0. /)
- enddo
- !$omp end parallel do
-
- !$omp parallel do default(none) shared(ixyzhm_leafparts) &
- !$omp private(ip)
- do ip = 1,maxleafparts
-    ixyzhm_leafparts(1:6,ip) = (/ 0.,0.,0.,0.,0.,0. /)
- enddo
- !$omp end parallel do
-
+ nxyzm_treetocmi  = 0.
+ h_solvertocmi    = 0.
+ nnode_toreplace  = 0
+ nixyzhmf_cminode = 0.
+ ixyzhm_leafparts = 0.
 end subroutine reset_cminode
-
 
 subroutine allocate_cmi_inputs_history
  use allocutils,   only:allocate_array
-
  call allocate_array('x_old',x_old,maxcminode+1)
  call allocate_array('y_old',y_old,maxcminode+1)
  call allocate_array('z_old',z_old,maxcminode+1)
-
 end subroutine allocate_cmi_inputs_history
 
-
 subroutine reset_cmi_inputs_history
- integer :: inode
-
- !$omp parallel do default(none) shared(x_old,y_old,z_old) &
- !$omp private(inode)
- do inode = 1,maxcminode
-   x_old(inode) = 0.
-   y_old(inode) = 0.
-   z_old(inode) = 0.
- enddo
- !$omp end parallel do
-
+ x_old = 0.
+ y_old = 0.
+ z_old = 0.
 end subroutine reset_cmi_inputs_history
 
+subroutine reset_energ
+ vxyzu_beforepred = 0.
+ du_cmi   = 0.
+ dudt_cmi = 0.
+ nH_allparts = -1.  !- -1 denotes those NOT to be heated
+end subroutine reset_energ
 
 subroutine allocate_cmi_inoutputs(x,y,z,h,m,nH)
  use allocutils, only:allocate_array
  real, allocatable, intent(inout) :: x(:),y(:),z(:),h(:),m(:),nH(:)
-
  call allocate_array('x',x,maxcminode+1)
  call allocate_array('y',y,maxcminode+1)
  call allocate_array('z',z,maxcminode+1)
  call allocate_array('h',h,maxcminode+1)
  call allocate_array('m',m,maxcminode+1)
  call allocate_array('nH',nH,maxcminode+1)
-
 end subroutine allocate_cmi_inoutputs
-
 
 subroutine deallocate_cmi_inoutputs(x,y,z,h,m,nH)
  real, allocatable, intent(inout) :: x(:),y(:),z(:),h(:),m(:),nH(:)
-
- if (allocated(x)) deallocate(x)
- if (allocated(y)) deallocate(y)
- if (allocated(z)) deallocate(z)
- if (allocated(h)) deallocate(h)
- if (allocated(m)) deallocate(m)
+ if (allocated(x))  deallocate(x)
+ if (allocated(y))  deallocate(y)
+ if (allocated(z))  deallocate(z)
+ if (allocated(h))  deallocate(h)
+ if (allocated(m))  deallocate(m)
  if (allocated(nH)) deallocate(nH)
-
 end subroutine deallocate_cmi_inoutputs
 
 !-----------------------------------------------------------------------
@@ -1296,6 +1421,8 @@ subroutine write_options_photoionize(iunit)
  call write_inopt(delta_rcut,'delta_rcut','Increase in rcut_opennode and rcut_leafpart per iter step',iunit)
  call write_inopt(nHlimit_fac,'nHlimit_fac','Paramter controlling resolution of ionization front',iunit)
  call write_inopt(min_nodesize_toflag,'min_nodesize_toflag','Minimum node size to check nH',iunit)
+ call write_inopt(fix_temp_hii,'fix_temp_hii','Heat ionized particles to specified temp_hii',iunit)
+ call write_inopt(implicit_cmi,'implicit_cmi','Use implicit method to update internal energies',iunit)
 
 end subroutine write_options_photoionize
 
@@ -1331,7 +1458,7 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
     read(valstring,*,iostat=ierr) nphoton
     ngot = ngot + 1
     if (nphoton <= 0.) call fatal(label,'invalid setting for nphoton (<=0)')
-case('wavelength')
+ case('wavelength')
     read(valstring,*,iostat=ierr) wavelength
     ngot = ngot + 1
     if (wavelength <= 0.) call fatal(label,'invalid setting for wavelength (<=0)')
@@ -1361,28 +1488,34 @@ case('wavelength')
     read(valstring,*,iostat=ierr) rcut_leafpart
     if (rcut_leafpart < 0.) call fatal(label,'invalid setting for rcut_leafpart')
     ngot = ngot + 1
-case('auto_opennode')
+ case('auto_opennode')
     read(valstring,*,iostat=ierr) auto_opennode
     ngot = ngot + 1
-case('auto_tree_acc')
+ case('auto_tree_acc')
     read(valstring,*,iostat=ierr) auto_tree_acc
     ngot = ngot + 1
-case('delta_rcut')
+ case('delta_rcut')
     read(valstring,*,iostat=ierr) delta_rcut
     ngot = ngot + 1
     if (delta_rcut < 0.) call fatal(label,'invalid setting for delta_rcut')
-case('nHlimit_fac')
+ case('nHlimit_fac')
     read(valstring,*,iostat=ierr) nHlimit_fac
     ngot = ngot + 1
     if (nHlimit_fac < 0.) call fatal(label,'invalid setting for nHlimit_fac')
-case('min_nodesize_toflag')
+ case('min_nodesize_toflag')
     read(valstring,*,iostat=ierr) min_nodesize_toflag
     ngot = ngot + 1
     if (min_nodesize_toflag < 0.) call fatal(label,'invalid setting for min_nodesize_toflag')
+case('fix_temp_hii')
+    read(valstring,*,iostat=ierr) fix_temp_hii
+    ngot = ngot + 1
+ case('implicit_cmi')
+    read(valstring,*,iostat=ierr) implicit_cmi
+    ngot = ngot + 1
  case default
     imatch = .false.
  end select
- igotall = ( ngot >= 17 )
+ igotall = ( ngot >= 19 )
 
 end subroutine read_options_photoionize
 

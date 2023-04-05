@@ -59,7 +59,8 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
  use part,           only:massoftype
 #endif
 #ifdef PHOTOION
- use photoionize_cmi, only:set_ionizing_source_cmi,release_ionizing_radiation_cmi
+ use photoionize_cmi, only:set_ionizing_source_cmi,compute_ionization_cmi
+ use photoionize_cmi, only:implicit_cmi,energ_implicit_cmi,energ_explicit_cmi
  use part,            only:nptmass,xyzmh_ptmass
 #endif
 #ifdef DUSTGROWTH
@@ -168,35 +169,40 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
 #ifdef PHOTOION
  !- checking
  print*,'icall',icall
+ u_mean = 0.
+ do ip = 1,npart
+    if (vxyzu(4,ip) < 0.) then
+       print*,'icall; negative u in deriv before cmi',ip,vxyzu(4,ip)
+       exit
+    endif
+    u_mean = u_mean + vxyzu(4,ip)
+ enddo
+ u_mean = u_mean/npart
+
+
  if (icall == 1 .or. icall == 0) then
-    u_mean = 0.
-    do ip = 1,npart
-       if (vxyzu(4,ip) < 0.) then
-          print*,'icall; negative u in deriv before cmi',ip,vxyzu(4,ip)
-          exit
-       endif
-       u_mean = u_mean + vxyzu(4,ip)
-    enddo
-    u_mean = u_mean/npart
-
-    !- Determine the ionizing sources at current timestep
-    call set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
-    !- Inject photoionization - calling CMacIonize
-    call release_ionizing_radiation_cmi(time,npart,xyzh,vxyzu)
-
-    !- checking
-    u_mean_new = 0.
-    do ip = 1,npart
-       if (vxyzu(4,ip) < 0.) then
-          print*,'icall; negative u in deriv after cmi',ip,vxyzu(4,ip)
-          exit
-       endif
-       u_mean_new = u_mean_new + vxyzu(4,ip)
-    enddo
-    u_mean_new = u_mean_new/npart
-    print*,'change in u: ',u_mean,u_mean_new
+    !- Calling CMacIonize to compute nH map
+    call compute_ionization_cmi(time,npart,xyzh)
+    !- Compute du_cmi and update vxyzu (ie. vpred) if implicit
+    if (implicit_cmi) call energ_implicit_cmi(npart,xyzh,vxyzu,dt)
  endif
+ ! Compute dudt_cmi if explicit (done in both icall=1 and icall=2)
+ if (.not.implicit_cmi) call energ_explicit_cmi(npart,xyzh,vxyzu)
+
+
+ !- checking
+ u_mean_new = 0.
+ do ip = 1,npart
+    if (vxyzu(4,ip) < 0.) then
+       print*,'icall; negative u in deriv after cmi',ip,vxyzu(4,ip)
+       exit
+    endif
+    u_mean_new = u_mean_new + vxyzu(4,ip)
+ enddo
+ u_mean_new = u_mean_new/npart
+ print*,'change in u: ',u_mean,u_mean_new
 #endif
+
 
 #ifdef GR
  call cons2primall(npart,xyzh,metrics,pxyzu,vxyzu,dens,eos_vars)

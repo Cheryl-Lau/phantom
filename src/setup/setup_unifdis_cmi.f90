@@ -53,7 +53,7 @@ contains
 subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,time,fileprefix)
  use dim,          only:maxvxyzu
  use io,           only:master,fatal,warning
- use boundary,     only:xmin,ymin,zmin,xmax,ymax,zmax,set_boundary
+ use boundary,     only:xmin,ymin,zmin,xmax,ymax,zmax,dxbound,dybound,dzbound,set_boundary
  use part,         only:set_particle_type,igas
  use physcon,      only:pi,mass_proton_cgs,kboltz,years,pc,solarm,micron
  use units,        only:set_units,unit_density,unit_velocity,unit_ergg,utime,select_unit
@@ -125,14 +125,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        ! Set number of particles (to be updated after set_unifdis)
        !
        npmax = int(2.0/3.0*size(xyzh(1,:)))
-       np_req = 2E6
+       np_req = 1E6
        call prompt('Enter total number of particles',np_req,1)
        if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
     else
        !
        ! Get glass file
        !
-       glass_filename = 'glassCube_128.dat'
+       glass_filename = 'glassCube_64.dat'
        call prompt('Enter filename of glass cube',glass_filename)
        glass_filename = trim(adjustl(glass_filename))
     endif
