@@ -108,9 +108,11 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
  real,         intent(inout) :: pxyzu(:,:), dens(:)
  real,         intent(in)    :: metrics(:,:,:,:)
  real(kind=4)                :: t1,tcpu1,tlast,tcpulast
+#ifdef PHOTOION
+ integer :: ip
+ real    :: u_mean,u_mean_new
+#endif
 
- integer :: ip  !! testing
- real :: u_mean,u_mean_new
 
  t1    = 0.
  tcpu1 = 0.
@@ -167,18 +169,18 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
  endif
 
 #ifdef PHOTOION
- !- checking
- print*,'icall',icall
- u_mean = 0.
- do ip = 1,npart
-    if (vxyzu(4,ip) < 0.) then
-       print*,'icall; negative u in deriv before cmi',ip,vxyzu(4,ip)
-       exit
-    endif
-    u_mean = u_mean + vxyzu(4,ip)
- enddo
- u_mean = u_mean/npart
-
+ !- Checking
+ if (implicit_cmi) then
+    u_mean = 0.
+    !$omp parallel do default(none) shared(npart,vxyzu) &
+    !$omp private(ip) &
+    !$omp reduction(+:u_mean)
+    do ip = 1,npart
+       u_mean = u_mean + vxyzu(4,ip)
+    enddo
+    !$omp end parallel do
+    u_mean = u_mean/npart
+ endif
 
  if (icall == 1 .or. icall == 0) then
     !- Calling CMacIonize to compute nH map
@@ -189,18 +191,22 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
  ! Compute dudt_cmi if explicit (done in both icall=1 and icall=2)
  if (.not.implicit_cmi) call energ_explicit_cmi(npart,xyzh,vxyzu)
 
-
- !- checking
+ !- Checking
  u_mean_new = 0.
+ !$omp parallel do default(none) shared(npart,vxyzu) &
+ !$omp private(ip) &
+ !$omp reduction(+:u_mean_new)
  do ip = 1,npart
-    if (vxyzu(4,ip) < 0.) then
-       print*,'icall; negative u in deriv after cmi',ip,vxyzu(4,ip)
-       exit
-    endif
     u_mean_new = u_mean_new + vxyzu(4,ip)
  enddo
+ !$omp end parallel do
  u_mean_new = u_mean_new/npart
- print*,'change in u: ',u_mean,u_mean_new
+
+ if (implicit_cmi) then
+    print*,'change in u: ',u_mean,u_mean_new
+ else
+    print*,'updated u',u_mean_new
+ endif
 #endif
 
 
