@@ -27,7 +27,7 @@ module photoionize_cmi
 !
 ! :Runtime parameters:
 !   - sink_ionsrc         : *Using sinks as ionizing sources*
-!   - masscrit_ionize     : *Minimum mass of sink that emit ionizing radiation*
+!   - masscrit_ionize_cgs : *Minimum mass of sink that emits ionizing radiation*
 !   - niter_mcrt          : *Number of iterations to release photon packets in MCRT simulation*
 !   - nphoton             : *Number of photons per iteration*
 !   - wavelength          : *Wavelength of ionizing photons in nm*
@@ -62,22 +62,22 @@ module photoionize_cmi
  ! Position of sources emitting radiation at current time
  integer, public, parameter :: maxphotosrc = 10
  integer, public :: nphotosrc                    !- Current number of sources
- real   , public :: xyz_photosrc(3,maxphotosrc)
+ real   , public :: xyz_photosrc(3,maxphotosrc)  !- Locations of current sources (code units)
 
  ! Using sinks as source
  logical, public :: sink_ionsrc = .false.
- real,    public :: masscrit_ionize = 7.  ! in code units
+ real,    public :: masscrit_ionize_cgs = 1.39237E34  ! 7 M_sun
  !- or
- ! Manually set location, starting/ending time and luminosity [s^-1] of ionizing sources
+ ! Manually set location, starting/ending time and luminosity [cgs units] of ionizing sources
  integer, public, parameter :: nsetphotosrc = 1
- real,    public :: xyztl_setphotosrc(6,nsetphotosrc) = reshape((/0.,0.,0.,1E-50,1E50,1E49 /),&
-                                                                 shape=(/6,nsetphotosrc/))
+ real,    public :: xyztl_setphotosrc_cgs(6,nsetphotosrc) = reshape((/0.,0.,0.,1E-50,1E50,1E49 /),&
+                                                                    shape=(/6,nsetphotosrc/))
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
  integer, public :: niter_mcrt = 10
  real,    public :: wavelength = 90      ! nm
  real,    public :: temp_hii   = 1E4     ! K
- real,    public :: tol_vsite  = 1E-3    ! in code units
+ real,    public :: tol_vsite  = 1E-3    ! code units
  logical, public :: lloyd      = .true.
 
  ! Move grid-construction up the tree
@@ -134,7 +134,7 @@ module photoionize_cmi
  integer :: ncall_writefile  = 10     !- interval to write xyzhmnH output file
  integer :: icall,iunit,ifile,iruncmi
  integer :: ncall_checktreewalk = 100
- real    :: xyz_photosrc_si(3,maxphotosrc),lumin_photosrc(maxphotosrc)
+ real    :: xyz_photosrc_si(3,maxphotosrc),lumin_photosrc(maxphotosrc),masscrit_ionize
  real    :: tree_accuracy_cmi_old
  real    :: totlumin,solarl_photonsec,freq_photon,u_hi,u_hii,udist_si,umass_si
  real    :: time0_wall,time0_cpu,time_now_wall,time_now_cpu
@@ -159,12 +159,10 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  use omp_lib
  integer, intent(in) :: npart
  real,    intent(in) :: xyzh(:,:)
- integer :: inode,ip,io_file,ifile_search
- real    :: h_avg,psep,wavelength_cgs,energ_photon
+ integer :: inode,ip,io_file
+ real    :: h_mean,psep,wavelength_cgs,energ_photon
  real    :: gmw0,csi_cgs,temp_hii_fromcsi,csi_cgs_req
- logical :: compilecond_ok,lastfile_found,iexist
- character(len=20) :: ifile_search_char,nixyzhmf_search_filename
- character(len=20) :: xyzhmf_search_filename
+ logical :: compilecond_ok
 
  print*,'Radiation-hydrodynamics: Phantom is coupled to photoionization code CMacIonize'
  print*,'Injecting ionizing radiation with MCRT method'
@@ -177,12 +175,12 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  if (maxvxyzu < 4) call fatal('photoionize_cmi','Not suitable for isothermal simulations')
 
  !- Check that the tol_vsite is sensible by estimating mean particle separation
- h_avg = 0.
+ h_mean = 0.
  do ip = 1,npart
-    h_avg = h_avg + xyzh(4,ip)
+    h_mean = h_mean + xyzh(4,ip)
  enddo
- h_avg = h_avg/npart
- psep = 2.*h_avg / (57.9)**(1./3.)
+ h_mean = h_mean/npart
+ psep = 2.*h_mean / (57.9)**(1./3.)
  if (tol_vsite > 10.*psep) call warning('photoionize_cmi','tol_vsite might be too large')
 
  !- Check pick-nodes settings
@@ -192,12 +190,10 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
                                                  & smaller than rcut_opennode')
     !- Check compile conditions
     compilecond_ok = .false.
-#ifndef MPI
 #ifndef PERIODIC
     compilecond_ok = .true.
 #endif
-#endif
-    if (.not.compilecond_ok) call fatal('photoionize_cmi','current version does not support MPI or PERIODIC')
+    if (.not.compilecond_ok) call fatal('photoionize_cmi','current version does not support PERIODIC')
  endif
 
  !- Convert cgs units to SI units
@@ -247,57 +243,17 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  !- Calculate photon frequency [Hz]
  freq_photon = c/wavelength_cgs
 
+ !- Critical mass of sinks
+ if (sink_ionsrc) masscrit_ionize = masscrit_ionize_cgs/umass
+
  !- Init for photoionization heating-cooling routines
  call reset_energ
  call precompute_uterms
  if (implicit_cmi) call init_ueq_table
 
- !
- ! Prepare for writing outputs
- !
+ !- For writing snapshots of nH map
  if (maxoutfile > maxoutfile_ult) call fatal('photoionize_cmi','maxoutfile must be within 5 digits')
- iunit = 4000
- iruncmi = 0
- warned = .false.
- if (photoionize_tree) then
-    !- Set starting val of ifile by finding the last nixyzhmf_* saved
-    ifile_search = maxoutfile
-    lastfile_found = .false.
-    do while (.not.lastfile_found)
-       write(ifile_search_char,'(i5.5)') ifile_search
-       nixyzhmf_search_filename = trim('nixyzhmf_')//trim(ifile_search_char)//trim('.txt')
-       inquire(file=nixyzhmf_search_filename,exist=iexist)
-       if (iexist) then
-          lastfile_found = .true.
-       else
-          ifile_search = ifile_search - 1
-          if (ifile_search < 0) then
-             exit
-          endif
-       endif
-    enddo
-    ifile = ifile_search + 1
-    print*,'Start with file nixyzhmf_',ifile
- else
-    !- Set starting val of ifile by finding the last xyzhmf_* saved
-    ifile_search = maxoutfile
-    lastfile_found = .false.
-    do while (.not.lastfile_found)
-       write(ifile_search_char,'(i5.5)') ifile_search
-       xyzhmf_search_filename = trim('xyzhmf_')//trim(ifile_search_char)//trim('.txt')
-       inquire(file=xyzhmf_search_filename,exist=iexist)
-       if (iexist) then
-          lastfile_found = .true.
-       else
-          ifile_search = ifile_search - 1
-          if (ifile_search < 0) then
-             exit
-          endif
-       endif
-    enddo
-    ifile = ifile_search + 1
-    print*,'Start with file xyzhmf_',ifile
- endif
+ call init_write_snapshot
 
  !- For writing Voronoi sites files / checking openned nodes
  icall = 0
@@ -320,7 +276,7 @@ end subroutine init_ionizing_radiation_cmi
 subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
  use io,       only:fatal
  use physcon,  only:solarm
- use units,    only:umass
+ use units,    only:umass,utime,udist
  use heatcool_cmi, only:check_to_stop_cooling
  integer, intent(in) :: nptmass
  real,    intent(in) :: time
@@ -350,14 +306,14 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
     enddo
  elseif (.not.sink_ionsrc) then !- Check time
     do isrc = 1,nsetphotosrc
-       time_startsrc = xyztl_setphotosrc(4,isrc)
-       time_endsrc   = xyztl_setphotosrc(5,isrc)
+       time_startsrc = xyztl_setphotosrc_cgs(4,isrc)/utime
+       time_endsrc   = xyztl_setphotosrc_cgs(5,isrc)/utime
        if (time > time_startsrc .and. time < time_endsrc) then
           nphotosrc = nphotosrc + 1
           if (nphotosrc > maxphotosrc) call fatal('photoionize_cmi','number of sources &
                                                  & exceeded maxphotosrc')
-          xyz_photosrc(1:3,nphotosrc) = xyztl_setphotosrc(1:3,isrc)
-          lumin_photosrc(nphotosrc)   = xyztl_setphotosrc(6,isrc)
+          xyz_photosrc(1:3,nphotosrc) = xyztl_setphotosrc_cgs(1:3,isrc)/udist
+          lumin_photosrc(nphotosrc)   = xyztl_setphotosrc_cgs(6,isrc)  !- remain in [s^-1]
        endif
     enddo
  endif
@@ -386,7 +342,7 @@ real function get_lumin(mptmass)
  use physcon,  only:solarm
  use units,    only:umass
  real, intent(in)  :: mptmass
- real    :: mptmass_cgs
+ real :: mptmass_cgs
 
  mptmass_cgs = mptmass*umass
  get_lumin   = solarl_photonsec * (mptmass_cgs/solarm)**(3.5)
@@ -411,109 +367,82 @@ subroutine compute_ionization_cmi(time,npart,xyzh)
  integer :: ip,ip_cmi,npart_cmi,i,n,ipnode,isite,ncminode
  real    :: nH_part,nH_site
  real    :: u_ionized
- character(len=50) :: xyzhmf_parts_filename,ifile_char
 
- if (nphotosrc >= 1) then
+ if (nphotosrc == 0) return
+
+ if (photoionize_tree) then
     !
     ! Pass tree nodes as pseudo-particles to CMI
     !
-    if (photoionize_tree) then
-       !- Walk tree and run CMI
-       call treewalk_run_cmi_iterate(time,xyzh,ncminode)
+    call treewalk_run_cmi_iterate(time,xyzh,ncminode)
+    call write_nH_snapshot(time,ncminode)
 
-       !- Assign nH to all particles beneath each node using the final nixyzhmf_cminode
-       over_entries: do isite = 1,ncminode
-          nH_site = nixyzhmf_cminode(8,isite)
-          if (nH_site < 0. .or. nH_site > 1.) call fatal('photoionize_cmi','invalid nH')
-          n = int(nixyzhmf_cminode(1,isite))
-          i = int(nixyzhmf_cminode(2,isite))
-          if (n /= 0 .and. i == 0) then !- is node
-             over_parts: do ipnode = inoderange(1,n),inoderange(2,n)
-                ip = abs(inodeparts(ipnode))
-                nH_allparts(ip) = nH_site
-             enddo over_parts
-          elseif (n == 0 .and. i /= 0) then !- is particle
-             nH_allparts(i) = nH_site
-          else
-             call fatal('photoionize_cmi','unidentified site')
-          endif
-       enddo over_entries
-       call reset_cminode
-    else
-       !
-       ! Pass all particles to grid-construction and density mapping
-       !
-       call allocate_cmi_inoutputs(x,y,z,h,m,nH)
-       npart_cmi = 0
-       do ip = 1,npart
-          if (.not.isdead_or_accreted(xyzh(4,ip))) then
-             npart_cmi = npart_cmi + 1
-             x(npart_cmi) = xyzh(1,ip)
-             y(npart_cmi) = xyzh(2,ip)
-             z(npart_cmi) = xyzh(3,ip)
-             h(npart_cmi) = xyzh(4,ip)
-             m(npart_cmi) = massoftype(igas)
-          endif
-       enddo
-       call run_cmacionize(npart_cmi,x,y,z,h,m,nH)
-
-       !- Collect nH of all alive particles
-       ip_cmi = 0
-       do ip = 1,npart
-          if (.not.isdead_or_accreted(xyzh(4,ip))) then
-             ip_cmi = ip_cmi + 1
-             nH_part = nH(ip_cmi)
-             if (nH_part < 0.) call fatal('photoionize_cmi','invalid nH')
-             nH_allparts(ip) = nH_part
-          endif
-       enddo
-       if (ip_cmi /= npart_cmi) call fatal('photoionize_cmi','number of particles &
-                                                            & passed to and from CMI do not match')
-       !
-       ! Write xyzhmf of particle to a snapshot file
-       !
-       if (iunit < maxoutfile) then
-          if (mod(iruncmi,ncall_writefile) == 0) then
-             write(ifile_char,'(i5.5)') ifile
-             xyzhmf_parts_filename = trim('xyzhmf_')//trim(ifile_char)//trim('.txt')
-             print*,'Writing outputs to ',xyzhmf_parts_filename
-             open(unit=iunit,file=xyzhmf_parts_filename,status='replace')
-             write(iunit,*) 'time_cgs'
-             write(iunit,*) time*utime
-             write(iunit,'(a20,a25,a25,a25,a25,a25)') 'x','y','z','h','m','nH'
-             ip_cmi = 0
-             do ip = 1,npart
-                if (.not.isdead_or_accreted(xyzh(4,ip))) then
-                   ip_cmi = ip_cmi + 1
-                   write(iunit,*) x(ip_cmi),y(ip_cmi),z(ip_cmi),h(ip_cmi),m(ip_cmi),nH(ip_cmi)
-                endif
-             enddo
-             close(iunit)
-             iunit = iunit + 1
-             ifile = ifile + 1
-          endif
+    !- Assign nH to all particles beneath each node using the final nixyzhmf_cminode
+    over_entries: do isite = 1,ncminode
+       nH_site = nixyzhmf_cminode(8,isite)
+       if (nH_site < 0. .or. nH_site > 1.) call fatal('photoionize_cmi','invalid nH')
+       n = int(nixyzhmf_cminode(1,isite))
+       i = int(nixyzhmf_cminode(2,isite))
+       if (n /= 0 .and. i == 0) then !- is node
+          over_parts: do ipnode = inoderange(1,n),inoderange(2,n)
+             ip = abs(inodeparts(ipnode))
+             nH_allparts(ip) = nH_site
+          enddo over_parts
+       elseif (n == 0 .and. i /= 0) then !- is particle
+          nH_allparts(i) = nH_site
        else
-          if (.not.warned) then
-             call warning('photoionize_cmi','maxoutfile reached - no longer writing node info to file')
-             warned = .true.
-          endif
+          call fatal('photoionize_cmi','unidentified site')
        endif
-       call deallocate_cmi_inoutputs(x,y,z,h,m,nH)
-    endif
+    enddo over_entries
+    call reset_cminode
 
-    iruncmi = iruncmi + 1
+ else
+    !
+    ! Pass all particles to grid-construction and density mapping
+    !
+    call allocate_cmi_inoutputs(x,y,z,h,m,nH)
+    npart_cmi = 0
+    do ip = 1,npart
+       if (.not.isdead_or_accreted(xyzh(4,ip))) then
+          npart_cmi = npart_cmi + 1
+          x(npart_cmi) = xyzh(1,ip)
+          y(npart_cmi) = xyzh(2,ip)
+          z(npart_cmi) = xyzh(3,ip)
+          h(npart_cmi) = xyzh(4,ip)
+          m(npart_cmi) = massoftype(igas)
+       endif
+    enddo
+    call run_cmacionize(npart_cmi,x,y,z,h,m,nH)
 
-    !
-    ! Time the simulations
-    !
-    call cpu_time(time_now_cpu)
-    time_now_wall = omp_get_wtime()
-    time_ellapsed_wall = time_now_wall - time0_wall
-    time_ellapsed_cpu  = time_now_cpu  - time0_cpu
-    open(2050,file='cpu_wall_time_record.txt',position='append')
-    write(2050,*) iruncmi, time_ellapsed_cpu, time_ellapsed_wall
-    close(2050)
+    !- Collect nH of all alive particles
+    ip_cmi = 0
+    do ip = 1,npart
+       if (.not.isdead_or_accreted(xyzh(4,ip))) then
+          ip_cmi = ip_cmi + 1
+          nH_part = nH(ip_cmi)
+          if (nH_part < 0.) call fatal('photoionize_cmi','invalid nH')
+          nH_allparts(ip) = nH_part
+       endif
+    enddo
+    if (ip_cmi /= npart_cmi) call fatal('photoionize_cmi','number of particles &
+                                                         & passed to and from CMI do not match')
+
+    call write_nH_snapshot(time,npart,xyzh_parts=xyzh,x_in=x,y_in=y,z_in=z,h_in=h,m_in=m,nH_in=nH)
+    call deallocate_cmi_inoutputs(x,y,z,h,m,nH)
  endif
+
+ iruncmi = iruncmi + 1
+
+ !
+ ! Time the simulations
+ !
+ call cpu_time(time_now_cpu)
+ time_now_wall = omp_get_wtime()
+ time_ellapsed_wall = time_now_wall - time0_wall
+ time_ellapsed_cpu  = time_now_cpu  - time0_cpu
+ open(2050,file='cpu_wall_time_record.txt',position='append')
+ write(2050,*) iruncmi, time_ellapsed_cpu, time_ellapsed_wall
+ close(2050)
 
 end subroutine compute_ionization_cmi
 
@@ -547,6 +476,8 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
  integer :: ip,npart_heated
  real    :: nH,ui,ueq,pmass,gammaheat,lambda,rhoi,du
  real    :: ueq_mean,temp_ueq,gmw0
+
+ if (nphotosrc == 0) return
 
  gmw0 = gmw
  gmw = 0.5
@@ -585,7 +516,7 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
        endif
        !- update vpred
        vxyzu(4,ip) = vxyzu(4,ip) + du
-       !- store du into array
+       !- store du into global array
        du_cmi(ip) = du
     endif
  enddo
@@ -617,6 +548,8 @@ subroutine energ_explicit_cmi(npart,xyzh,vxyzu)
  real    :: nH,ui,pmass,gammaheat,lambda,rhoi,dudt
  real    :: u_ionized,uhii_mean,temp_ionized,gmw0
 
+ if (nphotosrc == 0) return
+
  pmass = massoftype(igas)
  uhii_mean = 0.
  npart_heated = 0
@@ -638,7 +571,7 @@ subroutine energ_explicit_cmi(npart,xyzh,vxyzu)
        call compute_heating_term(nH,rhoi,ui,totlumin,nphotosrc,freq_photon,gammaheat)
        call compute_cooling_term(ui,lambda)
        call compute_dudt(rhoi,gammaheat,lambda,dudt)
-       !- store dudt into array
+       !- store dudt into global array
        dudt_cmi(ip) = dudt
        !- checking
        if (nH < 0.5) then
@@ -681,7 +614,6 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
  integer :: niter,inode,isite,n,i,inextopen,n_nextopen,maxnextopen
  real    :: size_node,size_root,nH_node,nH_part,nH_limit,tree_accuracy_cmi_new
  logical :: node_checks_passed
- character(len=50) :: nixyzhmf_cminode_filename,ifile_char
 
  !- Init
  node_checks_passed = .false.
@@ -718,14 +650,6 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
                                     nnode_needopen,nneedopen,&
                                     nxyzrs_nextopen_updatewalk,nnextopen_updatewalk)
     if (ncminode == 0) call fatal('photoionize_cmi','no nodes found')
-
-    ! testing
-!    open(2033,file='nxyzm_treetocmi.txt')
-!    write(2033,*) 'ncminode',ncminode
-!    do i = 1,ncminode
-!       write(2033,*) nxyzm_treetocmi(1:5,i)
-!    enddo
-!    close(2033)
 
     !
     ! Solve for the smoothing lengths of nodes
@@ -794,9 +718,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
 
              if (size_node > min_nodesize_toflag) then
                 nH_node = nixyzhmf_cminode(8,isite)
-                if (nH_node < 0. .or. nH_node > 1.) then
-                   write(*,'(2x,a5,i7,a15)') 'node ',n,' has invalid nH'
-                endif
+                if (nH_node < 0. .or. nH_node > 1.) write(*,'(2x,a5,i7,a15)') 'node ',n,' has invalid nH'
 
                 if (nH_node < nH_limit) then
                    !- Store to nnode_needopen for next iteration
@@ -852,14 +774,6 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
 
  enddo resolve_ionfront
 
- !- testing
-! open(2032,file='nxyzrs_nextopen.txt')
-! write(2032,*) nnextopen
-! do i = 1,nnextopen
-!    write(2032,*) nxyzrs_nextopen(1:6,i)
-! enddo
-! close(2032)
-
  !
  ! Now sync the completed set of nxyzrs_nextopen with nxyzrs_nextopen_updatewalk
  ! to give to the tree during the next timestep
@@ -868,6 +782,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
     nnextopen_updatewalk = nnextopen
     nxyzrs_nextopen_updatewalk(:,:) = nxyzrs_nextopen(:,:)
  endif
+
  !
  ! Lower tree_accuracy_cmi if too many nodes need to be opened
  ! likely that the radiation is escaping in all directions and reaching large distances
@@ -885,32 +800,6 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
  endif
 
  print*,'treewalk_iterate done'
-
- !
- ! Write time and nixyzhmf_cminode(1:8,1:ncminode) to a snapshot file
- !
- if (iunit < maxoutfile) then
-    if (mod(iruncmi,ncall_writefile) == 0) then
-       write(ifile_char,'(i5.5)') ifile
-       nixyzhmf_cminode_filename = trim('nixyzhmf_')//trim(ifile_char)//trim('.txt')
-       print*,'Writing outputs to ',nixyzhmf_cminode_filename
-       open(unit=iunit,file=nixyzhmf_cminode_filename,status='replace')
-       write(iunit,*) 'time_cgs'
-       write(iunit,*) time*utime
-       write(iunit,'(a20,a20,a25,a25,a25,a25,a25,a25)') 'n','i','x','y','z','h','m','nH'
-       do isite = 1,ncminode
-          write(iunit,*) nixyzhmf_cminode(1:8,isite)
-       enddo
-       close(iunit)
-       iunit = iunit + 1
-       ifile = ifile + 1
-    endif
- else
-    if (.not.warned) then
-       call warning('photoionize_cmi','maxoutfile reached - no longer writing node info to file')
-       warned = .true.
-    endif
- endif
 
 end subroutine treewalk_run_cmi_iterate
 
@@ -931,17 +820,6 @@ subroutine collect_and_combine_cminodes(ncminode,nleafparts,ncloseleaf)
  integer, intent(inout) :: ncminode
  integer :: ip,inode,ientry,irepentry,irowafter,ncminode_old,ncminode_curr
  integer :: n_fromtree,n_toreplace,i
-
- ! testing
-! open(2028,file='nodespicked_cmi.txt')
-! write(2028,*) 'ncminode',ncminode
-! write(2028,*) 'ncloseleaf',ncloseleaf
-! write(2028,*) 'nleafparts',nleafparts
-! write(2028,'(a20,a20)') 'n','nleaf'
-! do i = 1,ncminode
-!    write(2028,*) nxyzm_treetocmi(1,i), nnode_toreplace(i)
-! enddo
-! close(2028)
 
  !- Combine outputs from kdtree_cmi and hnode_cmi to fill properties of nodes
  do inode = 1,ncminode
@@ -975,15 +853,6 @@ subroutine collect_and_combine_cminodes(ncminode,nleafparts,ncloseleaf)
     if (ientry > ncminode_old) call fatal('photoionize_cmi','erroneous ientry')
  enddo over_entries
 
- ! testing
-! open(2030,file='nodesremoved_cmi.txt')
-! write(2030,*) 'ncminode',ncminode
-! write(2030,'(a20,a20)') 'n','nleaf'
-! do i = 1,ncminode
-!    write(2030,*) nixyzhmf_cminode(1,i), nnode_toreplace(i)
-! enddo
-! close(2030)
-
  !- Add leaf-particles onto the list and extend ncminode
  over_parts: do ip = 1,nleafparts
     ncminode = ncminode + 1
@@ -996,19 +865,6 @@ subroutine collect_and_combine_cminodes(ncminode,nleafparts,ncloseleaf)
 
  if (ncminode /= ncminode_old-ncloseleaf+nleafparts) call fatal('photoionize_cmi','final value of &
    & ncminode is inconsistent with inputs from kdtree_cmi')
-
- ! testing
-! open(2031,file='partsadded_cmi.txt')
-! write(2031,*) 'ncminode',ncminode
-! write(2031,'(a20,a20)') 'inodes','nleaf'
-! do i = 1,ncminode
-!    write(2031,*) nixyzhmf_cminode(2,i), nnode_toreplace(i)
-! enddo
-! write(2031,*) 'particle indices'
-! do i = 1,nleafparts
-!    write(2031,*) ixyzhm_leafparts(1,i)
-! enddo
-! close(2031)
 
 end subroutine collect_and_combine_cminodes
 
@@ -1101,13 +957,6 @@ subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
  real,    intent(out) :: nH(nsite)
  integer :: talk,numthreads,isite
 
- !- Testing
-! open(2027,file='xyzhm_cmi.txt')
-! write(2027,*) nsite
-! do isite = 1,nsite
-!    write(2027,*) x(isite),y(isite),z(isite),h(isite),m(isite)
-! enddo
-! close(2027)
  !
  ! Initialize CMI
  !
@@ -1125,14 +974,6 @@ subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
  call cmi_compute_neutral_fraction_dp(x(1:nsite),y(1:nsite),z(1:nsite),h(1:nsite),&
                                       m(1:nsite),nH(1:nsite),int8(nsite))
  call cmi_destroy
-
- !- Testing
-! open(2077,file='xyzhmf_cmi.txt')
-! write(2077,*) nsite
-! do isite = 1,nsite
-!    write(2077,*) x(isite),y(isite),z(isite),h(isite),m(isite),nH(isite)
-! enddo
-! close(2077)
 
 end subroutine run_cmacionize
 
@@ -1325,7 +1166,121 @@ end subroutine write_cmi_infiles
 
 !-----------------------------------------------------------------------
 !+
-!  Subroutines to init/clear storage arrays during runtime
+! Routines for writing node/particle properties to snapshot files
+!+
+!-----------------------------------------------------------------------
+subroutine init_write_snapshot
+ integer :: ifile_search
+ logical :: lastfile_found,iexist
+ character(len=50) :: filename_search,filename
+
+ iunit = 4000
+ iruncmi = 0
+ warned = .false.
+ !- Set starting val of ifile by finding the last nixyzhmf_* saved
+ ifile_search = maxoutfile
+ lastfile_found = .false.
+ do while (.not.lastfile_found)
+    call gen_filename(ifile_search,filename_search)
+    inquire(file=trim(filename_search),exist=iexist)
+    if (iexist) then
+        lastfile_found = .true.
+    else
+        ifile_search = ifile_search - 1
+        if (ifile_search < 0) then
+           exit
+        endif
+    endif
+ enddo
+ ifile = ifile_search + 1
+ call gen_filename(ifile,filename)
+ print*,'Beginning with snapshot file ',trim(filename)
+
+end subroutine init_write_snapshot
+
+
+subroutine write_nH_snapshot(time,nsite,xyzh_parts,x_in,y_in,z_in,h_in,m_in,nH_in)
+ use part,  only:isdead_or_accreted
+ use units, only:utime
+ use io,    only:fatal,warning
+ integer, intent(in) :: nsite
+ real,    intent(in) :: time
+ real,    intent(in), optional :: xyzh_parts(:,:)
+ real,    intent(in), optional :: x_in(nsite),y_in(nsite),z_in(nsite),h_in(nsite)
+ real,    intent(in), optional :: m_in(nsite),nH_in(nsite)
+ integer :: isite,ip,ip_cmi
+ logical :: got_all
+ character(len=50) :: allsites_filename
+ character(len=5)  :: ifile_char
+
+ !- Checking inputs
+ if (.not.photoionize_tree) then
+    got_all = .false.
+    if (present(xyzh_parts) .and. present(x_in) .and. present(y_in).and. present(z_in) &
+        .and. present(h_in) .and. present(m_in) .and. present(nH_in)) then
+       got_all = .true.
+    endif
+    if (.not.got_all) call fatal('photoionize_cmi','Missing inputs for writing snapshots')
+ endif
+
+ if (iunit < maxoutfile) then
+    if (mod(iruncmi,ncall_writefile) == 0) then
+
+       call gen_filename(ifile,allsites_filename)
+       print*,'Writing outputs to ',trim(allsites_filename)
+
+       open(unit=iunit,file=trim(allsites_filename),status='replace')
+
+       write(iunit,*) 'time_cgs'
+       write(iunit,*) time*utime
+
+       if (photoionize_tree) then
+          write(iunit,'(a20,a20,a25,a25,a25,a25,a25,a25)') 'n','i','x','y','z','h','m','nH'
+          do isite = 1,nsite
+             write(iunit,*) nixyzhmf_cminode(1:8,isite)
+          enddo
+       else
+          write(iunit,'(a20,a25,a25,a25,a25,a25)') 'x','y','z','h','m','nH'
+          ip_cmi = 0
+          do ip = 1,nsite
+             if (.not.isdead_or_accreted(xyzh_parts(4,ip))) then
+                ip_cmi = ip_cmi + 1
+                write(iunit,*) x_in(ip_cmi),y_in(ip_cmi),z_in(ip_cmi),h_in(ip_cmi),m_in(ip_cmi),nH_in(ip_cmi)
+             endif
+          enddo
+       endif
+       close(iunit)
+
+       iunit = iunit + 1
+       ifile = ifile + 1
+    endif
+ else
+    if (.not.warned) then
+       call warning('photoionize_cmi','maxoutfile reached - no longer writing node info to file')
+       warned = .true.
+    endif
+ endif
+
+end subroutine write_nH_snapshot
+
+
+subroutine gen_filename(ifile,filename)
+ integer,           intent(in)  :: ifile
+ character(len=50), intent(out) :: filename
+ character(len=5)   :: ifile_char
+
+ write(ifile_char,'(i5.5)') ifile  !- convert to str
+ if (photoionize_tree) then
+    filename = 'nixyzhmf_'//trim(ifile_char)//'.txt'
+ else
+    filename = 'xyzhmf_'//trim(ifile_char)//'.txt'
+ endif
+
+end subroutine gen_filename
+
+!-----------------------------------------------------------------------
+!+
+!  Routines to init/clear storage arrays during runtime
 !+
 !-----------------------------------------------------------------------
 subroutine allocate_cminode
@@ -1405,7 +1360,7 @@ subroutine write_options_photoionize(iunit)
 
  write(iunit,"(/,a)") '# options controlling photoionization'
  call write_inopt(sink_ionsrc,'sink_ionsrc','Using sinks as ionizing sources',iunit)
- call write_inopt(masscrit_ionize,'masscrit_ionize','Critical sink mass to begin emitting radiation',iunit)
+ call write_inopt(masscrit_ionize_cgs,'masscrit_ionize_cgs','Critical sink mass to begin emitting radiation',iunit)
  call write_inopt(niter_mcrt,'niter_mcrt','number of photon-release iterations',iunit)
  call write_inopt(nphoton,'nphoton','number of photons per iteration',iunit)
  call write_inopt(wavelength,'wavelength','wavelength of photons in nm',iunit)
@@ -1446,10 +1401,10 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
  case('sink_ionsrc')
     read(valstring,*,iostat=ierr) sink_ionsrc
     ngot = ngot + 1
- case('masscrit_ionize')
-    read(valstring,*,iostat=ierr) masscrit_ionize
+ case('masscrit_ionize_cgs')
+    read(valstring,*,iostat=ierr) masscrit_ionize_cgs
     ngot = ngot + 1
-    if (masscrit_ionize <= 0.) call fatal(label,'invalid setting for masscrit_ionize (<=0)')
+    if (masscrit_ionize_cgs <= 0.) call fatal(label,'invalid setting for masscrit_ionize_cgs (<=0)')
  case('niter_mcrt')
     read(valstring,*,iostat=ierr) niter_mcrt
     ngot = ngot + 1

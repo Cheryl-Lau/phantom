@@ -120,6 +120,8 @@ subroutine init_ueq_table
  logical :: write_ueq = .true.
  logical :: write_Teq = .true.
 
+ print*,'Pre-computing thermal equilibrium solutions'
+
  gmw0 = gmw
  gmw = 0.5   !- temporarily changing mean molecular weight
 
