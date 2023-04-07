@@ -136,7 +136,7 @@ module photoionize_cmi
  integer :: ncall_checktreewalk = 100
  real    :: xyz_photosrc_si(3,maxphotosrc),lumin_photosrc(maxphotosrc),masscrit_ionize
  real    :: tree_accuracy_cmi_old
- real    :: totlumin,solarl_photonsec,freq_photon,u_hi,u_hii,udist_si,umass_si
+ real    :: totlumin,solarl_photonsec,freq_photon,u_hii,udist_si,umass_si
  real    :: time0_wall,time0_cpu,time_now_wall,time_now_cpu
  real    :: time_ellapsed_wall,time_ellapsed_cpu
  logical :: first_call,warned
@@ -153,13 +153,13 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  use physcon,  only:mass_proton_cgs,kboltz,c,planckh,solarl
  use eos,      only:gmw,gamma
  use io,       only:warning,fatal
- use units,    only:udist,umass,utime,unit_ergg,unit_energ
+ use units,    only:udist,umass,unit_ergg
  use dim,      only:maxvxyzu,maxp_hard
  use heatcool_cmi, only:init_ueq_table,precompute_uterms
  use omp_lib
  integer, intent(in) :: npart
  real,    intent(in) :: xyzh(:,:)
- integer :: inode,ip,io_file
+ integer :: ip,io_file
  real    :: h_mean,psep,wavelength_cgs,energ_photon
  real    :: gmw0,csi_cgs,temp_hii_fromcsi,csi_cgs_req
  logical :: compilecond_ok
@@ -276,13 +276,13 @@ end subroutine init_ionizing_radiation_cmi
 subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
  use io,       only:fatal
  use physcon,  only:solarm
- use units,    only:umass,utime,udist
+ use units,    only:utime,udist
  use heatcool_cmi, only:check_to_stop_cooling
  integer, intent(in) :: nptmass
  real,    intent(in) :: time
  real,    intent(in) :: xyzmh_ptmass(:,:)
  integer :: isrc,ix,isink
- real    :: time_startsrc,time_endsrc,mptmass,lumin,mass_8solarm
+ real    :: time_startsrc,time_endsrc,mptmass
 
  !- Init/Reset
  nphotosrc = 0
@@ -357,7 +357,6 @@ end function get_lumin
 subroutine compute_ionization_cmi(time,npart,xyzh)
  use part,     only:massoftype,igas,isdead_or_accreted
  use kdtree,   only:inodeparts,inoderange
- use units,    only:utime
  use io,       only:fatal,warning
  use omp_lib
  integer, intent(inout) :: npart
@@ -366,7 +365,6 @@ subroutine compute_ionization_cmi(time,npart,xyzh)
  real,    allocatable   :: x(:),y(:),z(:),h(:),m(:),nH(:)
  integer :: ip,ip_cmi,npart_cmi,i,n,ipnode,isite,ncminode
  real    :: nH_part,nH_site
- real    :: u_ionized
 
  if (nphotosrc == 0) return
 
@@ -425,7 +423,7 @@ subroutine compute_ionization_cmi(time,npart,xyzh)
        endif
     enddo
     if (ip_cmi /= npart_cmi) call fatal('photoionize_cmi','number of particles &
-                                                         & passed to and from CMI do not match')
+                                       & passed to and from CMI do not match')
 
     call write_nH_snapshot(time,npart,xyzh_parts=xyzh,x_in=x,y_in=y,z_in=z,h_in=h,m_in=m,nH_in=nH)
     call deallocate_cmi_inoutputs(x,y,z,h,m,nH)
@@ -450,11 +448,11 @@ end subroutine compute_ionization_cmi
 !+
 ! Routines for updating the internal energy of particles using the final nH_parts(:)
 ! returned from CMI
-!- Note:  u-update needs to be separated from nH computation routines since CMI-call and
+!- Note1: u-update needs to be separated from nH computation routines since CMI-call and
 !-        implicit update are only done during 1st call of deriv, whereas explicit update
 !-        needs to be done in both calls.
 !- Note2: nH_allparts(i) = -1 denotes dead/non-existing particles, if nH >= -epsilon
-!         means particle has been dealt by CMI.
+!         means particle has been dealt by CMI (but not necessarily ionized).
 !- Note3: As the original cooling is being switched off, particles which are not heated
 !         by photoionization would still go through these routines to cool.
 !+
@@ -601,7 +599,6 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
  use linklist,   only:node,ifirstincell
  use kdtree_cmi, only:extract_cminodes_from_tree
  use hnode_cmi,  only:hnode_iterate
- use units,      only:utime
  use io,         only:fatal,warning
  real,    intent(in)  :: time
  real,    intent(in)  :: xyzh(:,:)
@@ -611,7 +608,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
  integer :: nneedopen    !- number of nodes at ionization front that needs to be opened at current iteration
  integer :: ncloseleaf   !- number of leaves to be replaced
  integer :: nleafparts   !- total number of particles in leaf nodes to be replaced
- integer :: niter,inode,isite,n,i,inextopen,n_nextopen,maxnextopen
+ integer :: niter,inode,isite,n,inextopen,n_nextopen,maxnextopen
  real    :: size_node,size_root,nH_node,nH_part,nH_limit,tree_accuracy_cmi_new
  logical :: node_checks_passed
 
@@ -760,14 +757,6 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
        if (niter > maxiter) call fatal('photoionize_cmi','ionization front is far away - increase delta_rcut')
     endif
 
-    !- testing
-!    open(2031,file='nnode_needopen.txt')
-!    write(2031,*) nneedopen
-!    do i = 1,nneedopen
-!       write(2031,*) nnode_needopen(i)
-!    enddo
-!    close(2031)
-
     ! Note: nnode_needopen accumulates ALL nodes not passing check throughout the iterations;
     !      otherwise during the next tree-walks, upper nodes will not be opened (based on original
     !      tree-opening criteria) and hence not reaching the ones beneath that need to be opened.
@@ -818,8 +807,8 @@ subroutine collect_and_combine_cminodes(ncminode,nleafparts,ncloseleaf)
  use io,  only:fatal
  integer, intent(in)    :: nleafparts,ncloseleaf
  integer, intent(inout) :: ncminode
- integer :: ip,inode,ientry,irepentry,irowafter,ncminode_old,ncminode_curr
- integer :: n_fromtree,n_toreplace,i
+ integer :: ip,inode,ientry,irepentry,irowafter,ncminode_old
+ integer :: n_fromtree,n_toreplace
 
  !- Combine outputs from kdtree_cmi and hnode_cmi to fill properties of nodes
  do inode = 1,ncminode
@@ -878,7 +867,6 @@ end subroutine collect_and_combine_cminodes
 !----------------------------------------------------------------
 subroutine remove_unnecessary_opennode(nHlimit_fac,ncminode,min_nodesize_toflag)
  use allocutils,  only:allocate_array
- use linklist,    only:node
  integer, intent(in)    :: ncminode
  real,    intent(in)    :: nHlimit_fac,min_nodesize_toflag
  real,    allocatable   :: nHmin(:)
@@ -955,7 +943,7 @@ subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
  integer, intent(in)  :: nsite
  real,    intent(in)  :: x(nsite),y(nsite),z(nsite),h(nsite),m(nsite)
  real,    intent(out) :: nH(nsite)
- integer :: talk,numthreads,isite
+ integer :: talk,numthreads
 
  !
  ! Initialize CMI
@@ -1211,7 +1199,6 @@ subroutine write_nH_snapshot(time,nsite,xyzh_parts,x_in,y_in,z_in,h_in,m_in,nH_i
  integer :: isite,ip,ip_cmi
  logical :: got_all
  character(len=50) :: allsites_filename
- character(len=5)  :: ifile_char
 
  !- Checking inputs
  if (.not.photoionize_tree) then

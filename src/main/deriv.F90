@@ -61,7 +61,6 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
 #ifdef PHOTOION
  use photoionize_cmi, only:set_ionizing_source_cmi,compute_ionization_cmi
  use photoionize_cmi, only:implicit_cmi,energ_implicit_cmi,energ_explicit_cmi
- use part,            only:nptmass,xyzmh_ptmass
 #endif
 #ifdef DUSTGROWTH
  use growth,         only:get_growth_rate

@@ -349,6 +349,7 @@ subroutine init_rhoutableJML(ierr)
     call root_bisection(nrho_cgs,T02,TmaxJML,Teq3,irterr3)
 
     ! Get total number of roots
+    numroots = 0
     if (irterr3 == 1) then
        if (irterr2 == 1) then
           if (irterr1 == 1) then
@@ -369,6 +370,7 @@ subroutine init_rhoutableJML(ierr)
     ueq1 = kboltz * Teq1 / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
     ueq2 = kboltz * Teq2 / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
     ueq3 = kboltz * Teq3 / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
+
     rhoueqJML_table(1,i) = rho
     rhoueqJML_table(2,i) = numroots
     rhoueqJML_table(3,i) = ueq1
@@ -473,53 +475,51 @@ end function equifunc
 ! Brackets the equilibium solution Teq with given Tmin and Tmax;
 ! returns Teq = 0. and irterr = 1 if no roots found
 !
-subroutine root_bisection(nrho,Tmin,Tmax,Teq,irterr)
- real,    intent(in)  :: nrho,Tmin,Tmax
+subroutine root_bisection(nrho,Tmin0,Tmax0,Teq,irterr)
+ use io,  only:fatal
+ real,    intent(in)  :: nrho,Tmin0,Tmax0
  integer, intent(out) :: irterr
  real,    intent(out) :: Teq
- integer :: n_iter,Tminsign,Tmaxsign
- real    :: Tminbisec,Tmaxbisec,tol,Tmid,f_T
+ integer :: niter
+ real    :: Tmin,Tmax,Tmid,Tminsign,Tmaxsign,func_min,func_max,func_mid
+ real    :: tol = 0.05   ! tolerance in root-search
  logical :: converged
 
- n_iter = 0
- tol = 0.05           ! tolerance in root-search
  converged = .false.  ! root flag
- irterr = 0           ! no-root flag
- Tminsign = sign(1.,equifunc(nrho,Tmin))
- Tmaxsign = sign(1.,equifunc(nrho,Tmax))
+ irterr = 0           ! no-root indicator
+ niter = 0
 
+ Tminsign = sign(1.,equifunc(nrho,Tmin0))
+ Tmaxsign = sign(1.,equifunc(nrho,Tmax0))
  if (Tminsign == Tmaxsign) then
     Teq = 0.
     irterr = 1
  endif
 
- Tmaxbisec = Tmax
- Tminbisec = Tmin
+ Tmin = Tmin0
+ Tmax = Tmax0
  do while (.not.converged .and. irterr == 0)
 
-    if ((Tmaxbisec-Tminbisec) < tol) then
+    func_max = equifunc(nrho,Tmax)
+    func_min = equifunc(nrho,Tmin)
+    if (func_max*func_min > 0) call fatal('heating_cooling_cmi','not bracketing Teq root')
+
+    Tmid = (Tmax+Tmin)/2.
+    func_mid = equifunc(nrho,Tmid)
+
+    if (func_mid*func_min < 0) then
+       Tmax = Tmid
+    elseif (func_mid*func_max < 0) then
+       Tmin = Tmid
+    endif
+
+    if ((Tmax-Tmin) < tol) then
        converged = .true.
-       Teq = (Tmaxbisec+Tminbisec)/2.
+       Teq = (Tmax+Tmin)/2.
     endif
 
-    Tmid = (Tmaxbisec+Tminbisec)/2.
-    f_T = equifunc(nrho,Tmid)
-
-    if (Tminsign == -1) then      ! ascending
-       if (f_T >= 0) then
-          Tmaxbisec = Tmid
-       elseif (f_T < 0) then
-          Tminbisec = Tmid
-       endif
-    elseif (Tmaxsign == -1) then  ! descending
-       if (f_T < 0) then
-          Tmaxbisec = Tmid
-       elseif (f_T >= 0) then
-          Tminbisec = Tmid
-       endif
-    endif
-    n_iter = n_iter + 1
-    if (n_iter > 1000) then
+    niter = niter + 1
+    if (niter > 1000) then
        Teq = 0.
        irterr = 1
     endif
@@ -804,6 +804,7 @@ subroutine cooling_JoungMacLow_implicit(eni,rhoi,dt,dudti)
     !- Interpolate between table entries to give the final ueqs
     ! ([i] closest index; [j] lower bound; [j+1] upper bound around rhoi)
     i = minloc(abs(rhotable(:)-rhoi),1)
+    j = 0
     if (i == 1) then
        j = 1
     elseif (i == maxt) then

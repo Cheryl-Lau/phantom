@@ -110,7 +110,7 @@ end subroutine precompute_uterms
 !
 subroutine init_ueq_table
  use physcon, only:mass_proton_cgs,kboltz
- use units,   only:utime,unit_density,unit_ergg
+ use units,   only:unit_density,unit_ergg
  use eos,     only:gmw,gamma
  use io,      only:fatal
  integer :: igamma,irho,numroots,irterr1,irterr2,irterr3
@@ -264,17 +264,16 @@ end subroutine root_bisection
 !
 subroutine compute_heating_term(nH,rho,u,totlumin,nphotosrc,freq_photon,gammaheat)
  use physcon, only:mass_proton_cgs,mass_electron_cgs,kboltz,steboltz,pi,planckh
- use units,   only:umass,utime,unit_density,unit_ergg,unit_energ
+ use units,   only:unit_density,unit_ergg
  use eos,     only:gamma,gmw
  use io,      only:fatal
  integer, intent(in)  :: nphotosrc
  real,    intent(in)  :: nH,rho,u
  real,    intent(in)  :: totlumin,freq_photon
  real,    intent(out) :: gammaheat
- real    :: num_neu,num_ion,num_e,num_p
- real    :: rho_cgs,nrho_cgs,vpart_cgs,temp,alphaA,betaA,Ne,Np
+ real    :: rho_cgs,nrho_cgs,temp,alphaA,Ne,Np
  real    :: energ_photon_cgs,lumin_cgs,temp_star
- real    :: heating_rate_cgs,recomb_cooling_rate_cgs,gamma_cgs
+ real    :: heating_rate_cgs,gamma_cgs
  real    :: rstar_cgs = 6.957E11 !- Radius of a typical O-star
 
  rho_cgs  = rho*unit_density
@@ -358,7 +357,7 @@ end subroutine compute_cooling_term
 !
 subroutine get_ueq(rho,gammaheat,u,ueq_final)
  use physcon, only:kboltz,mass_proton_cgs
- use units,   only:unit_ergg,unit_energ,utime
+ use units,   only:unit_ergg
  use eos,     only:gmw,gamma
  use io,      only:fatal
  real, intent(in)  :: rho,gammaheat,u
@@ -370,8 +369,6 @@ subroutine get_ueq(rho,gammaheat,u,ueq_final)
 
  rhotable   = rho_gamma_ueq_table(:,1,1)
  gammatable = rho_gamma_ueq_table(1,:,2)
-
- !print*,'gamma (code units)',gammaheat
 
  !- Closest index
  irho   = minloc(abs(rhotable(:)-rho),1)
@@ -385,6 +382,7 @@ subroutine get_ueq(rho,gammaheat,u,ueq_final)
     ! Note: [i] closest index; [j] lower bound; [j+1] upper bound bracketing input var
 
     ! get bracketing indices [j] and [j+1] for rho
+    jrho = 0
     if (irho == 1) then
        jrho = 1
     elseif (irho == maxrho) then
@@ -395,6 +393,7 @@ subroutine get_ueq(rho,gammaheat,u,ueq_final)
        jrho = irho
     endif
     ! get bracketing indices [j] and [j+1] for gamma
+    jgamma = 0
     if (igamma == 1) then
        jgamma = 1
     elseif (igamma == maxgamma) then

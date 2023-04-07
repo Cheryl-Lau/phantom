@@ -7,7 +7,7 @@
 module easter_egg
  !
  ! The 2048 of Phantom
- ! FOR EMERGENCY USE ONLY - pauses sim immediately to have a bit of fun
+ ! FOR EMERGENCY USE ONLY - pauses sim immediately to entertain oneself
  !
  ! Implemented for (and by) horribly bored people who are in desperate need
  ! of amusement whilst dreading their project.
@@ -45,6 +45,7 @@ module easter_egg
 
   tile_smash: do while (.not.stop_game)
      iter = iter + 1
+     idir = 0
      !- Interpret input
      read(*,'(a)') command
      command = trim(adjustl(command))

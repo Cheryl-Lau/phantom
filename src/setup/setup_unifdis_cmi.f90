@@ -53,14 +53,14 @@ contains
 subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,time,fileprefix)
  use dim,          only:maxvxyzu
  use io,           only:master,fatal,warning
- use boundary,     only:xmin,ymin,zmin,xmax,ymax,zmax,dxbound,dybound,dzbound,set_boundary
+ use boundary,     only:set_boundary
  use part,         only:set_particle_type,igas
  use physcon,      only:pi,mass_proton_cgs,kboltz,years,pc,solarm,micron
  use units,        only:set_units,unit_density,unit_velocity,unit_ergg,utime,select_unit
  use eos,          only:gmw,ieos
  use part,         only:periodic
  use unifdis,      only:set_unifdis
- use options,      only:alpha,alphau,nfulldump,icooling,ipdv_heating,ishock_heating
+ use options,      only:alphau,nfulldump,icooling,ipdv_heating,ishock_heating
  use cooling,      only:ufloor,Tfloor
  use timestep,     only:nout
  use prompting,    only:prompt
