@@ -25,7 +25,7 @@ module heatcool_cmi
 !   - get_ueq_by_interp    : *perform 2D interpolation, otherwise simply grabs closest ueq*
 !   - incl_recomb_cooling  : *include recombination cooling in heating term gamma*
 !
-! :Dependencies: io,eos,physcon,units,parts,cooling
+! :Dependencies: io, eos, physcon, units, parts, cooling, kdtree, linklist
 !
 ! :Note: The variable gamma in this mod refers to heating term, not to be confused with gamma
 !        (polytropic constant) from eos. In subroutines where both are used, gamma (heating term)
@@ -38,29 +38,32 @@ module heatcool_cmi
 
  public :: check_to_stop_cooling,init_ueq_table,precompute_uterms
  public :: compute_heating_term,compute_cooling_term,get_ueq,compute_du,compute_dudt
+ public :: compute_Rtype_time,compute_temp_star
 
  logical, public :: stop_cooling  !- flag to stop cooling at current step
 
  !- Options for controlling heating/cooling physics
- logical, public :: use_const_alphaA  = .false.
+ logical, public :: use_const_alpha   = .true.
  logical, public :: get_ueq_by_interp = .true.
 
  !- Heating from cosmic rays, X-rays, H2 formation and destruction etc. (as of KI02)
  real,    public :: gamma_background_cgs = 2E-26
 
+ real,    public :: t_recomb,temp_star
+
  private
 
  !- Pre-computed table of equilibiurms ueq(rho,gamma)
  integer, parameter :: maxrho   = 1000
- integer, parameter :: maxgamma = 1000
+ integer, parameter :: maxgamma = 5000
  real   :: rho_gamma_ueq_table(maxrho,maxgamma,6)  ! stores: rho,gamma,numroots,ueq1,ueq2,ueq3
 
  real   :: rhomin_cgs   = 7E-29
  real   :: rhomax_cgs   = 1E-19
  real   :: gammamin_cgs = 2E-26   !- min background heating
- real   :: gammamax_cgs = 1E-18
+ real   :: gammamax_cgs = 1E-14
  real   :: Tmin  = 1E1
- real   :: Tmax  = 1E8
+ real   :: Tmax  = 1E9
 
  !- Pre-computed vars
  real   :: one_over_mH,one_over_mH2,one_over_mH_cgs,one_over_mH2_cgs
@@ -103,6 +106,22 @@ subroutine precompute_uterms
  one_over_unit_lambda = 1./(unit_energ*udist**3/utime)
 
 end subroutine precompute_uterms
+
+!
+! Estimate temperature of the newly created photoelectrons using luminosity of source(s)
+!
+subroutine compute_temp_star(freq_photon,totlumin,nphotosrc)
+ use physcon, only:steboltz,pi,planckh
+ integer, intent(in)  :: nphotosrc
+ real,    intent(in)  :: totlumin,freq_photon
+ real    :: energ_photon_cgs,lumin_cgs
+ real    :: rstar_cgs = 6.957E11 !- Radius of a typical O-star
+
+ energ_photon_cgs = planckh*freq_photon
+ lumin_cgs = totlumin/nphotosrc*energ_photon_cgs   ! [erg s^-1]
+ temp_star = (lumin_cgs/(4.*pi*rstar_cgs**2*steboltz))**(1./4.)
+
+end subroutine compute_temp_star
 
 !
 ! Pre-solves the equilibriums ueq as function of both rho and gamma
@@ -148,9 +167,9 @@ subroutine init_ueq_table
        rho_cgs  = rhomin_cgs * 10**((irho-1)*drho_cgs)
        nrho_cgs = rho_cgs/mass_proton_cgs
 
-       call root_bisection(nrho_cgs,Tmin,Tlocalmax,gamma_cgs,Teq1,irterr1)
-       call root_bisection(nrho_cgs,Tlocalmax,Tlocalmin,gamma_cgs,Teq2,irterr2)
-       call root_bisection(nrho_cgs,Tlocalmin,Tmax,gamma_cgs,Teq3,irterr3)
+       call solve_temp_equil(nrho_cgs,Tmin,Tlocalmax,gamma_cgs,Teq1,irterr1)
+       call solve_temp_equil(nrho_cgs,Tlocalmax,Tlocalmin,gamma_cgs,Teq2,irterr2)
+       call solve_temp_equil(nrho_cgs,Tlocalmin,Tmax,gamma_cgs,Teq3,irterr3)
 
        ! Get total number of roots (irterr=1 means no roots found)
        if (irterr3 == 1) then
@@ -206,8 +225,7 @@ end function equifunc
 ! Brackets the equilibium solution Teq with given Tmin and Tmax;
 ! returns Teq = 0. and irterr = 1 if no roots found
 !
-subroutine root_bisection(nrho,Tmin0,Tmax0,gamma,Teq,irterr)
- use io,  only:fatal
+subroutine solve_temp_equil(nrho,Tmin0,Tmax0,gamma,Teq,irterr)
  real,    intent(in)  :: nrho,Tmin0,Tmax0,gamma
  integer, intent(out) :: irterr
  real,    intent(out) :: Teq
@@ -229,11 +247,10 @@ subroutine root_bisection(nrho,Tmin0,Tmax0,gamma,Teq,irterr)
 
  Tmin = Tmin0
  Tmax = Tmax0
- do while (.not.converged .and. irterr == 0)
+ bisection: do while (.not.converged .and. irterr == 0)
 
     func_max = equifunc(nrho,Tmax,gamma)
     func_min = equifunc(nrho,Tmin,gamma)
-    if (func_max*func_min > 0) call fatal('heating_cooling_cmi','not bracketing Teq root')
 
     Tmid = (Tmax+Tmin)/2.
     func_mid = equifunc(nrho,Tmid,gamma)
@@ -246,66 +263,55 @@ subroutine root_bisection(nrho,Tmin0,Tmax0,gamma,Teq,irterr)
 
     if ((Tmax-Tmin) < tol) then
        converged = .true.
-       Teq = (Tmax+Tmin)/2.
+       Teq = (Tmax+Tmin)/2.  !- get midpoint
     endif
 
     niter = niter + 1
-    if (niter > 1000) then
+    if (niter > 1000) then   !- assume no roots found
        Teq = 0.
        irterr = 1
     endif
- enddo
+ enddo bisection
 
-end subroutine root_bisection
+end subroutine solve_temp_equil
 
 !
 ! Compute photoionization heating rate gamma in code units using nH from CMI
-! Note that Osterbrock74 G(H) = n*gamma
+! Note that Osterbrock74 G(H) = N_neutral*gamma
 !
-subroutine compute_heating_term(nH,rho,u,totlumin,nphotosrc,freq_photon,gammaheat)
- use physcon, only:mass_proton_cgs,mass_electron_cgs,kboltz,steboltz,pi,planckh
+subroutine compute_heating_term(nH,rho,u,gammaheat)
+ use physcon, only:mass_proton_cgs,mass_electron_cgs,kboltz
  use units,   only:unit_density,unit_ergg
  use eos,     only:gamma,gmw
  use io,      only:fatal
- integer, intent(in)  :: nphotosrc
  real,    intent(in)  :: nH,rho,u
- real,    intent(in)  :: totlumin,freq_photon
  real,    intent(out) :: gammaheat
  real    :: rho_cgs,nrho_cgs,temp,alphaA,Ne,Np
- real    :: energ_photon_cgs,lumin_cgs,temp_star
  real    :: heating_rate_cgs,gamma_cgs
- real    :: rstar_cgs = 6.957E11 !- Radius of a typical O-star
 
  rho_cgs  = rho*unit_density
- nrho_cgs = rho_cgs/mass_proton_cgs
+ nrho_cgs = rho_cgs*one_over_mH_cgs
 
- !- number density of electrons and protons
+ !- number density of free electrons and protons
  Ne = (1.-nH)*nrho_cgs
  Np = (1.-nH)*nrho_cgs
 
- !- current temp from u
- temp = u/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
-
  !- compute approx alphaA
+ temp = u/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
  alphaA = get_alphaA(temp)
-
- !- temp of newly created photoelectrons (~ temp of star)
- energ_photon_cgs = planckh*freq_photon
- lumin_cgs = totlumin/nphotosrc*energ_photon_cgs   ! [erg s^-1]
- temp_star = (lumin_cgs/(4.*pi*rstar_cgs**2*steboltz))**(1./4.)
 
  !- Photoionization heating G(H) as of Osterbrock74 eqn 3.2
  heating_rate_cgs = Ne*Np*alphaA*(3./2.)*kboltz*temp_star   ! [erg cm^-3 s-1]
 
  !- gamma
- nrho_cgs  = rho_cgs*one_over_mH_cgs
- gamma_cgs = heating_rate_cgs/nrho_cgs  ! [erg s-1]
+ gamma_cgs = heating_rate_cgs/(nrho_cgs*nH)  ! [erg s-1]
 
  !- Include background heating
  gamma_cgs = gamma_cgs + gamma_background_cgs
 
  if (gamma_cgs < gammamin_cgs .or. gamma_cgs > gammamax_cgs) then
-    print*,'gamma_cgs',gamma_cgs
+    print*,'nH; gamma_cgs; temp; alpha; GH; rho; nrho; Ne; Np',nH,gamma_cgs,temp,alphaA,&
+            heating_rate_cgs,rho_cgs,nrho_cgs,Ne,Np
     call fatal('heating_cooling_cmi','gamma_cgs exceeded range')
  endif
 
@@ -313,24 +319,6 @@ subroutine compute_heating_term(nH,rho,u,totlumin,nphotosrc,freq_photon,gammahea
  gammaheat = gamma_cgs*one_over_unit_gamma
 
 end subroutine compute_heating_term
-
-!
-! Recombination coef alphaA as func of temp obtained from fitting table 2.1
-! of Osterbrock74 [cm^3 s^-1]
-!
-real function get_alphaA(temp)
- real, intent(in) :: temp
- real :: a = 6.113723867E-11
- real :: b = -1.85763022E-13
-
- if (use_const_alphaA) then
-    get_alphaA = 2.7e-13
- else
-    get_alphaA = a* temp**(-1./2.) + b  !- P.16: recomb coef ~ T^(-1/2)
- endif
-
-end function get_alphaA
-
 
 !
 ! Routine to read cooling rate off temp directly from cooling curve
@@ -448,30 +436,55 @@ subroutine get_ueq(rho,gammaheat,u,ueq_final)
 end subroutine get_ueq
 
 !
-! With the ueq, compute new u after dt to give du in code units
-! method based on Vazquez-Semadeni07
+! With the ueq, compute new u after dt to give du in code units as of VS07
 !
-subroutine compute_du(dt,rho,u,ueq,gamma,lambda,du)
- real, intent(in)  :: dt,rho,u,ueq,gamma,lambda
- real, intent(out) :: du
+subroutine compute_du(skip_Rtype,dt,rho,u,ueq,gamma,lambda,du)
+ use io,  only:warning
+ use units, only:utime  !- testing
+ logical, intent(in)  :: skip_Rtype
+ real,    intent(in)  :: dt,rho,u,ueq,gamma,lambda
+ real,    intent(out) :: du
  real :: unew,tau
 
- !- timescale to radiate thermal energy excess
+ !- time required to radiate energy excess / gain energy
  tau  = abs((u-ueq)/(rho*one_over_mH2*lambda - one_over_mH*gamma))
 
- unew = ueq + (u-ueq)*exp(-dt/tau)
- du   = unew - u
+ if (skip_Rtype) then
+    if (t_recomb > dt) then
+       unew = ueq + (u-ueq)*exp(-t_recomb/tau)
+    else
+       call warning('heating_cooling_cmi','t_recomb is shorter; keeping original dt')
+    endif
+ else
+    unew = ueq + (u-ueq)*exp(-dt/tau)
+ endif
+
+ du = unew - u
 
 end subroutine compute_du
 
 !
 ! Balance heating and cooling term to give dudt in code units
 !
-subroutine compute_dudt(rho,gamma,lambda,dudt)
- real, intent(in)  :: rho,gamma,lambda
- real, intent(out) :: dudt
+subroutine compute_dudt(skip_Rtype,dt,rho,u,gamma,lambda,dudt)
+ use io,  only:warning
+ logical, intent(in)  :: skip_Rtype
+ real,    intent(in)  :: dt,rho,u,gamma,lambda
+ real,    intent(out) :: dudt
+ real :: ueq,du,unew
 
  dudt = one_over_mH*gamma - rho*one_over_mH2*lambda
+
+ !- To 'skip' a certain amount of time, an implicit method is required
+ if (skip_Rtype) then
+    if (t_recomb > dt) then
+       call get_ueq(rho,gamma,u,ueq)
+       call compute_du(skip_Rtype,dt,rho,u,ueq,gamma,lambda,du)
+       dudt = du/dt
+    else
+       call warning('heating_cooling_cmi','t_recomb is shorter; keeping original dt')
+    endif
+ endif
 
 end subroutine compute_dudt
 
@@ -479,5 +492,99 @@ end subroutine compute_dudt
 ! According to KI02 and VS07, it should be nrho*gamma - nrho^2*lambda, where nrho = rho/mass_proton.
 ! But since u is in erg/g, we further divide nrho by rho to make the equations dimensionally correct,
 ! giving dudt = (1/mass_proton)*gamma - (rho/mass_proton**2)*lambda; [erg/g/s].
+
+
+!
+! Calculates timescale of R-type phase t_recomb
+!
+subroutine compute_Rtype_time(nphotosrc,xyz_photosrc,xyzh)
+ use units,    only:udist,utime,unit_density
+ use physcon,  only:mass_proton_cgs
+ use part,     only:rhoh,massoftype,igas
+ use kdtree,   only:getneigh
+ use linklist, only:node,ifirstincell,listneigh
+ use io,       only:fatal
+ integer, intent(in) :: nphotosrc
+ real,    intent(in) :: xyz_photosrc(3,nphotosrc)
+ real,    intent(in) :: xyzh(:,:)
+ integer, parameter  :: neighcachesize = 1E5
+ integer :: isrc,nneigh,n,ip,ixyzcachesize
+ real    :: xyzcache(3,neighcachesize)
+ real    :: pos_src(3),rcut,hmean,pmass,rhomean,rhomean_cgs,alphaB
+ real    :: t_recomb_src,t_recomb_cgs,t_recomb_myr
+ real    :: rcut_cgs = 1E19    !- sample within 3pc around source
+
+ rcut = rcut_cgs/udist
+ alphaB = get_alphaB(1E4)  !- assumes constant temp of 1E4 K in HII region
+
+ t_recomb = epsilon(t_recomb)
+
+ each_source: do isrc = 1,nphotosrc
+    pos_src = xyz_photosrc(3,isrc)
+
+    !- Get mean density within a radius of rcut
+    call getneigh(node,pos_src,0.,rcut,3,listneigh,nneigh,xyzh,xyzcache,ixyzcachesize,ifirstincell,.false.)
+    if (nneigh < 100) call fatal('heating_cooling_cmi','not sampling enough particles for estimating t_recomb')
+
+    hmean = 0.
+    over_neigh: do n = 1,nneigh
+       ip = listneigh(n)
+       hmean = hmean + xyzh(4,ip)
+    enddo over_neigh
+    hmean = hmean/nneigh
+
+    pmass = massoftype(igas)
+    rhomean = rhoh(hmean,pmass)
+    rhomean_cgs = rhomean *unit_density
+
+    t_recomb_src = mass_proton_cgs/(alphaB*rhomean_cgs) /utime
+    t_recomb = max(t_recomb,t_recomb_src)
+ enddo each_source
+
+ ! testing
+ t_recomb = 1E4*(365*24*60*60)/utime  ! 1E-2 Myr
+
+ t_recomb_cgs = t_recomb*utime
+ t_recomb_myr = t_recomb_cgs/(1E6*365*24*60*60)
+ print*,'Skipping R-type phase of time [Myr]: ',t_recomb_myr
+
+end subroutine compute_Rtype_time
+
+
+!
+! Recombination coef alphaA as func of temp obtained from fitting table 2.1
+! of Osterbrock74 [cm^3 s^-1]
+!
+real function get_alphaA(temp)
+ real, intent(in) :: temp
+ real :: a = 6.113723867E-11
+ real :: b = -1.85763022E-13
+
+ if (use_const_alpha) then
+    get_alphaA = 2.7E-13
+ else
+    get_alphaA = a* temp**(-1./2.) + b  !- P.16: recomb coef ~ T^(-1/2)
+ endif
+ get_alphaA = max(get_alphaA,1.E-13)
+
+end function get_alphaA
+
+!
+! Recombination coef alphaB as func of temp obtained from fitting table 2.1
+! of Osterbrock74 [cm^3 s^-1]
+!
+real function get_alphaB(temp)
+ real, intent(in) :: temp
+ real :: a = 4.417139142E-11
+ real :: b = -1.73910208E-13
+
+ if (use_const_alpha) then
+    get_alphaB = 2.7E-13
+ else
+    get_alphaB = a* temp**(-1./2.) + b
+ endif
+ get_alphaB = max(get_alphaB,1.E-13)
+
+end function get_alphaB
 
 end module heatcool_cmi

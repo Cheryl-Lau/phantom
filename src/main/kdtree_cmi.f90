@@ -14,7 +14,7 @@ module kdtree_cmi
 !
 ! :Owner: Cheryl Lau
 !
-! :Dependencies: io, part, dtypekdtree,kdtree
+! :Dependencies: io, part, dtypekdtree, kdtree
 !
  implicit none
 

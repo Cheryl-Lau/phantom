@@ -132,7 +132,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        !
        ! Get glass file
        !
-       glass_filename = 'glassCube_128.dat'
+       glass_filename = 'glassCube_64.dat'
        call prompt('Enter filename of glass cube',glass_filename)
        glass_filename = trim(adjustl(glass_filename))
     endif

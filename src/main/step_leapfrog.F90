@@ -132,7 +132,7 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
  use derivutils,      only:timer_extf
  use growth,          only:check_dustprop
 #ifdef PHOTOION
- use photoionize_cmi, only:set_ionizing_source_cmi
+ use photoionize_cmi, only:set_ionizing_source_cmi,energy_checks
  use photoionize_cmi, only:implicit_cmi,vxyzu_beforepred,du_cmi
 #endif
  integer, intent(inout) :: npart
@@ -246,11 +246,13 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
 
 
 #ifdef PHOTOION
- !- Determine if there are any ionizing sources at current timestep
- ! Note- Done before going into step_extern in order to flag and
- !       stop the implicit cooling
  timenow = timei + dtsph
+ !- Determine if there are any ionizing sources at current step
  call set_ionizing_source_cmi(timenow,nptmass,xyzmh_ptmass)
+ !- Prepare for energy update
+ !  Note: Done before going into step_extern in order to flag and
+ !        stop the orignal implicit cooling
+ call energy_checks(xyzh)
 #endif
 
 
@@ -540,7 +542,7 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
           if (ufloor > 0.) then
              if (vxyzu(4,i) < ufloor) then
                 vxyzu(4,i) = ufloor
-                print*,'ufloored',i,vxyzu(4,i)
+                !print*,'ufloored',i,vxyzu(4,i)
                 nvfloorc   = nvfloorc + 1
              endif
           endif

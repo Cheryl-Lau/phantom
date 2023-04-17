@@ -29,9 +29,9 @@ module photoionize_cmi
 !   - sink_ionsrc         : *Using sinks as ionizing sources*
 !   - masscrit_ionize_cgs : *Minimum mass of sink that emits ionizing radiation*
 !   - niter_mcrt          : *Number of iterations to release photon packets in MCRT simulation*
-!   - nphoton             : *Number of photons per iteration*
+!   - nphoton             : *Number of photon packets per iteration*
 !   - wavelength          : *Wavelength of ionizing photons in nm*
-!   - temp_hii            : *Temperature of ionized gas*
+!   - temp_hii            : *Temperature of ionized gas (used only if fix_temp_hii is switched on)*
 !   - tol_vsite           : *Tolerence in nodes' position change above which the Voronoi generating-
 !                            sites will be updated*
 !   - lloyd               : *Do Lloyd iterations for Voronoi grid construction*
@@ -46,9 +46,10 @@ module photoionize_cmi
 !   - min_nodesize_toflag : *Minimum node size (relative to root node) to check neutral frac*
 !   - fix_temp_hii        : *Heats ionized particles to temp_hii, else computes heating and cooling*
 !   - implicit_cmi        : *Update internal energy of particles with implicit method, else explicit*
+!   - skip_Rtype_phase    : *Skips the time of R-type phase expansion in heating and cooling*
 !
 ! :Dependencies: infile_utils, physcon, units, io, dim, boundaries, eos, part, kdtree,
-!                kdtree_cmi,hnode_cmi,heatcool_cmi
+!                kdtree_cmi, hnode_cmi, heatcool_cmi
 !
 !
  use cmi_fortran_library
@@ -56,7 +57,7 @@ module photoionize_cmi
  implicit none
 
  public :: init_ionizing_radiation_cmi,set_ionizing_source_cmi,compute_ionization_cmi
- public :: energ_implicit_cmi,energ_explicit_cmi
+ public :: energy_checks,energ_implicit_cmi,energ_explicit_cmi
  public :: read_options_photoionize,write_options_photoionize
 
  ! Position of sources emitting radiation at current time
@@ -77,7 +78,7 @@ module photoionize_cmi
  integer, public :: niter_mcrt = 10
  real,    public :: wavelength = 90      ! nm
  real,    public :: temp_hii   = 1E4     ! K
- real,    public :: tol_vsite  = 1E-3    ! code units
+ real,    public :: tol_vsite  = 1E-2    ! code units
  logical, public :: lloyd      = .true.
 
  ! Move grid-construction up the tree
@@ -96,6 +97,7 @@ module photoionize_cmi
  ! Options for heating/cooling method
  logical, public :: fix_temp_hii = .false.      ! else computes heating and cooling
  logical, public :: implicit_cmi = .true.       ! else updates u explicitly
+ logical, public :: skip_Rtype_phase = .true.
 
  ! Global storages required for updating u
  real,    public,   allocatable :: vxyzu_beforepred(:,:)  ! u before predictor step
@@ -134,11 +136,13 @@ module photoionize_cmi
  integer :: ncall_writefile  = 10     !- interval to write xyzhmnH output file
  integer :: icall,iunit,ifile,iruncmi
  integer :: ncall_checktreewalk = 100
+ integer :: nphotosrc_old
  real    :: xyz_photosrc_si(3,maxphotosrc),lumin_photosrc(maxphotosrc),masscrit_ionize
  real    :: tree_accuracy_cmi_old
  real    :: totlumin,solarl_photonsec,freq_photon,u_hii,udist_si,umass_si
  real    :: time0_wall,time0_cpu,time_now_wall,time_now_cpu
  real    :: time_ellapsed_wall,time_ellapsed_cpu
+ logical :: skip_Rtype_time_now
  logical :: first_call,warned
  logical :: print_cmi = .false.   ! Print CMI outputs to shell
 
@@ -146,7 +150,7 @@ contains
 
 !------------------------------------------------------------------------------
 !+
-! Initializations to prepare for CMI call
+! Initializations
 !+
 !------------------------------------------------------------------------------
 subroutine init_ionizing_radiation_cmi(npart,xyzh)
@@ -251,6 +255,9 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  call precompute_uterms
  if (implicit_cmi) call init_ueq_table
 
+ !- For skipping R-type phase in heating
+ nphotosrc_old = 0
+
  !- For writing snapshots of nH map
  if (maxoutfile > maxoutfile_ult) call fatal('photoionize_cmi','maxoutfile must be within 5 digits')
  call init_write_snapshot
@@ -267,17 +274,20 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
 
 end subroutine init_ionizing_radiation_cmi
 
+
 !----------------------------------------------------------------
 !+
+! Routines to prepare for CMI-call and energy-updates at the beginning of each step
+!+
+!----------------------------------------------------------------
+!
 ! Dynamically set the locations of the sources at current timestep
-! Updates nphotosrc and xyz_photosrc (also used for controlling cooling)
-!+
-!----------------------------------------------------------------
+! Updates nphotosrc and xyz_photosrc
+!
 subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
  use io,       only:fatal
  use physcon,  only:solarm
  use units,    only:utime,udist
- use heatcool_cmi, only:check_to_stop_cooling
  integer, intent(in) :: nptmass
  real,    intent(in) :: time
  real,    intent(in) :: xyzmh_ptmass(:,:)
@@ -327,12 +337,6 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
     enddo
  endif
 
- !- If going to inject radiation at current step, disable original cooling
- if (.not.fix_temp_hii) call check_to_stop_cooling(nphotosrc)
-
- !- About to rerun CMI - reset all storages for energy computation
- if (nphotosrc >= 1) call reset_energ
-
 end subroutine set_ionizing_source_cmi
 
 !
@@ -349,22 +353,64 @@ real function get_lumin(mptmass)
 
 end function get_lumin
 
+!
+! Routine to prepare for energy injections
+!
+subroutine energy_checks(xyzh)
+ use heatcool_cmi, only:check_to_stop_cooling,compute_Rtype_time
+ use heatcool_cmi, only:compute_temp_star
+ real,    intent(in) :: xyzh(:,:)
+ integer :: isrc
+
+ if (.not.fix_temp_hii) call check_to_stop_cooling(nphotosrc)
+
+ if (nphotosrc >= 1) then
+    !- ready to rerun CMI
+    call reset_energ
+
+    !- calculate total luminosity of all sources
+    totlumin = 0.
+    do isrc = 1,nphotosrc
+       totlumin = totlumin + lumin_photosrc(isrc)
+    enddo
+
+    !- With sources at current step set, estimate temp of source(s)
+    call compute_temp_star(freq_photon,totlumin,nphotosrc)
+ endif
+
+ if (skip_Rtype_phase) then
+    if (nphotosrc > nphotosrc_old) then   !- a new source is added
+       skip_Rtype_time_now = .true.
+       call compute_Rtype_time(nphotosrc,xyz_photosrc,xyzh)
+    else
+       if (skip_Rtype_time_now) skip_Rtype_time_now = .false.  !- switch back off
+    endif
+    nphotosrc_old = nphotosrc
+ endif
+
+end subroutine energy_checks
+
 !----------------------------------------------------------------
 !+
 ! Wrapper for computing nH of all particles at current timestep
 !+
 !----------------------------------------------------------------
-subroutine compute_ionization_cmi(time,npart,xyzh)
+subroutine compute_ionization_cmi(time,npart,xyzh,vxyzu)
  use part,     only:massoftype,igas,isdead_or_accreted
  use kdtree,   only:inodeparts,inoderange
  use io,       only:fatal,warning
+ use units,    only:utime ! testing
  use omp_lib
  integer, intent(inout) :: npart
  real,    intent(in)    :: time
- real,    intent(inout) :: xyzh(:,:)
+ real,    intent(inout) :: xyzh(:,:),vxyzu(:,:)
  real,    allocatable   :: x(:),y(:),z(:),h(:),m(:),nH(:)
  integer :: ip,ip_cmi,npart_cmi,i,n,ipnode,isite,ncminode
  real    :: nH_part,nH_site
+ real    :: time_cgs ! testing
+
+ integer :: iunit_test
+ character(len=50) :: ifile_char,filename_test
 
  if (nphotosrc == 0) return
 
@@ -393,6 +439,21 @@ subroutine compute_ionization_cmi(time,npart,xyzh)
        endif
     enddo over_entries
     call reset_cminode
+
+    ! Testing
+    if (mod(iruncmi,ncall_writefile) == 0) then
+       write(ifile_char,*) ifile-1
+       iunit_test = iunit+5000
+       filename_test = 'nH_u_parts_'//trim(adjustl(ifile_char))//'.txt'
+       print*,'writing to file ',filename_test
+       open(iunit_test,file=filename_test,status='replace')
+       time_cgs = time*utime
+       write(iunit_test,*) time_cgs
+       do ip = 1,npart
+          write(iunit_test,*) nH_allparts(ip), vxyzu(4,ip)
+       enddo
+       close(iunit_test)
+    endif
 
  else
     !
@@ -486,7 +547,8 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
  npart_heated = 0
  !$omp parallel do default(none) shared(npart,nH_allparts,xyzh,vxyzu) &
  !$omp shared(vxyzu_beforepred,pmass,dt,du_cmi) &
- !$omp shared(totlumin,nphotosrc,freq_photon,fix_temp_hii,u_hii) &
+ !$omp shared(fix_temp_hii,u_hii) &
+ !$omp shared(skip_Rtype_time_now) &
  !$omp private(ip,nH,rhoi,ui,ueq,gammaheat,lambda,du) &
  !$omp reduction(+:ueq_mean,npart_heated)
  do ip = 1,npart
@@ -501,10 +563,10 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
        else
           if (nH > -epsilon(nH)) then
              rhoi = rhoh(xyzh(4,ip),pmass)
-             call compute_heating_term(nH,rhoi,ui,totlumin,nphotosrc,freq_photon,gammaheat)
+             call compute_heating_term(nH,rhoi,ui,gammaheat)
              call compute_cooling_term(ui,lambda)  !- for calculating timescale
              call get_ueq(rhoi,gammaheat,ui,ueq)
-             call compute_du(dt,rhoi,ui,ueq,gammaheat,lambda,du)
+             call compute_du(skip_Rtype_time_now,dt,rhoi,ui,ueq,gammaheat,lambda,du)
              !- checking
              if (nH < 0.5) then
                 npart_heated = npart_heated + 1
@@ -533,13 +595,14 @@ end subroutine energ_implicit_cmi
 !
 ! Computes dudt_cmi(:); to be heated in force
 !
-subroutine energ_explicit_cmi(npart,xyzh,vxyzu)
+subroutine energ_explicit_cmi(npart,xyzh,vxyzu,dt)
  use heatcool_cmi, only:compute_heating_term,compute_cooling_term,compute_dudt
  use part,         only:rhoh,massoftype,igas
  use physcon,      only:kboltz,mass_proton_cgs
  use eos,          only:gamma,gmw
  use units,        only:unit_ergg
  integer, intent(in) :: npart
+ real,    intent(in) :: dt
  real,    intent(in) :: xyzh(:,:)
  real,    intent(in) :: vxyzu(:,:)
  integer :: ip,npart_heated
@@ -556,8 +619,8 @@ subroutine energ_explicit_cmi(npart,xyzh,vxyzu)
  gmw = 0.5
 
  !$omp parallel do default(none) shared(npart,nH_allparts,xyzh,vxyzu) &
- !$omp shared(totlumin,nphotosrc,freq_photon) &
- !$omp shared(pmass,dudt_cmi) &
+ !$omp shared(pmass,dt,dudt_cmi) &
+ !$omp shared(skip_Rtype_time_now) &
  !$omp private(ip,nH,rhoi,ui,gammaheat,lambda,dudt) &
  !$omp private(u_ionized) &
  !$omp reduction(+:npart_heated,uhii_mean)
@@ -566,9 +629,9 @@ subroutine energ_explicit_cmi(npart,xyzh,vxyzu)
     if (nH > -epsilon(nH)) then
        rhoi = rhoh(xyzh(4,ip),pmass)
        ui   = vxyzu(4,ip)
-       call compute_heating_term(nH,rhoi,ui,totlumin,nphotosrc,freq_photon,gammaheat)
+       call compute_heating_term(nH,rhoi,ui,gammaheat)
        call compute_cooling_term(ui,lambda)
-       call compute_dudt(rhoi,gammaheat,lambda,dudt)
+       call compute_dudt(skip_Rtype_time_now,dt,rhoi,ui,gammaheat,lambda,dudt)
        !- store dudt into global array
        dudt_cmi(ip) = dudt
        !- checking
@@ -971,13 +1034,15 @@ end subroutine run_cmacionize
 !+
 !-----------------------------------------------------------------------
 subroutine write_cmi_infiles(nsite,x,y,z,h,m)
- use io,  only:fatal
+ use heatcool_cmi, only:temp_star
+ use io,           only:fatal
  integer, intent(in) :: nsite
  real,    intent(in) :: x(:),y(:),z(:),h(:),m(:)
  integer :: i,isrc
  real    :: xmin,xmax,ymin,ymax,zmin,zmax,dx,dy,dz,space_fac
  real    :: xmin_si,ymin_si,zmin_si,dx_si,dy_si,dz_si
  logical :: redo_grid
+
  !
  ! Set boundaries only around the given sites
  ! also check that the input xyzhm are sensible
@@ -1054,10 +1119,6 @@ subroutine write_cmi_infiles(nsite,x,y,z,h,m)
  !
  open(2025,file='source_positions.txt')
  write(2025,*) nphotosrc
- totlumin = 0.
- do isrc = 1,nphotosrc
-    totlumin = totlumin + lumin_photosrc(isrc)
- enddo
  write(2025,*) totlumin
  do isrc = 1,nphotosrc
     write(2025,*) xyz_photosrc_si(1:3,isrc), lumin_photosrc(isrc)/totlumin
@@ -1078,7 +1139,7 @@ subroutine write_cmi_infiles(nsite,x,y,z,h,m)
  write(2026,'(2x,a6)') "S: 0.0"
 
  write(2026,'(a22)') "TemperatureCalculator:"
- write(2026,'(2x,a33)') "do temperature calculation: false"
+ write(2026,'(2x,a32)') "do temperature calculation: true"
 
  write(2026,'(a25)') "DiffuseReemissionHandler:"
  write(2026,'(2x,a10)') "type: None"
@@ -1099,6 +1160,9 @@ subroutine write_cmi_infiles(nsite,x,y,z,h,m)
  write(2026,'(4x,a35)') "filename: phantom_voronoi_sites.txt"
  write(2026,'(4x,a9)') "type: SPH"
 
+ write(2026,'(a24)') "DensityGridWriterFields:"  ! testing
+ write(2026,'(2x,a15)') "HeatingRateH: 1"
+
  write(2026,'(a16)') "DensityFunction:"
  write(2026,'(2x,a17)') "type: Homogeneous"
 
@@ -1107,8 +1171,11 @@ subroutine write_cmi_infiles(nsite,x,y,z,h,m)
  write(2026,'(2x,a30)') "filename: source_positions.txt"
 
  write(2026,'(a21)') "PhotonSourceSpectrum:"
- write(2026,'(2x,a19)') "type: Monochromatic"
- write(2026,'(2x,a11,e12.3,a3)') "frequency: ",freq_photon," Hz"
+! write(2026,'(2x,a19)') "type: Monochromatic"
+! write(2026,'(2x,a11,e12.3,a3)') "frequency: ",freq_photon," Hz"
+ write(2026,'(2x,a12)') "type: Planck"
+ write(2026,'(2x,a13,e10.3,a2)') "temperature: ",temp_star," K"
+ write(2026,'(2x,a28)') "ionizing flux: -1. m^-2 s^-1"
 
  write(2026,'(a21)') "IonizationSimulation:"
  write(2026,'(2x,a22,i2)') "number of iterations: ",niter_mcrt
@@ -1165,7 +1232,7 @@ subroutine init_write_snapshot
  iunit = 4000
  iruncmi = 0
  warned = .false.
- !- Set starting val of ifile by finding the last nixyzhmf_* saved
+ !- Set starting val of ifile by finding the last snapshot file saved
  ifile_search = maxoutfile
  lastfile_found = .false.
  do while (.not.lastfile_found)
@@ -1176,7 +1243,7 @@ subroutine init_write_snapshot
     else
         ifile_search = ifile_search - 1
         if (ifile_search < 0) then
-           exit
+           exit  !- start from _00000
         endif
     endif
  enddo
@@ -1210,7 +1277,7 @@ subroutine write_nH_snapshot(time,nsite,xyzh_parts,x_in,y_in,z_in,h_in,m_in,nH_i
     if (.not.got_all) call fatal('photoionize_cmi','Missing inputs for writing snapshots')
  endif
 
- if (iunit < maxoutfile) then
+ if (ifile < maxoutfile) then
     if (mod(iruncmi,ncall_writefile) == 0) then
 
        call gen_filename(ifile,allsites_filename)
@@ -1365,6 +1432,7 @@ subroutine write_options_photoionize(iunit)
  call write_inopt(min_nodesize_toflag,'min_nodesize_toflag','Minimum node size to check nH',iunit)
  call write_inopt(fix_temp_hii,'fix_temp_hii','Heat ionized particles to specified temp_hii',iunit)
  call write_inopt(implicit_cmi,'implicit_cmi','Use implicit method to update internal energies',iunit)
+ call write_inopt(skip_Rtype_phase,'skip_Rtype_phase','Skips time of R-type phase expansion in heating',iunit)
 
 end subroutine write_options_photoionize
 
@@ -1454,10 +1522,13 @@ case('fix_temp_hii')
  case('implicit_cmi')
     read(valstring,*,iostat=ierr) implicit_cmi
     ngot = ngot + 1
+ case('skip_Rtype_phase')
+    read(valstring,*,iostat=ierr) skip_Rtype_phase
+    ngot = ngot + 1
  case default
     imatch = .false.
  end select
- igotall = ( ngot >= 19 )
+ igotall = ( ngot >= 20 )
 
 end subroutine read_options_photoionize
 
