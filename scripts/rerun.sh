@@ -3,6 +3,11 @@
 # Rerun a phantom simulation
 #
 read -p 'Filename: ' jobname
+length=${#jobname}
+
+if [ $length == 0 ]; then
+   exit 2
+fi
 
 rm p*
 rm $jobname*

@@ -7,7 +7,7 @@
 module easter_egg
  !
  ! The 2048 of Phantom
- ! FOR EMERGENCY USE ONLY - pauses sim immediately to entertain oneself
+ ! FOR EMERGENCY USE ONLY - pauses sim immediately for a bit of fun
  !
  ! Implemented for (and by) horribly bored people who are in desperate need
  ! of amusement whilst dreading their project.

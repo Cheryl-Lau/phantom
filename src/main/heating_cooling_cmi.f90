@@ -37,8 +37,8 @@ module heatcool_cmi
  implicit none
 
  public :: check_to_stop_cooling,init_ueq_table,precompute_uterms
- public :: compute_heating_term,compute_cooling_term,get_ueq,compute_du,compute_dudt
- public :: compute_Rtype_time,compute_temp_star
+ public :: heating_term,cooling_term,get_ueq,compute_du,compute_dudt
+ public :: compute_Rtype_time
 
  logical, public :: stop_cooling  !- flag to stop cooling at current step
 
@@ -49,7 +49,7 @@ module heatcool_cmi
  !- Heating from cosmic rays, X-rays, H2 formation and destruction etc. (as of KI02)
  real,    public :: gamma_background_cgs = 2E-26
 
- real,    public :: t_recomb,temp_star
+ real,    public :: t_recomb
 
  private
 
@@ -58,11 +58,11 @@ module heatcool_cmi
  integer, parameter :: maxgamma = 5000
  real   :: rho_gamma_ueq_table(maxrho,maxgamma,6)  ! stores: rho,gamma,numroots,ueq1,ueq2,ueq3
 
- real   :: rhomin_cgs   = 7E-29
- real   :: rhomax_cgs   = 1E-19
- real   :: gammamin_cgs = 2E-26   !- min background heating
- real   :: gammamax_cgs = 1E-14
- real   :: Tmin  = 1E1
+ real   :: rhomin_cgs   = 1E-23
+ real   :: rhomax_cgs   = 1E-17
+ real   :: gammamin_cgs = 1E-27
+ real   :: gammamax_cgs = 1E-11
+ real   :: Tmin  = 1E0
  real   :: Tmax  = 1E9
 
  !- Pre-computed vars
@@ -108,22 +108,6 @@ subroutine precompute_uterms
 end subroutine precompute_uterms
 
 !
-! Estimate temperature of the newly created photoelectrons using luminosity of source(s)
-!
-subroutine compute_temp_star(freq_photon,totlumin,nphotosrc)
- use physcon, only:steboltz,pi,planckh
- integer, intent(in)  :: nphotosrc
- real,    intent(in)  :: totlumin,freq_photon
- real    :: energ_photon_cgs,lumin_cgs
- real    :: rstar_cgs = 6.957E11 !- Radius of a typical O-star
-
- energ_photon_cgs = planckh*freq_photon
- lumin_cgs = totlumin/nphotosrc*energ_photon_cgs   ! [erg s^-1]
- temp_star = (lumin_cgs/(4.*pi*rstar_cgs**2*steboltz))**(1./4.)
-
-end subroutine compute_temp_star
-
-!
 ! Pre-solves the equilibriums ueq as function of both rho and gamma
 ! and organize into a 3D table: rho_gamma_ueq_table(irho,igamma,(rho,gamma,numroot,ueq123))
 !
@@ -136,7 +120,7 @@ subroutine init_ueq_table
  real    :: Tlocalmax,Tlocalmin,gamma_cgs,dgamma_cgs,drho_cgs,rho_cgs,nrho_cgs
  real    :: rho,gammaheat
  real    :: Teq1,Teq2,Teq3,ueq1,ueq2,ueq3,gmw0
- logical :: write_ueq = .true.
+ logical :: write_ueq = .false.
  logical :: write_Teq = .true.
 
  print*,'Pre-computing thermal equilibrium solutions'
@@ -174,7 +158,9 @@ subroutine init_ueq_table
        ! Get total number of roots (irterr=1 means no roots found)
        if (irterr3 == 1) then
           if (irterr2 == 1) then
-             if (irterr1 /= 1) then
+             if (irterr1 == 1) then
+                numroots = 0
+             else
                 numroots = 1
              endif
           else
@@ -277,19 +263,25 @@ end subroutine solve_temp_equil
 
 !
 ! Compute photoionization heating rate gamma in code units using nH from CMI
-! Note that Osterbrock74 G(H) = N_neutral*gamma
+! Note that Osterbrock74 G(H) = nrho*gamma
 !
-subroutine compute_heating_term(nH,rho,u,gammaheat)
+subroutine heating_term(nH,rho,u,temp_star,gammaheat)
  use physcon, only:mass_proton_cgs,mass_electron_cgs,kboltz
  use units,   only:unit_density,unit_ergg
  use eos,     only:gamma,gmw
  use io,      only:fatal
- real,    intent(in)  :: nH,rho,u
- real,    intent(out) :: gammaheat
- real    :: rho_cgs,nrho_cgs,temp,alphaA,Ne,Np
- real    :: heating_rate_cgs,gamma_cgs
+ real, intent(in)  :: nH,rho,u,temp_star
+ real, intent(out) :: gammaheat
+ real :: rho_cgs,nrho_cgs,temp,alphaA,Ne,Np
+ real :: heating_rate_cgs,gamma_cgs
 
- rho_cgs  = rho*unit_density
+ rho_cgs = rho*unit_density
+
+ if (rho_cgs < rhomin_cgs .or. rho_cgs > rhomax_cgs) then
+    print*,'rho_cgs',rho_cgs
+    call fatal('heating_cooling_cmi','rho_cgs exceeded range')
+ endif
+
  nrho_cgs = rho_cgs*one_over_mH_cgs
 
  !- number density of free electrons and protons
@@ -301,29 +293,28 @@ subroutine compute_heating_term(nH,rho,u,gammaheat)
  alphaA = get_alphaA(temp)
 
  !- Photoionization heating G(H) as of Osterbrock74 eqn 3.2
- heating_rate_cgs = Ne*Np*alphaA*(3./2.)*kboltz*temp_star   ! [erg cm^-3 s-1]
+ heating_rate_cgs = Ne*Np*alphaA*3./2.*kboltz*temp_star   ! [erg cm^-3 s-1]
 
  !- gamma
- gamma_cgs = heating_rate_cgs/(nrho_cgs*nH)  ! [erg s-1]
+ gamma_cgs = heating_rate_cgs/(nrho_cgs)  ! [erg s-1]
 
  !- Include background heating
  gamma_cgs = gamma_cgs + gamma_background_cgs
 
  if (gamma_cgs < gammamin_cgs .or. gamma_cgs > gammamax_cgs) then
-    print*,'nH; gamma_cgs; temp; alpha; GH; rho; nrho; Ne; Np',nH,gamma_cgs,temp,alphaA,&
-            heating_rate_cgs,rho_cgs,nrho_cgs,Ne,Np
+    print*,'nH; gamma_cgs',nH,gamma_cgs
     call fatal('heating_cooling_cmi','gamma_cgs exceeded range')
  endif
 
  !- convert to code units
  gammaheat = gamma_cgs*one_over_unit_gamma
 
-end subroutine compute_heating_term
+end subroutine heating_term
 
 !
 ! Routine to read cooling rate off temp directly from cooling curve
 !
-subroutine compute_cooling_term(u,lambda)
+subroutine cooling_term(u,lambda)
  use physcon, only:mass_proton_cgs,kboltz
  use eos,     only:gmw,gamma
  use units,   only:unit_ergg
@@ -337,20 +328,21 @@ subroutine compute_cooling_term(u,lambda)
  !- convert to code units
  lambda = lambda_cgs*one_over_unit_lambda
 
-end subroutine compute_cooling_term
+end subroutine cooling_term
 
 !
 ! Extract ueq(s) from pre-computed table with the given rho and gamma
-! Selects the right ueq using the input vxyzu
+! Selects the right ueq using the current u
 !
-subroutine get_ueq(rho,gammaheat,u,ueq_final)
+subroutine get_ueq(rho,gammaheat,u,ueq_final,numroots)
  use physcon, only:kboltz,mass_proton_cgs
  use units,   only:unit_ergg
  use eos,     only:gmw,gamma
- use io,      only:fatal
+ use io,      only:fatal,warning
  real, intent(in)  :: rho,gammaheat,u
  real, intent(out) :: ueq_final
- integer :: irho,igamma,jrho,jgamma,numroots,r
+ integer, intent(out) :: numroots  ! testing
+ integer :: irho,igamma,jrho,jgamma,r !,numroots
  real    :: rhotable(maxrho),gammatable(maxgamma)  !- unpacked from rho_gamma_ueq_table
  real    :: ueqs(3)                                !- holds the 3 possible ueq solutions
  real    :: x1,x2,y1,y2,q11,q12,q21,q22            !- for 2D interpolation
@@ -361,11 +353,17 @@ subroutine get_ueq(rho,gammaheat,u,ueq_final)
  !- Closest index
  irho   = minloc(abs(rhotable(:)-rho),1)
  igamma = minloc(abs(gammatable(:)-gammaheat),1)
+ if (irho == 1 .or. irho == maxrho) call warning('heating_cooling_cmi','rho range too small')
+ if (igamma == 1 .or. igamma == maxgamma) call warning('heating_cooling_cmi','gamma range too small')
 
  numroots = int(rho_gamma_ueq_table(irho,igamma,3))
- if (numroots == 0) call fatal('cooling_heating_cmi','no equilibrium solution found')
- ueqs = (/ 0.,0.,0. /)
+ if (numroots == 0) then
+    call warning('heating_cooling_cmi','no equilibrium solution found - drift to Tmax')
+    ueq_final = kboltz*Tmax / (gmw*mass_proton_cgs*(gamma-1)) / unit_ergg
+    return
+ endif
 
+ ueqs = 0.
  if (get_ueq_by_interp) then
     ! Note: [i] closest index; [j] lower bound; [j+1] upper bound bracketing input var
 
@@ -425,6 +423,7 @@ subroutine get_ueq(rho,gammaheat,u,ueq_final)
     if (u <= ueqs(2)) then
        ueq_final = ueqs(1)
     else
+       print*,'u is greater than ueq2, its Teq2 is',ueqs(2)/kboltz*(gmw*mass_proton_cgs*(gamma-1))*unit_ergg
        if (numroots == 2) then
           ueq_final = kboltz*Tmax / (gmw*mass_proton_cgs*(gamma-1)) / unit_ergg
        elseif (numroots == 3) then
@@ -471,6 +470,7 @@ subroutine compute_dudt(skip_Rtype,dt,rho,u,gamma,lambda,dudt)
  logical, intent(in)  :: skip_Rtype
  real,    intent(in)  :: dt,rho,u,gamma,lambda
  real,    intent(out) :: dudt
+ integer :: numroots ! testing
  real :: ueq,du,unew
 
  dudt = one_over_mH*gamma - rho*one_over_mH2*lambda
@@ -478,7 +478,7 @@ subroutine compute_dudt(skip_Rtype,dt,rho,u,gamma,lambda,dudt)
  !- To 'skip' a certain amount of time, an implicit method is required
  if (skip_Rtype) then
     if (t_recomb > dt) then
-       call get_ueq(rho,gamma,u,ueq)
+       call get_ueq(rho,gamma,u,ueq,numroots)  ! numroots added for testing
        call compute_du(skip_Rtype,dt,rho,u,ueq,gamma,lambda,du)
        dudt = du/dt
     else
@@ -542,11 +542,11 @@ subroutine compute_Rtype_time(nphotosrc,xyz_photosrc,xyzh)
  enddo each_source
 
  ! testing
- t_recomb = 1E4*(365*24*60*60)/utime  ! 1E-2 Myr
+ t_recomb = 1E7*(365*24*60*60)/utime  ! 1E1 Myr
 
  t_recomb_cgs = t_recomb*utime
  t_recomb_myr = t_recomb_cgs/(1E6*365*24*60*60)
- print*,'Skipping R-type phase of time [Myr]: ',t_recomb_myr
+ write(*,'(1x,a37,f7.3)') 'Skipping R-type phase of time [Myr]: ',t_recomb_myr
 
 end subroutine compute_Rtype_time
 
