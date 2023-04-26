@@ -266,14 +266,16 @@ end subroutine solve_temp_equil
 ! Note that Osterbrock74 G(H) = nrho*gamma
 !
 subroutine heating_term(nH,rho,u,temp_star,gammaheat)
- use physcon, only:mass_proton_cgs,mass_electron_cgs,kboltz
+ use physcon, only:mass_proton_cgs,kboltz
  use units,   only:unit_density,unit_ergg
  use eos,     only:gamma,gmw
  use io,      only:fatal
+ use units,   only:umass
+ use part,    only:massoftype,igas
  real, intent(in)  :: nH,rho,u,temp_star
  real, intent(out) :: gammaheat
  real :: rho_cgs,nrho_cgs,temp,alphaA,Ne,Np
- real :: heating_rate_cgs,gamma_cgs
+ real :: heating_rate_cgs,gamma_cgs,vpart_cgs  ! testing
 
  rho_cgs = rho*unit_density
 
@@ -297,6 +299,10 @@ subroutine heating_term(nH,rho,u,temp_star,gammaheat)
 
  !- gamma
  gamma_cgs = heating_rate_cgs/(nrho_cgs)  ! [erg s-1]
+! vpart_cgs = massoftype(igas)*umass/(nrho_cgs*mass_proton_cgs)
+! gamma_cgs = heating_rate_cgs*vpart_cgs
+
+! if (nH < 0.5) print*,'gamma_cgs/NeNp',gamma_cgs/(Ne*Np)
 
  !- Include background heating
  gamma_cgs = gamma_cgs + gamma_background_cgs

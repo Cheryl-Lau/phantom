@@ -20,6 +20,12 @@ module photoionize_cmi
 !     ionization front is resolved. Activate auto_opennode and tweak parameters including
 !     nHlimit_fac, min_nodesize_toflag and tree_accuracy_cmi for best results.
 !
+! Photoionization heating can be done in the following modes -
+!  1. sinks as sources       / user-defined sources
+!  2. monochromatic source   / blackbody source               (blackbody only if using sinks)
+!  3. instantly heat to 1E4K / compute heating and cooling
+!  4. update u implicitly    / update u explicitly            (if doing heating & cooling)
+!
 ! :References: Petkova,et.al,2021,MNRAS,507,858
 !              Bisbas,et.al,2015,MNRAS,453,1324
 !
@@ -31,7 +37,9 @@ module photoionize_cmi
 !   - niter_mcrt          : *Number of iterations to release photon packets in MCRT simulation*
 !   - nphoton             : *Number of photon packets per iteration*
 !   - photon_eV           : *Energy of ionizing photons in eV*
-!   - temp_hii            : *Temperature of ionized gas (used only if fix_temp_hii is switched on)*
+!   - temp_star           : *Temperature of the star (for setting the source and/or computing heating)*
+!   - monochrom_source    : *Use source with monochromatic frequency which corresponds to energy photon_eV,
+!                            else follows a planck distribution at temperature temp_star*
 !   - tol_vsite           : *Tolerence in nodes' position change above which the Voronoi generating-
 !                            sites will be updated*
 !   - lloyd               : *Do Lloyd iterations for Voronoi grid construction*
@@ -44,6 +52,7 @@ module photoionize_cmi
 !   - delta_rcut          : *Increase in rcut_opennode and rcut_leafpart in an iteration step*
 !   - nHlimit_fac         : *Parameter which controls the resolution of the ionization front*
 !   - min_nodesize_toflag : *Minimum node size (relative to root node) to check neutral frac*
+!   - temp_hii            : *Presumed temperature of ionized gas*
 !   - fix_temp_hii        : *Heats ionized particles to temp_hii, else computes heating and cooling*
 !   - implicit_cmi        : *Update internal energy of particles with implicit method, else explicit*
 !   - skip_Rtype_phase    : *Skips the time of R-type phase expansion in heating and cooling*
@@ -77,10 +86,10 @@ module photoionize_cmi
  integer, public :: nphoton    = 1E6
  integer, public :: niter_mcrt = 10
  real,    public :: photon_eV  = 13.7    ! eV; used only if sink_ionsrc=F and monochrom_source=T
- real,    public :: temp_star  = 3E4     ! K;  used only if sink_ionsrc=F and monochrom_source=F
+ real,    public :: temp_star  = 5E4     ! K;  used only if sink_ionsrc=F and monochrom_source=F
  real,    public :: tol_vsite  = 1E-2    ! code units
  logical, public :: lloyd      = .true.
- logical, public :: monochrom_source = .true.   ! else blackbody spec
+ logical, public :: monochrom_source = .false.   ! else blackbody spec
 
  ! Move grid-construction up the tree
  logical, public :: photoionize_tree = .true.
@@ -1510,9 +1519,10 @@ subroutine write_options_photoionize(iunit)
  call write_inopt(niter_mcrt,'niter_mcrt','number of photon-release iterations',iunit)
  call write_inopt(nphoton,'nphoton','number of photons per iteration',iunit)
  call write_inopt(photon_eV,'photon_eV','Energy of ionizing photons in eV',iunit)
- call write_inopt(temp_hii,'temp_hii','Temperature of ionized gas',iunit)
+ call write_inopt(temp_star,'temp_star','Temperature of ionizing source',iunit)
  call write_inopt(tol_vsite,'tol_vsite','Threshold to update Voronoi gen-sites',iunit)
  call write_inopt(lloyd,'lloyd','Apply Lloyd iteration to construct Voronoi grid',iunit)
+ call write_inopt(monochrom_source,'monochrom_source','Use monochromatic source',iunit)
  call write_inopt(photoionize_tree,'photoionize_tree','Construct Voronoi grid around tree nodes',iunit)
  call write_inopt(tree_accuracy_cmi,'tree_accuracy_cmi','Tree-opening criteria for cmi-nodes',iunit)
  call write_inopt(rcut_opennode,'rcut_opennode','Radius within which nodes must be leaves',iunit)
@@ -1522,6 +1532,7 @@ subroutine write_options_photoionize(iunit)
  call write_inopt(delta_rcut,'delta_rcut','Increase in rcut_opennode and rcut_leafpart per iter step',iunit)
  call write_inopt(nHlimit_fac,'nHlimit_fac','Paramter controlling resolution of ionization front',iunit)
  call write_inopt(min_nodesize_toflag,'min_nodesize_toflag','Minimum node size to check nH',iunit)
+ call write_inopt(temp_hii,'temp_hii','Temperature of ionized gas',iunit)
  call write_inopt(fix_temp_hii,'fix_temp_hii','Heat ionized particles to specified temp_hii',iunit)
  call write_inopt(implicit_cmi,'implicit_cmi','Use implicit method to update internal energies',iunit)
  call write_inopt(skip_Rtype_phase,'skip_Rtype_phase','Skips time of R-type phase expansion in heating',iunit)
@@ -1564,16 +1575,19 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
     read(valstring,*,iostat=ierr) photon_eV
     ngot = ngot + 1
     if (photon_eV <= 0.) call fatal(label,'invalid setting for photon_eV (<=0)')
- case('temp_hii')
-    read(valstring,*,iostat=ierr) temp_hii
+ case('temp_star')
+    read(valstring,*,iostat=ierr) temp_star
     ngot = ngot + 1
-    if (temp_hii <= 0.) call fatal(label,'invalid setting for temp_hii (<=0)')
+    if (temp_star <= 0.) call fatal(label,'invalid setting for temp_star (<=0)')
  case('tol_vsite')
     read(valstring,*,iostat=ierr) tol_vsite
     ngot = ngot + 1
     if (tol_vsite < 0.) call fatal(label,'invalid setting for tol_vsite (<0)')
  case('lloyd')
     read(valstring,*,iostat=ierr) lloyd
+    ngot = ngot + 1
+ case('monochrom_source')
+    read(valstring,*,iostat=ierr) monochrom_source
     ngot = ngot + 1
  case('photoionize_tree')
     read(valstring,*,iostat=ierr) photoionize_tree
@@ -1608,7 +1622,11 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
     read(valstring,*,iostat=ierr) min_nodesize_toflag
     ngot = ngot + 1
     if (min_nodesize_toflag < 0.) call fatal(label,'invalid setting for min_nodesize_toflag')
-case('fix_temp_hii')
+ case('temp_hii')
+    read(valstring,*,iostat=ierr) temp_hii
+    ngot = ngot + 1
+    if (temp_hii <= 0.) call fatal(label,'invalid setting for temp_hii (<=0)')
+ case('fix_temp_hii')
     read(valstring,*,iostat=ierr) fix_temp_hii
     ngot = ngot + 1
  case('implicit_cmi')
@@ -1620,7 +1638,7 @@ case('fix_temp_hii')
  case default
     imatch = .false.
  end select
- igotall = ( ngot >= 20 )
+ igotall = ( ngot >= 22 )
 
 end subroutine read_options_photoionize
 
