@@ -54,7 +54,7 @@ module heatcool_cmi
  private
 
  !- Pre-computed table of equilibiurms ueq(rho,gamma)
- integer, parameter :: maxrho   = 5000
+ integer, parameter :: maxrho   = 1000
  integer, parameter :: maxgamma = 5000
  real   :: rho_gamma_ueq_table(maxrho,maxgamma,6)  ! stores: rho,gamma,numroots,ueq1,ueq2,ueq3
 
