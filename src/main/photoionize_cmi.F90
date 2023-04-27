@@ -86,7 +86,7 @@ module photoionize_cmi
  integer, public :: nphoton    = 1E6
  integer, public :: niter_mcrt = 10
  real,    public :: photon_eV  = 13.7    ! eV; used only if sink_ionsrc=F and monochrom_source=T
- real,    public :: temp_star  = 5E4     ! K;  used only if sink_ionsrc=F and monochrom_source=F
+ real,    public :: temp_star  = 3E4     ! K;  used only if sink_ionsrc=F and monochrom_source=F
  real,    public :: tol_vsite  = 1E-2    ! code units
  logical, public :: lloyd      = .true.
  logical, public :: monochrom_source = .false.   ! else blackbody spec

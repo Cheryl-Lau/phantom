@@ -54,7 +54,7 @@ module heatcool_cmi
  private
 
  !- Pre-computed table of equilibiurms ueq(rho,gamma)
- integer, parameter :: maxrho   = 1000
+ integer, parameter :: maxrho   = 5000
  integer, parameter :: maxgamma = 5000
  real   :: rho_gamma_ueq_table(maxrho,maxgamma,6)  ! stores: rho,gamma,numroots,ueq1,ueq2,ueq3
 
@@ -198,12 +198,12 @@ subroutine init_ueq_table
 end subroutine init_ueq_table
 
 !
-! Thermal equilibium: f_T = n*lambda(T) - gamma
+! Thermal equilibium: f_T = n*gamma - n^2*lambda(T)
 !
 real function equifunc(nrho_cgs,temp,gamma_cgs)
  real, intent(in) :: nrho_cgs,temp,gamma_cgs
 
- equifunc = nrho_cgs*lambdacoolDR(temp) - gamma_cgs
+ equifunc = nrho_cgs*gamma_cgs - nrho_cgs**2*lambdacoolDR(temp)
 
 end function equifunc
 
@@ -270,12 +270,10 @@ subroutine heating_term(nH,rho,u,temp_star,gammaheat)
  use units,   only:unit_density,unit_ergg
  use eos,     only:gamma,gmw
  use io,      only:fatal
- use units,   only:umass
- use part,    only:massoftype,igas
  real, intent(in)  :: nH,rho,u,temp_star
  real, intent(out) :: gammaheat
  real :: rho_cgs,nrho_cgs,temp,alphaA,Ne,Np
- real :: heating_rate_cgs,gamma_cgs,vpart_cgs  ! testing
+ real :: heating_rate_cgs,gamma_cgs
 
  rho_cgs = rho*unit_density
 
@@ -299,10 +297,6 @@ subroutine heating_term(nH,rho,u,temp_star,gammaheat)
 
  !- gamma
  gamma_cgs = heating_rate_cgs/(nrho_cgs)  ! [erg s-1]
-! vpart_cgs = massoftype(igas)*umass/(nrho_cgs*mass_proton_cgs)
-! gamma_cgs = heating_rate_cgs*vpart_cgs
-
-! if (nH < 0.5) print*,'gamma_cgs/NeNp',gamma_cgs/(Ne*Np)
 
  !- Include background heating
  gamma_cgs = gamma_cgs + gamma_background_cgs

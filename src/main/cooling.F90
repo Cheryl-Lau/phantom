@@ -455,6 +455,8 @@ real function lambdacoolDR(temp)
     lambdagamma = lambdagamma * 10**(-5.25) * temp**(0.7)
  endif
 
+ lambdagamma = lambdagamma / 10**(0.35)
+
  lambdacoolDR = lambdagamma * GammaKI_cgs
 
 end function lambdacoolDR
