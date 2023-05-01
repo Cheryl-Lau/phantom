@@ -40,17 +40,17 @@ module photoionize_cmi
 !   - temp_star           : *Temperature of the star (for setting the source and/or computing heating)*
 !   - monochrom_source    : *Use source with monochromatic frequency which corresponds to energy photon_eV,
 !                            else follows a planck distribution at temperature temp_star*
-!   - tol_vsite           : *Tolerence in nodes' position change above which the Voronoi generating-
-!                            sites will be updated*
+!   - tol_vsite           : *Tolerence in nodes' fractional position change above which the Voronoi
+!                            generating-sites will be updated*
 !   - lloyd               : *Do Lloyd iterations for Voronoi grid construction*
 !   - photoionize_tree    : *Construct Voronoi grid with tree nodes; else with particles*
 !   - tree_accuracy_cmi   : *threshold angle to open tree node during kdtree-walk*
-!   - rcut_opennode       : *Radius within which we must get leaves*
-!   - rcut_leafpart       : *Radius within which we extract individual particles*
+!   - rcut_opennode_cgs   : *Radius within which we must get leaves*
+!   - rcut_leafpart_cgs   : *Radius within which we extract individual particles*
 !   - auto_opennode       : *Automatically adjust tree-walk according to CMI neutral frac output*
 !   - auto_tree_acc       : *Automatically adjust tree_accuracy_cmi based on runtime outputs*
-!   - delta_rcut          : *Increase in rcut_opennode and rcut_leafpart in an iteration step*
-!   - nHlimit_fac         : *Parameter which controls the resolution of the ionization front*
+!   - delta_rcut_cgs      : *Increase in rcut_opennode_cgs and rcut_leafpart_cgs in an iteration step*
+!   - nHlimit_fac         : *Free parameter which controls the resolution of the ionization front*
 !   - min_nodesize_toflag : *Minimum node size (relative to root node) to check neutral frac*
 !   - temp_hii            : *Presumed temperature of ionized gas*
 !   - fix_temp_hii        : *Heats ionized particles to temp_hii, else computes heating and cooling*
@@ -72,7 +72,7 @@ module photoionize_cmi
  ! Position of sources emitting radiation at current time
  integer, public, parameter :: maxphotosrc = 10
  integer, public :: nphotosrc                    !- Current number of sources
- real   , public :: xyz_photosrc(3,maxphotosrc)  !- Locations of current sources (code units)
+ real   , public :: xyz_photosrc(3,maxphotosrc)  !- Locations of current sources [code units]
 
  ! Using sinks as source
  logical, public :: sink_ionsrc = .false.
@@ -85,9 +85,9 @@ module photoionize_cmi
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
  integer, public :: niter_mcrt = 10
- real,    public :: photon_eV  = 13.7    ! eV; used only if sink_ionsrc=F and monochrom_source=T
- real,    public :: temp_star  = 3E4     ! K;  used only if sink_ionsrc=F and monochrom_source=F
- real,    public :: tol_vsite  = 1E-2    ! code units
+ real,    public :: photon_eV  = 13.7   ! eV; used only if sink_ionsrc=F and monochrom_source=T
+ real,    public :: temp_star  = 5E4    ! K;  used only if sink_ionsrc=F and monochrom_source=F
+ real,    public :: tol_vsite  = 1E-3
  logical, public :: lloyd      = .true.
  logical, public :: monochrom_source = .false.   ! else blackbody spec
 
@@ -96,12 +96,12 @@ module photoionize_cmi
 
  ! Options for extracting cmi-nodes from kdtree
  real,    public :: tree_accuracy_cmi = 0.1
- real,    public :: rcut_opennode = 1.5         ! in code units
- real,    public :: rcut_leafpart = 0.7         ! in code units
- real,    public :: delta_rcut    = 0.1         ! in code units
- real,    public :: nHlimit_fac   = 100         ! ionization front resolution; recommend 40-80
- real,    public :: min_nodesize_toflag = 0.005 ! min node size as a fraction of root node
- logical, public :: auto_opennode = .false.
+ real,    public :: rcut_opennode_cgs = 4.6E18   ! 1.5 pc
+ real,    public :: rcut_leafpart_cgs = 1.5E18   ! 0.5 pc
+ real,    public :: delta_rcut_cgs    = 0.3E18   ! 0.1 pc
+ real,    public :: nHlimit_fac       = 100      ! ionization front resolution; recommend 40-100
+ real,    public :: min_nodesize_toflag = 0.005  ! min node size as a fraction of root node
+ logical, public :: auto_opennode = .true.
  logical, public :: auto_tree_acc = .false.
 
  ! Options for heating/cooling
@@ -150,6 +150,7 @@ module photoionize_cmi
  integer :: nphotosrc_old
  real    :: xyz_photosrc_si(3,maxphotosrc),lumin_photosrc(maxphotosrc),mass_photosrc(maxphotosrc),masscrit_ionize
  real    :: tree_accuracy_cmi_old
+ real    :: rcut_opennode,rcut_leafpart,delta_rcut
  real    :: totlumin,solarl_photonsec,freq_photon,u_hii,udist_si,umass_si
  real    :: time0_wall,time0_cpu,time_now_wall,time_now_cpu
  real    :: time_ellapsed_wall,time_ellapsed_cpu
@@ -168,7 +169,7 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  use physcon,  only:mass_proton_cgs,kboltz,c,planckh,solarl,eV
  use eos,      only:gmw,gamma
  use io,       only:warning,fatal
- use units,    only:udist,umass,unit_ergg,unit_energ
+ use units,    only:udist,umass,unit_ergg
  use dim,      only:maxvxyzu,maxp_hard
  use heatcool_cmi, only:init_ueq_table,precompute_uterms
  use omp_lib
@@ -196,11 +197,14 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  enddo
  h_mean = h_mean/npart
  psep = 2.*h_mean / (57.9)**(1./3.)
- if (tol_vsite > 10.*psep) call warning('photoionize_cmi','tol_vsite might be too large')
+ if (tol_vsite > 0.5*psep) call warning('photoionize_cmi','tol_vsite might be too large')
 
  !- Check pick-nodes settings
  if (photoionize_tree) then
-    if (tree_accuracy_cmi == 0) call warning('photoionize_cmi','extracting only leaf nodes')
+    if (tree_accuracy_cmi == 0) call warning('photoionize_cmi','extracting leaf nodes only')
+    rcut_opennode = rcut_opennode_cgs/udist
+    rcut_leafpart = rcut_leafpart_cgs/udist
+    delta_rcut    = delta_rcut_cgs/udist
     if (rcut_opennode < rcut_leafpart) call fatal('photoionize_cmi','rcut_leafpart must be &
                                                  & smaller than rcut_opennode')
     !- Check compile conditions
@@ -563,6 +567,9 @@ end subroutine compute_ionization_cmi
 !          means particle has been dealt by CMI (but not necessarily ionized).
 !-       * As the original cooling is being switched off, particles which are not heated
 !          by photoionization would still go through these routines to cool.
+!        * In situations where no thermal equilibrium is found, it likely means that the
+!          heating rate is greater than cooling rate at all temperatures, and that the
+!          particle will heat forever. We will drift the particle to Tmax.
 !+
 !--------------------------------------------------------------------------------
 !
@@ -580,14 +587,13 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
  real,    intent(in)    :: xyzh(:,:)
  real,    intent(inout) :: vxyzu(:,:)
  integer, parameter :: nbuc = 100
- integer :: ip,npart_heated,ibuc
+ integer :: ip,npart_heated,ibuc,inoroot,numroots
  real    :: nH,ui,ueq,pmass,gammaheat,lambda,rhoi,du
  real    :: ueq_mean,temp_ueq,gmw0
+ real    :: pos_noroot(3,npart),nH_noroot(npart),temp_noroot(npart)
  real    :: nH_buc(nbuc),gamma_buc(nbuc),nentry_buc(nbuc)
- logical :: write_nH_gamma_distri = .true.
-
- integer :: numroots  ! testing
- real    :: pos_noroots(3),Ti
+ logical :: write_nH_gamma_distri = .true.  ! write heating rate vs neutral frac to file
+ logical :: catch_noroot_parts    = .false. ! write particles with no therm equil roots to file
 
  if (nphotosrc == 0) return
 
@@ -605,15 +611,16 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
     nentry_buc = 0
  endif
 
-! open(5014, file='noroots.txt',status='replace')
-
  ueq_mean = 0.
  npart_heated = 0
+ inoroot = 0
  !$omp parallel do default(none) shared(npart,nH_allparts,xyzh,vxyzu) &
  !$omp shared(vxyzu_beforepred,pmass,temp_star,dt,du_cmi) &
  !$omp shared(fix_temp_hii,u_hii) &
  !$omp shared(skip_Rtype_time_now) &
  !$omp shared(write_nH_gamma_distri,nH_buc,unit_energ,utime) &
+ !$omp shared(catch_noroot_parts,pos_noroot,nH_noroot,temp_noroot) &
+ !$omp shared(gmw,gamma,unit_ergg,inoroot) &
  !$omp private(ibuc) &
  !$omp private(ip,nH,rhoi,ui,ueq,gammaheat,lambda,du,numroots) &
  !$omp reduction(+:ueq_mean,npart_heated) &
@@ -631,25 +638,33 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
           if (nH > -epsilon(nH)) then
              rhoi = rhoh(xyzh(4,ip),pmass)
              call heating_term(nH,rhoi,ui,temp_star,gammaheat)
-             call cooling_term(ui,lambda)  !- for calculating timescale
-             call get_ueq(rhoi,gammaheat,ui,ueq,numroots)
-!             if (numroots == 0) then   ! testing
-!                pos_noroots = xyzh(1:3,ip)
-!                Ti = ui/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
-!                write(5014,*) pos_noroots(1:3), Ti, nH
-!             endif
+             call cooling_term(ui,lambda)  ! for calculating timescale
+             call get_ueq(rhoi,gammaheat,ui,numroots,ueq)
              call compute_du(skip_Rtype_time_now,dt,rhoi,ui,ueq,gammaheat,lambda,du)
 
-             !- checking Teq of HII region
+             !- check Teq of HII region
              if (nH < 0.5) then
                 npart_heated = npart_heated + 1
                 ueq_mean     = ueq_mean + ueq
              endif
-             !- checking gamma distribution
+
+             !- check gamma distribution
              if (write_nH_gamma_distri) then
                 ibuc = minloc(abs(nH_buc(:)-nH),1)
                 gamma_buc(ibuc)  = gamma_buc(ibuc) + gammaheat*(unit_energ/utime)
                 nentry_buc(ibuc) = nentry_buc(ibuc) + 1
+             endif
+
+             !- store properties of particles with no roots for trouble-shooting
+             if (catch_noroot_parts) then
+                if (numroots == 0) then
+                   !$omp critical
+                   inoroot = inoroot + 1
+                   pos_noroot(1:3,inoroot) = xyzh(1:3,ip)
+                   nH_noroot(inoroot)   = nH
+                   temp_noroot(inoroot) = ui/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
+                   !$omp end critical
+                endif
              endif
           endif
        endif
@@ -660,8 +675,6 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
     endif
  enddo
  !$omp end parallel do
-
-! close(5014)
 
  if (.not.fix_temp_hii) then
     ueq_mean = ueq_mean/npart_heated
@@ -680,6 +693,15 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
        write(3012,*) nH_buc(ibuc), gamma_buc(ibuc)
     enddo
     close(3012)
+ endif
+
+ if (catch_noroot_parts .and. inoroot > 1) then
+    open(5014, file='noroots.txt',status='replace')
+    write(5014,'(5a25)') 'x','y','z','nH','temp'
+    do ip = 1,inoroot
+       write(5014,*) pos_noroot(1:3,ip), nH_noroot(ip), temp_noroot(ip)
+    enddo
+    close(5014)
  endif
 
  gmw = gmw0
@@ -768,6 +790,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
  integer :: niter,inode,isite,n,inextopen,n_nextopen,maxnextopen
  real    :: size_node,size_root,nH_node,nH_part,nH_limit,tree_accuracy_cmi_new
  logical :: node_checks_passed
+ logical :: write_node_prop = .true.
 
  !- Init
  node_checks_passed = .false.
@@ -783,7 +806,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
     icall = icall + 1
     if (icall == ncall_checktreewalk) then
        if (nnextopen_updatewalk > 0) then
-!          call remove_unnecessary_opennode(nHlimit_fac,ncminode,min_nodesize_toflag)
+          call remove_unnecessary_opennode(ncminode)
        endif
        icall = 0
     endif
@@ -842,13 +865,15 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
     nixyzhmf_cminode(8,1:ncminode) = nH(1:ncminode) !- fill nixyzhmf_cminode(8,inode)
     call deallocate_cmi_inoutputs(x,y,z,h,m,nH)
 
-    ! testing
-    open(2029,file='nixyzhmf_cminode.txt')
-    write(2029,'(a25,a25,a25,a25,a25,a25,a25,a25)') 'n','i','x','y','z','h','m','nH'
-    do isite = 1,ncminode
-       write(2029,*) nixyzhmf_cminode(1:8,isite)
-    enddo
-    close(2029)
+    !- For plotting ionization structure of nodes
+    if (write_node_prop) then
+       open(2029,file='nixyzhmf_cminode.txt')
+       write(2029,'(a25,a25,a25,a25,a25,a25,a25,a25)') 'n','i','x','y','z','h','m','nH'
+       do isite = 1,ncminode
+          write(2029,*) nixyzhmf_cminode(1:8,isite)
+       enddo
+       close(2029)
+    endif
 
     !
     ! Check the outputs to adjust tree-walk in the next iteration -
@@ -1019,13 +1044,12 @@ end subroutine collect_and_combine_cminodes
 ! Check all nodes which were previously opened to resolve into the ionization front;
 ! If they are no longer heavily ionized [determine this with the currrent nixyzhmf_cminode],
 ! move the tree back up by removing entries in nxyzrs_nextopen(_updatewalk).
-!!!!!!!!!!!! NEED TO TEST THIS !!!!!!!!!!!!!!!!!!
+! Note: rcut_opennode and rcut_leafpart will remain.
 !+
 !----------------------------------------------------------------
-subroutine remove_unnecessary_opennode(nHlimit_fac,ncminode,min_nodesize_toflag)
+subroutine remove_unnecessary_opennode(ncminode)
  use allocutils,  only:allocate_array
  integer, intent(in)    :: ncminode
- real,    intent(in)    :: nHlimit_fac,min_nodesize_toflag
  real,    allocatable   :: nHmin(:)
  integer :: nnextopen_old,inextopen,icminode,n_node,irowafter
  real    :: pos_opennode(3),rad_opennode2,pos_node(3),dist2,nH_node
@@ -1033,16 +1057,17 @@ subroutine remove_unnecessary_opennode(nHlimit_fac,ncminode,min_nodesize_toflag)
 
  nnextopen_old = nnextopen
  call allocate_array('nHmin',nHmin,nnextopen_old)
+
  !
  ! Find the lowest nH in each of the stored regions in nxyzrs_nextopen (which can overlap)
  !
  all_opened: do inextopen = 1,nnextopen_old
     nHmin(inextopen) = 1. !- init
-    pos_opennode = nxyzrs_nextopen(2:4,inextopen)
+    pos_opennode  = nxyzrs_nextopen(2:4,inextopen)
     rad_opennode2 = nxyzrs_nextopen(5,inextopen)**2.
     current_nodes: do icminode = 1,ncminode
        n_node = int(nixyzhmf_cminode(1,icminode))
-       if (n_node /= 0) then
+       if (n_node /= 0) then  !- is node
           pos_node = nixyzhmf_cminode(3:5,icminode)
           dist2 = mag2(pos_node(1:3)-pos_opennode(1:3))
           if (dist2 < rad_opennode2) then
@@ -1052,16 +1077,17 @@ subroutine remove_unnecessary_opennode(nHlimit_fac,ncminode,min_nodesize_toflag)
        endif
     enddo current_nodes
  enddo all_opened
+
  !
- ! Remove entry in nxyzrs_nextopen(_updatewalk) if nH is sufficiently high
+ ! Remove entry in nxyzrs_nextopen(_updatewalk) if nH is now sufficiently high
  !
  nHlimit_fac_rev = nHlimit_fac + 5.  !- slightly higher than the opening-criterion
  inextopen = 1
  do while (inextopen <= nnextopen)
     nH = nHmin(inextopen)
     size = nxyzrs_nextopen(5,inextopen)
-    nH_limit = 1/nHlimit_fac_rev * (-1/size + nHlimit_fac)
-    if (nH > nH_limit .and. size > min_nodesize_toflag) then !- can undo the resolve-iteration
+    nH_limit = 1/nHlimit_fac_rev * (-1/size + nHlimit_fac_rev)
+    if (nH > nH_limit .and. size > min_nodesize_toflag) then  !- can undo the resolve-iteration
        do irowafter = inextopen,nnextopen-1
           nxyzrs_nextopen(1:6,irowafter) = nxyzrs_nextopen(1:6,irowafter+1)
           nHmin(irowafter) = nHmin(irowafter+1)
@@ -1074,7 +1100,7 @@ subroutine remove_unnecessary_opennode(nHlimit_fac,ncminode,min_nodesize_toflag)
  nnextopen_updatewalk = nnextopen
  nxyzrs_nextopen_updatewalk(:,:) = nxyzrs_nextopen(:,:)
 
- print*,'nnextopen_old/nnextopen: ',nnextopen_old,nnextopen
+ print*,'current nnextopen / new nnextopen: ',nnextopen_old,nnextopen
 
  if (allocated(nHmin)) deallocate(nHmin)
 
@@ -1182,8 +1208,8 @@ subroutine write_cmi_infiles(nsite,x,y,z,h,m)
  !
  redo_grid = .false.
  check_poschange: do i = 1,maxcminode
-    if (abs(x_old(i)-x(i)) > tol_vsite .or. abs(y_old(i)-y(i)) > tol_vsite .or. &
-        abs(z_old(i)-z(i)) > tol_vsite) then
+    if (abs(x_old(i)-x(i))/x_old(i) > tol_vsite .or. abs(y_old(i)-y(i))/y_old(i) > tol_vsite .or. &
+        abs(z_old(i)-z(i))/z_old(i) > tol_vsite) then
        redo_grid = .true.
        exit check_poschange
     endif
@@ -1525,11 +1551,11 @@ subroutine write_options_photoionize(iunit)
  call write_inopt(monochrom_source,'monochrom_source','Use monochromatic source',iunit)
  call write_inopt(photoionize_tree,'photoionize_tree','Construct Voronoi grid around tree nodes',iunit)
  call write_inopt(tree_accuracy_cmi,'tree_accuracy_cmi','Tree-opening criteria for cmi-nodes',iunit)
- call write_inopt(rcut_opennode,'rcut_opennode','Radius within which nodes must be leaves',iunit)
- call write_inopt(rcut_leafpart,'rcut_leafpart','Radius within which particles are extracted',iunit)
+ call write_inopt(rcut_opennode_cgs,'rcut_opennode_cgs','Radius within which nodes must be leaves',iunit)
+ call write_inopt(rcut_leafpart_cgs,'rcut_leafpart_cgs','Radius within which particles are extracted',iunit)
  call write_inopt(auto_opennode,'auto_opennode','Automatically adjust tree-walk with iterative approach',iunit)
  call write_inopt(auto_tree_acc,'auto_tree_acc','Automatically adjust tree_accuracy_cmi',iunit)
- call write_inopt(delta_rcut,'delta_rcut','Increase in rcut_opennode and rcut_leafpart per iter step',iunit)
+ call write_inopt(delta_rcut_cgs,'delta_rcut_cgs','Increase in rcut_opennode_cgs and rcut_leafpart_cgs per iter step',iunit)
  call write_inopt(nHlimit_fac,'nHlimit_fac','Paramter controlling resolution of ionization front',iunit)
  call write_inopt(min_nodesize_toflag,'min_nodesize_toflag','Minimum node size to check nH',iunit)
  call write_inopt(temp_hii,'temp_hii','Temperature of ionized gas',iunit)
@@ -1596,13 +1622,13 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
     read(valstring,*,iostat=ierr) tree_accuracy_cmi
     ngot = ngot + 1
     if (tree_accuracy_cmi < 0. .or. tree_accuracy_cmi > 1.) call fatal(label,'invalid setting for tree_accuracy_cmi')
- case('rcut_opennode')
-    read(valstring,*,iostat=ierr) rcut_opennode
+ case('rcut_opennode_cgs')
+    read(valstring,*,iostat=ierr) rcut_opennode_cgs
     ngot = ngot + 1
-    if (rcut_opennode < 0.) call fatal(label,'invalid setting for rcut_opennode')
- case('rcut_leafpart')
-    read(valstring,*,iostat=ierr) rcut_leafpart
-    if (rcut_leafpart < 0.) call fatal(label,'invalid setting for rcut_leafpart')
+    if (rcut_opennode_cgs < 0.) call fatal(label,'invalid setting for rcut_opennode_cgs')
+ case('rcut_leafpart_cgs')
+    read(valstring,*,iostat=ierr) rcut_leafpart_cgs
+    if (rcut_leafpart_cgs < 0.) call fatal(label,'invalid setting for rcut_leafpart_cgs')
     ngot = ngot + 1
  case('auto_opennode')
     read(valstring,*,iostat=ierr) auto_opennode
@@ -1610,10 +1636,10 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
  case('auto_tree_acc')
     read(valstring,*,iostat=ierr) auto_tree_acc
     ngot = ngot + 1
- case('delta_rcut')
-    read(valstring,*,iostat=ierr) delta_rcut
+ case('delta_rcut_cgs')
+    read(valstring,*,iostat=ierr) delta_rcut_cgs
     ngot = ngot + 1
-    if (delta_rcut < 0.) call fatal(label,'invalid setting for delta_rcut')
+    if (delta_rcut_cgs < 0.) call fatal(label,'invalid setting for delta_rcut_cgs')
  case('nHlimit_fac')
     read(valstring,*,iostat=ierr) nHlimit_fac
     ngot = ngot + 1

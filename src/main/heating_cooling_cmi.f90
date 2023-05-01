@@ -10,10 +10,10 @@ module heatcool_cmi
 ! This module contains all the subroutines necessary for doing the heating and cooling
 ! processes involved in photoionization.
 !
-! :References: Koyama & Inutsuka (2002), ApJL 564, 97-100
+! :References: Osterbrock (1974), Astrophysics of Gaseous Nebulae, W.H. Freeman and Company
 !              Vazquez-Semadeni,et.al (2007), ApJ 657, 870-883
-!              Joung & Mac Low (2006), ApJ 653, 1266-1279
-!              Osterbrock (1974), Astrophysics of Gaseous Nebulae, W.H. Freeman and Company
+!              Koyama & Inutsuka (2002), ApJL 564, 97-100
+!              De Rijcke,et.al (2013), MNRAS 433, 3005-3016
 !
 ! :Owner: Cheryl Lau
 !
@@ -25,15 +25,13 @@ module heatcool_cmi
 !   - get_ueq_by_interp    : *perform 2D interpolation, otherwise simply grabs closest ueq*
 !   - incl_recomb_cooling  : *include recombination cooling in heating term gamma*
 !
-! :Dependencies: io, eos, physcon, units, parts, cooling, kdtree, linklist
+! :Dependencies: io, eos, physcon, units, parts, kdtree, linklist
 !
 ! :Note: The variable gamma in this mod refers to heating term, not to be confused with gamma
 !        (polytropic constant) from eos. In subroutines where both are used, gamma (heating term)
 !        will be referred to as gammaheat.
 !
 !
- use cooling, only:lambdacoolJML,lambdacoolDR  !- cooling function lambda(T) [erg cm^3 s^-1]
-
  implicit none
 
  public :: check_to_stop_cooling,init_ueq_table,precompute_uterms
@@ -334,15 +332,15 @@ end subroutine cooling_term
 ! Extract ueq(s) from pre-computed table with the given rho and gamma
 ! Selects the right ueq using the current u
 !
-subroutine get_ueq(rho,gammaheat,u,ueq_final,numroots)
+subroutine get_ueq(rho,gammaheat,u,numroots,ueq_final)
  use physcon, only:kboltz,mass_proton_cgs
  use units,   only:unit_ergg
  use eos,     only:gmw,gamma
  use io,      only:fatal,warning
- real, intent(in)  :: rho,gammaheat,u
- real, intent(out) :: ueq_final
- integer, intent(out) :: numroots  ! testing
- integer :: irho,igamma,jrho,jgamma,r !,numroots
+ real,    intent(in)  :: rho,gammaheat,u
+ integer, intent(out) :: numroots
+ real,    intent(out) :: ueq_final
+ integer :: irho,igamma,jrho,jgamma,r
  real    :: rhotable(maxrho),gammatable(maxgamma)  !- unpacked from rho_gamma_ueq_table
  real    :: ueqs(3)                                !- holds the 3 possible ueq solutions
  real    :: x1,x2,y1,y2,q11,q12,q21,q22            !- for 2D interpolation
@@ -423,7 +421,7 @@ subroutine get_ueq(rho,gammaheat,u,ueq_final,numroots)
     if (u <= ueqs(2)) then
        ueq_final = ueqs(1)
     else
-       print*,'u is greater than ueq2, its Teq2 is',ueqs(2)/kboltz*(gmw*mass_proton_cgs*(gamma-1))*unit_ergg
+!       print*,'u is greater than ueq2! Teq2 is ',ueqs(2)/kboltz*(gmw*mass_proton_cgs*(gamma-1))*unit_ergg
        if (numroots == 2) then
           ueq_final = kboltz*Tmax / (gmw*mass_proton_cgs*(gamma-1)) / unit_ergg
        elseif (numroots == 3) then
@@ -470,15 +468,15 @@ subroutine compute_dudt(skip_Rtype,dt,rho,u,gamma,lambda,dudt)
  logical, intent(in)  :: skip_Rtype
  real,    intent(in)  :: dt,rho,u,gamma,lambda
  real,    intent(out) :: dudt
- integer :: numroots ! testing
- real :: ueq,du,unew
+ integer :: numroots
+ real    :: ueq,du,unew
 
  dudt = one_over_mH*gamma - rho*one_over_mH2*lambda
 
  !- To 'skip' a certain amount of time, an implicit method is required
  if (skip_Rtype) then
     if (t_recomb > dt) then
-       call get_ueq(rho,gamma,u,ueq,numroots)  ! numroots added for testing
+       call get_ueq(rho,gamma,u,numroots,ueq)
        call compute_du(skip_Rtype,dt,rho,u,ueq,gamma,lambda,du)
        dudt = du/dt
     else
@@ -495,7 +493,7 @@ end subroutine compute_dudt
 
 
 !
-! Calculates timescale of R-type phase t_recomb
+! Calculates timescale of R-type phase (t_recomb) i.e. time taken to reach Stromgren radius
 !
 subroutine compute_Rtype_time(nphotosrc,xyz_photosrc,xyzh)
  use units,    only:udist,utime,unit_density
@@ -542,11 +540,11 @@ subroutine compute_Rtype_time(nphotosrc,xyz_photosrc,xyzh)
  enddo each_source
 
  ! testing
- t_recomb = 1E7*(365*24*60*60)/utime  ! 1E1 Myr
+! t_recomb = 1E7*(365*24*60*60)/utime  ! 1E1 Myr
 
  t_recomb_cgs = t_recomb*utime
  t_recomb_myr = t_recomb_cgs/(1E6*365*24*60*60)
- write(*,'(1x,a37,f7.3)') 'Skipping R-type phase of time [Myr]: ',t_recomb_myr
+ print*, 'Skipping R-type phase of time [Myr]: ',t_recomb_myr
 
 end subroutine compute_Rtype_time
 
@@ -586,5 +584,46 @@ real function get_alphaB(temp)
  get_alphaB = max(get_alphaB,1.E-13)
 
 end function get_alphaB
+
+
+!
+! Analytic function which mimics the cooling curve of DeRijcke et al. (2013)
+!
+real function lambdacoolDR(temp)
+ real, intent(in) :: temp
+ real  :: lambdagamma1,lambdagamma2,lambdagamma
+
+ if (temp > 10**4.15) then
+    lambdagamma1 = 4.69414E-4 * 1E7 * exp(-1.184E5 * 1.15983E6 / ((temp*10**(-0.08))**2.68935 + 1000))
+ else
+    lambdagamma1 = 1E7 * exp(-1.184E5 / ((temp*10**(-0.16)) + 1000))* temp**0.18
+ endif
+
+ lambdagamma2 = 0.115 * 0.014 * (temp*10**(-0.75))**0.60 * exp(-72/(temp*10**(-0.12)))
+ lambdagamma2 = lambdagamma2 * temp**(0.15)
+
+ lambdagamma = (lambdagamma1 + lambdagamma2) * 10**(0.95)
+
+ if (temp < 10**3.7) then
+    lambdagamma = lambdagamma * 10**1.665 * temp**(-0.45)
+ endif
+
+ if (temp > 10**5.3) then
+    if (temp < 10**6.5) then
+        lambdagamma = lambdagamma * 10**5.3 * temp**(-1.)
+    else
+        lambdagamma = lambdagamma * 10**0.425 * temp**(-0.25)
+    endif
+ endif
+
+ if (temp > 10**7.5) then
+    lambdagamma = lambdagamma * 10**(-5.25) * temp**(0.7)
+ endif
+
+ lambdagamma = lambdagamma / 10**(0.35)
+
+ lambdacoolDR = lambdagamma * 2E-26
+
+end function lambdacoolDR
 
 end module heatcool_cmi

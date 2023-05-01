@@ -24,6 +24,7 @@ module cooling
 !   Townsend (2009), ApJS 181, 391-397
 !   Gail & Sedlmayr textbook Physics and chemistry of Circumstellar dust shells
 !   Joung & Mac Low (2006), ApJ 653, 1266-1279
+!   De Rijcke,et.al (2013), MNRAS 433, 3005-3016
 !   SPHNG coolcurve.F & thermeq.f modified by Ian Bonnell
 !
 ! :Owner: Lionel Siess
