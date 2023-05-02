@@ -15,11 +15,11 @@ module inject
 !
 ! :Runtime parameters:
 !   - maxsn           : *maximum number of supernovae at a time*
-!   - r_sn            : *supernova blast radius*
-!   - engsn           : *total energy released from suepernova in code units*
+!   - r_sn_cgs        : *supernova blast radius*
+!   - engsn_cgs       : *total energy [erg] released from suepernova*
 !   - frackin         : *fraction of kinetic energy in eng_sn*
 !   - fractherm       : *fraction of thermal energy in eng_sn*
-!   - pmsncrit        : *critical mass of sink particles*
+!   - pmsncrit_cgs    : *critical mass of sink particles*
 !   - sink_progenitor : *if true, inits sne when sink exceeds critical mass;
 !                        otherwise inits sn(e) with user-given time and location*
 !
@@ -32,23 +32,23 @@ module inject
 
  public :: init_inject,inject_particles,write_options_inject,read_options_inject
 
+ logical, public :: inject_sn = .true.  ! switch on/off sn for testing
+
  ! Runtime parameters for supernovae injection to read from input file
- ! in code units of pc; solarm
  integer, public :: maxsn     = 10
- real,    public :: r_sn      = 0.2
- real,    public :: engsn     = 1.17E10  ! 10^51 erg
+ real,    public :: r_sn_cgs  = 6.17E17     ! 0.2 pc
+ real,    public :: engsn_cgs = 1E51        ! 1E51 erg
  real,    public :: frackin   = 0.5
  real,    public :: fractherm = 0.5
- real,    public :: pmsncrit  = 8
+ real,    public :: pmsncrit_cgs = 1.59E34  ! 8 solarm
  logical, public :: sink_progenitor = .false.
 
  private
 
- ! Manually insert sne
- integer, parameter :: maxsn_insert = 2
- real    :: xyzt_sn_insert(4,maxsn_insert) = reshape((/ 0.,0.,0.,1E-7, &
-                                                        3.,0.,0.,1E-2 /),&
-                                                      shape=(/4,maxsn_insert/))
+ ! Set sne properties if not using sinks
+ integer, parameter :: maxsn_insert = 1
+ real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 0.,0.,0.,1E10 /), &
+                                                          shape=(/4,maxsn_insert/))
 
  ! Global storage for all sne (also used for switching-off cooling)
  integer, parameter :: maxallsn = 50
@@ -67,8 +67,8 @@ module inject
  logical :: first_sn
 
  integer :: iseed = -12345
-
- logical  :: inject_sn = .true.  ! switch on/off sn for testing
+ real    :: r_sn,engsn,pmsncrit
+ real    :: xyzt_sn_insert(4,maxsn_insert)
 
 contains
 !-----------------------------------------------------------------------
@@ -78,6 +78,7 @@ contains
 !-----------------------------------------------------------------------
 subroutine init_inject(ierr)
  use datafiles,  only:find_phantom_datafile
+ use units,      only:umass,udist,utime,unit_energ
  integer, intent(out) :: ierr
  integer  :: i,ip,isn,ientry
  !
@@ -114,17 +115,25 @@ subroutine init_inject(ierr)
  ! Init counters/table for perm-storage of all sne taken place in simulation
  !
  nallsn = 0
- do i = 1,maxallsn
-    xyzht_allsn(:,i) = (/ 0.,0.,0.,0.,0./)
-    vxyz_allsn(:,i)  = (/ 0.,0.,0. /)
-    if (sink_progenitor) then
-       m_allsn(i)       = 0.
-       iprog_allsn(i)   = 0.
-    else
-       iinsert_allsn(i) = 0.
-    endif
-    queueflag(i) = .false.
- enddo
+ xyzht_allsn = 0.
+ vxyz_allsn  = 0.
+ if (sink_progenitor) then
+    m_allsn = 0.
+    iprog_allsn = 0.
+ else
+    iinsert_allsn = 0.
+ endif
+ queueflag = .false.  ! if cant do this then loop over maxallsn
+ !
+ ! Convert input params to code units
+ !
+ r_sn  = r_sn_cgs/udist
+ engsn = engsn_cgs/unit_energ
+ pmsncrit = pmsncrit_cgs/umass
+ if (.not.sink_progenitor) then
+    xyzt_sn_insert(1:3,:) = xyzt_sn_insert_cgs(1:3,:)/udist
+    xyzt_sn_insert(4,:)   = xyzt_sn_insert_cgs(4,:)  /utime
+ endif
 
 end subroutine init_inject
 
@@ -159,19 +168,15 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  ! Init/Reset variables of sne properties injected at current timestep (temp-storage)
  !
  nsn = 0                    ! number of sne going off now
- do j = 1,maxsn
-    if (sink_progenitor) then
-       iprog_sn(j) = 0      ! sink index of progenitors
-       m_sn(j)  = 0.        ! mass of progenitors
-    else
-       iinsert_sn(j) = 0.   ! index of user-defined sne
-    endif
-    h_sn(j)  = 0.           ! smoothing length of progenitors
-    do i = 1,3
-       xyz_sn(i,j)  = 0.
-       vxyz_sn(i,j) = 0.
-    enddo
- enddo
+ if (sink_progenitor) then
+    iprog_sn = 0      ! sink index of progenitors
+    m_sn  = 0.        ! mass of progenitors
+ else
+    iinsert_sn = 0.   ! index of user-defined sne
+ endif
+ h_sn  = 0.           ! smoothing length of progenitors
+ xyz_sn  = 0.
+ vxyz_sn = 0.
  !
  ! Detect and put all sne into a dynamically-created queue (perm-storage)
  !
@@ -312,10 +317,8 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  !
  if (snecoolingoff) then
     ! Refresh table
-    do icf = 1,maxcoolingoff
-       ncoolingoff = 0
-       xyzh_coolingoff(:,icf) = (/ 0.,0.,0.,0. /)
-    enddo
+    ncoolingoff = 0
+    xyzh_coolingoff = 0.
     ! Store sn properties into xyzh_coolingoff table (to be then passed to cooling)
     over_allsne: do icf = 1,maxallsn
        t_sn = xyzht_allsn(5,icf)
@@ -339,13 +342,14 @@ end subroutine inject_particles
 !
 ! ----------------------------------------------------------------------------------
 subroutine check_sink(xyzmh_ptmass,vxyz_ptmass,nptmass,pmsncrit,time)
- use units, only:utime
- use io,    only:fatal
- integer, intent(in)    :: nptmass
- real,    intent(in)    :: pmsncrit,time
- real,    intent(in)    :: xyzmh_ptmass(:,:),vxyz_ptmass(:,:)
+ use units,   only:utime,umass
+ use physcon, only:solarm
+ use io,      only:fatal
+ integer, intent(in) :: nptmass
+ real,    intent(in) :: pmsncrit,time
+ real,    intent(in) :: xyzmh_ptmass(:,:),vxyz_ptmass(:,:)
  integer  :: ip
- real     :: mptmass,t_ms_cgs,t_sn
+ real     :: mptmass,mptmass_solarm,t_ms_cgs,t_sn
  logical  :: snflag_sinkip
 
  over_sinks: do ip = 1,nptmass
@@ -355,7 +359,8 @@ subroutine check_sink(xyzmh_ptmass,vxyz_ptmass,nptmass,pmsncrit,time)
        !
        ! Time to inject sn - estimated using lifetime of star as MS (Maeder 2009)
        !
-       t_ms_cgs = 9.57E8 * mptmass**(-1.59) *(365*24*3600)
+       mptmass_solarm = mptmass*umass/solarm  !- convert to units of solarm
+       t_ms_cgs = 9.57E8 * mptmass_solarm**(-1.59) *(365*24*3600)
        t_sn = time + t_ms_cgs/utime
        !
        ! Store sn into queue
@@ -549,12 +554,12 @@ subroutine write_options_inject(iunit)
 
  write(iunit,"(/,a)") '# options for injecting supernova'
  call write_inopt(sink_progenitor,'sink_progenitor','init sne with sinks',iunit)
- call write_inopt(engsn,'engsn','total energy released from sn',iunit)
+ call write_inopt(engsn_cgs,'engsn_cgs','total energy released from sn',iunit)
  call write_inopt(frackin,'frackin','fraction of kinetic energy',iunit)
  call write_inopt(fractherm,'fractherm','fraction of thermal energy',iunit)
- call write_inopt(r_sn,'r_sn','blast radius of supernova',iunit)
+ call write_inopt(r_sn_cgs,'r_sn_cgs','blast radius of supernova',iunit)
  call write_inopt(maxsn,'maxsn','maximum number of supernovae at a time',iunit)
- call write_inopt(pmsncrit,'pmsncrit','critical mass of sinks',iunit)
+ call write_inopt(pmsncrit_cgs,'pmsncrit_cgs','critical mass of sinks',iunit)
 
 end subroutine write_options_inject
 
@@ -579,10 +584,10 @@ subroutine read_options_inject(name,valstring,imatch,igotall,ierr)
  case('sink_progenitor')
     read(valstring,*,iostat=ierr) sink_progenitor
     ngot = ngot + 1
- case('engsn')
-    read(valstring,*,iostat=ierr) engsn
+ case('engsn_cgs')
+    read(valstring,*,iostat=ierr) engsn_cgs
     ngot = ngot + 1
-    if (engsn < 0.) call fatal(label,'invalid setting for engsn (<0)')
+    if (engsn_cgs < 0.) call fatal(label,'invalid setting for engsn_cgs (<0)')
  case('frackin')
     read(valstring,*,iostat=ierr) frackin
     ngot = ngot + 1
@@ -591,18 +596,18 @@ subroutine read_options_inject(name,valstring,imatch,igotall,ierr)
     read(valstring,*,iostat=ierr) fractherm
     ngot = ngot + 1
     if (fractherm < 0.) call fatal(label,'invalid setting for fractherm (<0)')
- case('r_sn')
-    read(valstring,*,iostat=ierr) r_sn
+ case('r_sn_cgs')
+    read(valstring,*,iostat=ierr) r_sn_cgs
     ngot = ngot + 1
-    if (r_sn < 0.) call fatal(label,'invalid setting for r_sn (<0)')
+    if (r_sn_cgs < 0.) call fatal(label,'invalid setting for r_sn_cgs (<0)')
  case('maxsn')
     read(valstring,*,iostat=ierr) maxsn
     ngot = ngot + 1
     if (maxsn < 1.) call fatal(label,'invalid setting for maxsn (<1)')
- case('pmsncrit')
-    read(valstring,*,iostat=ierr) pmsncrit
+ case('pmsncrit_cgs')
+    read(valstring,*,iostat=ierr) pmsncrit_cgs
     ngot = ngot + 1
-    if (pmsncrit < 0.) call fatal(label,'invalid setting for pmsncrit (<0)')
+    if (pmsncrit_cgs < 0.) call fatal(label,'invalid setting for pmsncrit_cgs (<0)')
  case default
     imatch = .false.
  end select
