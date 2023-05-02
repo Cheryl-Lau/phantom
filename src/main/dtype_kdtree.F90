@@ -58,7 +58,9 @@ module dtypekdtree
     real :: mass
 #endif
 #ifdef GRAVITY
+#ifndef PHOTOION
     real :: mass
+#endif
     real :: quads(6)
 #endif
 #ifdef TREEVIZ
