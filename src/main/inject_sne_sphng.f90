@@ -47,7 +47,7 @@ module inject
 
  ! Set sne properties if not using sinks
  integer, parameter :: maxsn_insert = 1
- real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 0.,0.,0.,1E10 /), &
+ real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 0.,0.,0.,5E10 /), &
                                                           shape=(/4,maxsn_insert/))
 
  ! Global storage for all sne (also used for switching-off cooling)
@@ -123,7 +123,7 @@ subroutine init_inject(ierr)
  else
     iinsert_allsn = 0.
  endif
- queueflag = .false.  ! if cant do this then loop over maxallsn
+ queueflag = .false.
  !
  ! Convert input params to code units
  !
@@ -148,6 +148,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  use part,       only:nptmass,massoftype,iphase,igas,kill_particle,hfact,ibin
  use partinject, only:add_or_update_particle
  use physcon,    only:pi
+ use units,      only:unit_energ
  use timestep,   only:dtmax
  use cooling,    only:snecoolingoff,maxcoolingoff,xyzh_coolingoff,dt_cooloff,ncoolingoff
  real,    intent(in)    :: time,dtlast
@@ -162,6 +163,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  real     :: xyz_sn(3,maxsn),vxyz_sn(3,maxsn),m_sn(maxsn),h_sn(maxsn),mradsn,engkin,engtherm,numden,t_sn
  real     :: xyz_partsn(3),vxyz_partsn(3),xyz_ref(3,6),r_ref,vfact,hnew,unew,radvel,dist,dist_nearby
  real     :: vrad,a_vrad,r_vrad,aN_scalefactor
+ real     :: ekintot,ethermtot,etot_allparts_old,etot_allparts,endiff_cgs
  logical  :: timematch_inject,queueflag_iallsn
 
  !
@@ -212,7 +214,16 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  ! Inject supernovae from temp-storage
  !
  if (inject_sn .and. nsn >= 1) then
-    print*,'Injecting ',nsn,' supernovae'
+    write(*,'(1x,a10,i3,a11)') 'Injecting ',nsn,' supernovae'
+
+    !- Checking
+    ekintot = 0.
+    ethermtot = 0.
+    do ipart = 1,npart
+       ekintot   = ekintot + 1./2.*massoftype(igas)*dot_product(vxyzu(1:3,ipart),vxyzu(1:3,ipart))
+       ethermtot = ethermtot + vxyzu(4,ipart)*massoftype(igas)
+    enddo
+    etot_allparts_old =  ekintot + ethermtot
 
     over_sne: do isn = 1,nsn
        !
@@ -240,13 +251,16 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        !
        engkin   = engsn * frackin
        engtherm = engsn * fractherm
-       unew = engtherm / mradsn
        !
        ! Set number of new particles assuming mass is conserved
        !
        npartsn = nint(mradsn/massoftype(igas))
-       print*,'number of sn particles',npartsn
+       print*,'Number of SN particles: ',npartsn
        if (npartsn < 6) call fatal('inject_sne_sphng','too few supernova particles')
+       !
+       ! Internal energy of sn particles
+       !
+       unew = (engtherm/npartsn)/massoftype(igas)
        !
        ! Set up velocity profile of sn particles
        !
@@ -310,6 +324,24 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        queueflag(iallsn) = .true.
 
     enddo over_sne
+
+    !- Checking
+    ekintot = 0.
+    ethermtot = 0.
+    do ipart = 1,npart
+       ekintot  = ekintot + 1./2.*massoftype(igas)*dot_product(vxyzu(1:3,ipart),vxyzu(1:3,ipart))
+       ethermtot = ethermtot + vxyzu(4,ipart)*massoftype(igas)
+    enddo
+    etot_allparts = ekintot + ethermtot
+
+    endiff_cgs = (etot_allparts - etot_allparts_old) *unit_energ
+    print*,'Energy added [erg]: ',endiff_cgs
+
+    !- check if they are in the same order of magnitude
+    if (abs(log10(engsn_cgs*nsn) - log10(endiff_cgs)) > 0.5) then
+       call fatal('inject_sne_sphng','Amount of energy injected does not match the required value')
+    endif
+
  endif
  !
  ! Store coordinates of all sne which, at the current time, needs to have
@@ -500,6 +532,7 @@ real function vrfunc(a,r)
  endif
 
 end function vrfunc
+
 !
 ! Extract indicies of all entries in vprofile table (and its corresponding Ek)
 ! where both npartsn and m matches
@@ -536,7 +569,7 @@ subroutine get_vrprofile_candidates(npartsn,mi)
     endif
  enddo
 
- if (ifill == 0) call fatal('inject_sne_sphng','Unable to find matching entries from vprofile')
+ if (ifill == 0)  call fatal('inject_sne_sphng','Unable to find matching entries from vprofile')
  if (ifill < 200) call fatal('inject_sne_sphng','Unable to find all matching entries in vprofile')
  if (ifill > 400) call fatal('inject_sne_sphng','Require a smaller tol_m and/or tol_npartsn')
 
