@@ -81,7 +81,7 @@ contains
 !+
 !----------------------------------------------------------------
 subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,time,fileprefix)
- use physcon,      only:pi,solarm,hours,years,au
+ use physcon,      only:pi,solarm,hours,years,au,kboltz,mass_proton_cgs
  use dim,          only:maxvxyzu,h2chemistry,gr
  use setup_params, only:rhozero,npart_total,ihavesetupB  !,rmax
  use io,           only:master,fatal,iprint
@@ -90,7 +90,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use rho_profile,  only:rho_bonnorebert,prompt_BEparameters
  use boundary,     only:set_boundary,xmin,xmax,ymin,ymax,zmin,zmax,dxbound,dybound,dzbound
  use prompting,    only:prompt
- use units,        only:set_units,select_unit,utime,unit_density,unit_Bfield,unit_velocity,unit_pressure,unit_energ
+ use units,        only:set_units,select_unit,utime,unit_density,unit_Bfield,unit_velocity,unit_pressure,unit_energ,unit_ergg
  use eos,          only:polyk2,ieos,gmw
  use part,         only:Bxyz,Bextx,Bexty,Bextz,igas,idust,abundance,iHI,set_particle_type
  use timestep,     only:dtmax,tmax,dtmax_dratio,dtmax_min,C_cour,C_force,C_cool,tolv,nout
@@ -534,13 +534,13 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  infilename=trim(fileprefix)//'.in'
  inquire(file=infilename,exist=in_iexist)
  if (.not. in_iexist) then
-    tmax      = 4.41504E12/utime !1E0
-    dtmax     = 3.15360E9/utime  !1E-4
-    nout      = 1E1
+    tmax      = 3.15360E13/utime ! 1E0 Myr
+    dtmax     = 3.15360E9/utime  ! 1E-4 Myr
+    nout      = 10
     nmaxdumps = 5000
-    icooling  = 7    ! JML06
+    icooling  = 0
     Tfloor    = 3.
-    ufloor    = 0.
+    ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
     ipdv_heating   = 1
     ishock_heating = 1
     ieos         = 2  ! adiabatic eos with P = (gamma-1)*rho*u

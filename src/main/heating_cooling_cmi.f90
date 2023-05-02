@@ -107,7 +107,7 @@ end subroutine precompute_uterms
 
 !
 ! Pre-solves the equilibriums ueq as function of both rho and gamma
-! and organize into a 3D table: rho_gamma_ueq_table(irho,igamma,(rho,gamma,numroot,ueq123))
+! Creates the 3D rho_gamma_ueq_table(irho,igamma,(rho,gamma,numroot,ueq1,ueq2,ueq3))
 !
 subroutine init_ueq_table
  use physcon, only:mass_proton_cgs,kboltz
@@ -273,28 +273,33 @@ subroutine heating_term(nH,rho,u,temp_star,gammaheat)
  real :: rho_cgs,nrho_cgs,temp,alphaA,Ne,Np
  real :: heating_rate_cgs,gamma_cgs
 
- rho_cgs = rho*unit_density
+ if (nH < 1.) then
 
- if (rho_cgs < rhomin_cgs .or. rho_cgs > rhomax_cgs) then
-    print*,'rho_cgs',rho_cgs
-    call fatal('heating_cooling_cmi','rho_cgs exceeded range')
+    !- number density of H atoms
+    rho_cgs = rho*unit_density
+    if (rho_cgs < rhomin_cgs .or. rho_cgs > rhomax_cgs) then
+       print*,'rho_cgs',rho_cgs
+       call fatal('heating_cooling_cmi','rho_cgs exceeded range')
+    endif
+    nrho_cgs = rho_cgs*one_over_mH_cgs
+
+    !- number density of free electrons and protons
+    Ne = (1.-nH)*nrho_cgs
+    Np = (1.-nH)*nrho_cgs
+
+    !- compute approx alphaA
+    temp = u/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
+    alphaA = get_alphaA(temp)
+
+    !- Photoionization heating G(H) as of Osterbrock74 eqn 3.2
+    heating_rate_cgs = Ne*Np*alphaA*3./2.*kboltz*temp_star   ! [erg cm^-3 s-1]
+
+    !- gamma
+    gamma_cgs = heating_rate_cgs/nrho_cgs  ! [erg s-1]
+
+ else
+    gamma_cgs = 0.
  endif
-
- nrho_cgs = rho_cgs*one_over_mH_cgs
-
- !- number density of free electrons and protons
- Ne = (1.-nH)*nrho_cgs
- Np = (1.-nH)*nrho_cgs
-
- !- compute approx alphaA
- temp = u/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
- alphaA = get_alphaA(temp)
-
- !- Photoionization heating G(H) as of Osterbrock74 eqn 3.2
- heating_rate_cgs = Ne*Np*alphaA*3./2.*kboltz*temp_star   ! [erg cm^-3 s-1]
-
- !- gamma
- gamma_cgs = heating_rate_cgs/(nrho_cgs)  ! [erg s-1]
 
  !- Include background heating
  gamma_cgs = gamma_cgs + gamma_background_cgs
@@ -437,7 +442,6 @@ end subroutine get_ueq
 !
 subroutine compute_du(skip_Rtype,dt,rho,u,ueq,gamma,lambda,du)
  use io,  only:warning
- use units, only:utime  !- testing
  logical, intent(in)  :: skip_Rtype
  real,    intent(in)  :: dt,rho,u,ueq,gamma,lambda
  real,    intent(out) :: du
@@ -585,9 +589,10 @@ real function get_alphaB(temp)
 
 end function get_alphaB
 
-
 !
 ! Analytic function which mimics the cooling curve of DeRijcke et al. (2013)
+! Note: This function is a smoothed-out best fit of the tabulated curve which removes all
+!       the 'wriggles' to limit the number of equil solutions to a max of 3.
 !
 real function lambdacoolDR(temp)
  real, intent(in) :: temp

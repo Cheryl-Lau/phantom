@@ -31,7 +31,7 @@ module hnode_cmi
  public :: hnode_iterate
 
  real,    public :: hfact_node = 1.1
- real,    public :: tolh_node  = 1E-2 ! 1E-4
+ real,    public :: tolh_node  = 1E-2
  integer, public :: kmid = 5
 
  private

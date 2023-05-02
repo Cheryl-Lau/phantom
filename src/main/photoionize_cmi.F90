@@ -21,10 +21,10 @@ module photoionize_cmi
 !     nHlimit_fac, min_nodesize_toflag and tree_accuracy_cmi for best results.
 !
 ! Photoionization heating can be done in the following modes -
-!  1. sinks as sources       / user-defined sources
-!  2. monochromatic source   / blackbody source               (blackbody only if using sinks)
-!  3. instantly heat to 1E4K / compute heating and cooling
-!  4. update u implicitly    / update u explicitly            (if doing heating & cooling)
+!  1. sinks as sources        / user-defined sources
+!  2. monochromatic source    / blackbody source               (blackbody only if using sinks)
+!  3. instantly heat to 1E4 K / compute heating and cooling
+!  4. update u implicitly     / update u explicitly            (if doing heating & cooling)
 !
 ! :References: Petkova,et.al,2021,MNRAS,507,858
 !              Bisbas,et.al,2015,MNRAS,453,1324
@@ -57,7 +57,7 @@ module photoionize_cmi
 !   - implicit_cmi        : *Update internal energy of particles with implicit method, else explicit*
 !   - skip_Rtype_phase    : *Skips the time of R-type phase expansion in heating and cooling*
 !
-! :Dependencies: infile_utils, physcon, units, io, dim, boundaries, eos, part, kdtree,
+! :Dependencies: infile_utils, physcon, units, io, dim, boundaries, eos, part, kdtree, cooling,
 !                kdtree_cmi, hnode_cmi, heatcool_cmi
 !
 !
@@ -97,9 +97,9 @@ module photoionize_cmi
  ! Options for extracting cmi-nodes from kdtree
  real,    public :: tree_accuracy_cmi = 0.1
  real,    public :: rcut_opennode_cgs = 4.6E18   ! 1.5 pc
- real,    public :: rcut_leafpart_cgs = 1.5E18   ! 0.5 pc
- real,    public :: delta_rcut_cgs    = 0.9E18   ! 0.3 pc
- real,    public :: nHlimit_fac       = 100      ! ionization front resolution; recommend 40-100
+ real,    public :: rcut_leafpart_cgs = 3.1E18   ! 1.0 pc
+ real,    public :: delta_rcut_cgs    = 1.5E18   ! 0.5 pc
+ real,    public :: nHlimit_fac       = 80       ! ionization front resolution; recommend 40-100
  real,    public :: min_nodesize_toflag = 0.005  ! min node size as a fraction of root node
  logical, public :: auto_opennode = .true.
  logical, public :: auto_tree_acc = .false.
@@ -156,7 +156,8 @@ module photoionize_cmi
  real    :: time_ellapsed_wall,time_ellapsed_cpu
  logical :: skip_Rtype_time_now
  logical :: first_call,warned
- logical :: print_cmi = .false.   ! Print CMI outputs to shell
+ logical :: write_gamma = .true.    ! write heating rates to file (both phantom and CMI)
+ logical :: print_cmi   = .false.   ! print CMI outputs to shell
 
 contains
 
@@ -560,16 +561,17 @@ end subroutine compute_ionization_cmi
 !+
 ! Routines for updating the internal energy of particles using the final nH_parts(:)
 ! returned from CMI
-!- Note: * u-update needs to be separated from nH computation routines since CMI-call and
+!- Notes:* u-update needs to be separated from nH computation routines since CMI-call and
 !-         implicit update are only done during 1st call of deriv, whereas explicit update
 !-         needs to be done in both calls.
 !-       * nH_allparts(i) = -1 denotes dead/non-existing particles, if nH >= -epsilon
 !          means particle has been dealt by CMI (but not necessarily ionized).
 !-       * As the original cooling is being switched off, particles which are not heated
 !          by photoionization would still go through these routines to cool.
-!        * In situations where no thermal equilibrium is found, it likely means that the
-!          heating rate is greater than cooling rate at all temperatures, and that the
-!          particle will heat forever. We will drift the particle to Tmax.
+!        * In situations where no thermal equilibrium is found, it probably means that the
+!          heating rate is greater than cooling rate at all temperatures, i.e. particle
+!          will heat forever. Here we'll drift it to Tmax, however the sim is likely
+!          problematic and we recommend checking the heating rates.
 !+
 !--------------------------------------------------------------------------------
 !
@@ -581,6 +583,7 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
  use part,         only:rhoh,massoftype,igas
  use physcon,      only:kboltz,mass_proton_cgs
  use eos,          only:gamma,gmw
+ use cooling,      only:ufloor
  use units,        only:unit_ergg,unit_energ,utime
  integer, intent(in)    :: npart
  real,    intent(in)    :: dt
@@ -592,8 +595,7 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
  real    :: ueq_mean,temp_ueq,gmw0
  real    :: pos_noroot(3,npart),nH_noroot(npart),temp_noroot(npart)
  real    :: nH_buc(nbuc),gamma_buc(nbuc),nentry_buc(nbuc)
- logical :: write_nH_gamma_distri = .true.  ! write heating rate vs neutral frac to file
- logical :: catch_noroot_parts    = .false. ! write particles with no therm equil roots to file
+ logical :: catch_noroot_parts = .false.  ! write particles with no equil roots to file
 
  if (nphotosrc == 0) return
 
@@ -603,7 +605,7 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
  pmass = massoftype(igas)
 
  !- Check variation of gamma with nH
- if (write_nH_gamma_distri) then
+ if (write_gamma) then
     do ibuc = 1,nbuc
        nH_buc(ibuc) = 1./nbuc * (ibuc-1)
     enddo
@@ -616,9 +618,9 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
  inoroot = 0
  !$omp parallel do default(none) shared(npart,nH_allparts,xyzh,vxyzu) &
  !$omp shared(vxyzu_beforepred,pmass,temp_star,dt,du_cmi) &
- !$omp shared(fix_temp_hii,u_hii) &
+ !$omp shared(fix_temp_hii,u_hii,ufloor) &
  !$omp shared(skip_Rtype_time_now) &
- !$omp shared(write_nH_gamma_distri,nH_buc,unit_energ,utime) &
+ !$omp shared(write_gamma,nH_buc,unit_energ,utime) &
  !$omp shared(catch_noroot_parts,pos_noroot,nH_noroot,temp_noroot) &
  !$omp shared(gmw,gamma,unit_ergg,inoroot) &
  !$omp private(ibuc) &
@@ -649,7 +651,7 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
              endif
 
              !- check gamma distribution
-             if (write_nH_gamma_distri) then
+             if (write_gamma) then
                 ibuc = minloc(abs(nH_buc(:)-nH),1)
                 gamma_buc(ibuc)  = gamma_buc(ibuc) + gammaheat*(unit_energ/utime)
                 nentry_buc(ibuc) = nentry_buc(ibuc) + 1
@@ -668,8 +670,18 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
              endif
           endif
        endif
+
        !- update vpred
        vxyzu(4,ip) = vxyzu(4,ip) + du
+
+       !- floor thermal energy if required
+       if (ufloor > 0.) then
+          if (vxyzu(4,ip) < ufloor) then
+             du = ufloor - (vxyzu(4,ip) - du)
+             vxyzu(4,ip) = ufloor
+          endif
+        endif
+
        !- store du into global array
        du_cmi(ip) = du
     endif
@@ -682,7 +694,7 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
     print*,'Drifting HII region to temp [K]: ',temp_ueq
  endif
 
- if (write_nH_gamma_distri) then
+ if (write_gamma) then
     do ibuc = 1,nbuc
        if (nentry_buc(ibuc) > 0) then
           gamma_buc(ibuc) = gamma_buc(ibuc)/nentry_buc(ibuc)
@@ -1041,8 +1053,8 @@ end subroutine collect_and_combine_cminodes
 
 !----------------------------------------------------------------
 !+
-! Check all nodes which were previously opened to resolve into the ionization front;
-! If they are no longer heavily ionized [determine this with the currrent nixyzhmf_cminode],
+! Check all nodes that were previously opened to resolve into the ionization front;
+! If they are no longer heavily ionized [determine this with the current nixyzhmf_cminode],
 ! move the tree back up by removing entries in nxyzrs_nextopen(_updatewalk).
 ! Note: rcut_opennode and rcut_leafpart will remain.
 !+
@@ -1284,8 +1296,10 @@ subroutine write_cmi_infiles(nsite,x,y,z,h,m)
  write(2026,'(4x,a35)') "filename: phantom_voronoi_sites.txt"
  write(2026,'(4x,a9)') "type: SPH"
 
- write(2026,'(a24)') "DensityGridWriterFields:"  ! testing
- write(2026,'(2x,a15)') "HeatingRateH: 1"
+ if (write_gamma) then
+    write(2026,'(a24)') "DensityGridWriterFields:"
+    write(2026,'(2x,a15)') "HeatingRateH: 1"
+ endif
 
  write(2026,'(a16)') "DensityFunction:"
  write(2026,'(2x,a17)') "type: Homogeneous"
