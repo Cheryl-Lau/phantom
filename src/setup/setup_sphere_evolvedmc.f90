@@ -177,7 +177,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     npmax = int(2.0/3.0*size(xyzh(1,:))) ! approx max number allowed in sphere given size(xyzh(1,:))
     print*, 'npmax', npmax
-    np = 1E5
+    np = 1E6
     !
     ! prompt user for settings
     !
@@ -199,7 +199,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
           np_in    = np
           r_sphere = 5.
           call prompt('Enter radius of sphere in units of '//dist_unit,r_sphere,0.)
-          totmass_sphere = 1E3
+          totmass_sphere = 1E4
           call prompt('Enter total mass in sphere in units of '//mass_unit,totmass_sphere,0.)
 
        else
@@ -217,7 +217,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        call prompt('Enter the semi-axis {a} of ellipsoid in units of '//dist_unit,r_ellipsoid(1),0.)
        call prompt('Enter the semi-axis {b} of ellipsoid in units of '//dist_unit,r_ellipsoid(2),0.)
        call prompt('Enter the semi-axis {c} of ellipsoid in units of '//dist_unit,r_ellipsoid(3),0.)
-       totmass_sphere = 1E3  ! 1E4 !
+       totmass_sphere = 1E4
        call prompt('Enter total mass in ellipsoid in units of '//mass_unit,totmass_sphere,0.)
 
     else
@@ -252,7 +252,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        call prompt('Do to intend to slightly randomize particle positions on the lattice?',pos_ranh)
     endif
 
-    rms_mach = 3. !10.
+    rms_mach = 10.
     call prompt('Enter the Mach number of the cloud turbulence',rms_mach,0.)
 
     if (use_dust) then
@@ -534,11 +534,11 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  infilename=trim(fileprefix)//'.in'
  inquire(file=infilename,exist=in_iexist)
  if (.not. in_iexist) then
-    tmax      = 1E0
-    dtmax     = 1E-4
+    tmax      = 4.41504E12/utime !1E0
+    dtmax     = 3.15360E9/utime  !1E-4
     nout      = 1E1
     nmaxdumps = 5000
-    icooling  = 0    ! JML06
+    icooling  = 7    ! JML06
     Tfloor    = 3.
     ufloor    = 0.
     ipdv_heating   = 1
