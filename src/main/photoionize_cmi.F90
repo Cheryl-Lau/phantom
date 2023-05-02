@@ -98,7 +98,7 @@ module photoionize_cmi
  real,    public :: tree_accuracy_cmi = 0.1
  real,    public :: rcut_opennode_cgs = 4.6E18   ! 1.5 pc
  real,    public :: rcut_leafpart_cgs = 1.5E18   ! 0.5 pc
- real,    public :: delta_rcut_cgs    = 0.3E18   ! 0.1 pc
+ real,    public :: delta_rcut_cgs    = 0.9E18   ! 0.3 pc
  real,    public :: nHlimit_fac       = 100      ! ionization front resolution; recommend 40-100
  real,    public :: min_nodesize_toflag = 0.005  ! min node size as a fraction of root node
  logical, public :: auto_opennode = .true.
