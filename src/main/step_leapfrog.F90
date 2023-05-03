@@ -250,7 +250,7 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
  !- Determine if there are any ionizing sources at current step
  call set_ionizing_source_cmi(timenow,nptmass,xyzmh_ptmass)
  !- Prepare for energy update and flag to stop cooling
- call energy_checks_cmi(xyzh)
+ call energy_checks_cmi(xyzh,dtsph)
 #endif
 
 

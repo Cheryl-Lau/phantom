@@ -47,8 +47,6 @@ module heatcool_cmi
  !- Heating from cosmic rays, X-rays, H2 formation and destruction etc. (as of KI02)
  real,    public :: gamma_background_cgs = 2E-26
 
- real,    public :: t_recomb
-
  private
 
  !- Pre-computed table of equilibiurms ueq(rho,gamma)
@@ -440,26 +438,26 @@ end subroutine get_ueq
 !
 ! With the ueq, compute new u after dt to give du in code units as of VS07
 !
-subroutine compute_du(skip_Rtype,dt,rho,u,ueq,gamma,lambda,du)
+subroutine compute_du(is_Rtype_phase,dt,rho,u,ueq,gamma,lambda,du)
  use io,  only:warning
- logical, intent(in)  :: skip_Rtype
+ logical, intent(in)  :: is_Rtype_phase
  real,    intent(in)  :: dt,rho,u,ueq,gamma,lambda
  real,    intent(out) :: du
  real :: unew,tau
 
  !- time required to radiate energy excess / gain energy
- tau  = abs((u-ueq)/(rho*one_over_mH2*lambda - one_over_mH*gamma))
+ tau = abs((u-ueq)/(rho*one_over_mH2*lambda - one_over_mH*gamma))
 
- if (skip_Rtype) then
-    if (t_recomb > dt) then
-       unew = ueq + (u-ueq)*exp(-t_recomb/tau)
-    else
-       call warning('heating_cooling_cmi','t_recomb is shorter; keeping original dt')
-    endif
- else
-    unew = ueq + (u-ueq)*exp(-dt/tau)
+ !- During R-type phase recomb rate (i.e. cooling) is being brought up from 0,
+ !  so it does approach the equil between gamma and orginal lambda too
+ !  but at a quicker rate. Here we model this process by simply changing tau
+ !  to let it drift to ueq faster
+ if (is_Rtype_phase) then
+    tau = abs((u-ueq)/(one_over_mH*gamma))   !???
+!    tau = 1E-4*tau   ! to immediately go to ~1E4 K
  endif
 
+ unew = ueq + (u-ueq)*exp(-dt/tau)
  du = unew - u
 
 end subroutine compute_du
@@ -467,26 +465,20 @@ end subroutine compute_du
 !
 ! Balance heating and cooling term to give dudt in code units
 !
-subroutine compute_dudt(skip_Rtype,dt,rho,u,gamma,lambda,dudt)
+subroutine compute_dudt(is_Rtype_phase,dt,rho,u,gamma,lambda,dudt)
  use io,  only:warning
- logical, intent(in)  :: skip_Rtype
- real,    intent(in)  :: dt,rho,u,gamma,lambda
- real,    intent(out) :: dudt
+ logical, intent(in)    :: is_Rtype_phase
+ real,    intent(in)    :: dt,rho,u
+ real,    intent(inout) :: gamma,lambda
+ real,    intent(out)   :: dudt
  integer :: numroots
  real    :: ueq,du,unew
 
- dudt = one_over_mH*gamma - rho*one_over_mH2*lambda
-
- !- To 'skip' a certain amount of time, an implicit method is required
- if (skip_Rtype) then
-    if (t_recomb > dt) then
-       call get_ueq(rho,gamma,u,numroots,ueq)
-       call compute_du(skip_Rtype,dt,rho,u,ueq,gamma,lambda,du)
-       dudt = du/dt
-    else
-       call warning('heating_cooling_cmi','t_recomb is shorter; keeping original dt')
-    endif
+ if (is_Rtype_phase) then
+    lambda = 0.   !???
  endif
+
+ dudt = one_over_mH*gamma - rho*one_over_mH2*lambda
 
 end subroutine compute_dudt
 
@@ -497,23 +489,24 @@ end subroutine compute_dudt
 
 
 !
-! Calculates timescale of R-type phase (t_recomb) i.e. time taken to reach Stromgren radius
+! Calculates timescale of R-type phase i.e. time taken to reach Stromgren radius
 !
-subroutine compute_Rtype_time(nphotosrc,xyz_photosrc,xyzh)
+subroutine compute_Rtype_time(nphotosrc,xyz_photosrc,xyzh,t_recomb)
  use units,    only:udist,utime,unit_density
  use physcon,  only:mass_proton_cgs
  use part,     only:rhoh,massoftype,igas
  use kdtree,   only:getneigh
  use linklist, only:node,ifirstincell,listneigh
  use io,       only:fatal
- integer, intent(in) :: nphotosrc
- real,    intent(in) :: xyz_photosrc(3,nphotosrc)
- real,    intent(in) :: xyzh(:,:)
- integer, parameter  :: neighcachesize = 1E5
+ integer, intent(in)  :: nphotosrc
+ real,    intent(in)  :: xyz_photosrc(3,nphotosrc)
+ real,    intent(in)  :: xyzh(:,:)
+ real,    intent(out) :: t_recomb
+ integer, parameter   :: neighcachesize = 1E5
  integer :: isrc,nneigh,n,ip,ixyzcachesize
  real    :: xyzcache(3,neighcachesize)
  real    :: pos_src(3),rcut,hmean,pmass,rhomean,rhomean_cgs,alphaB
- real    :: t_recomb_src,t_recomb_cgs,t_recomb_myr
+ real    :: t_recomb_src
  real    :: rcut_cgs = 1E19    !- sample within 3pc around source
 
  rcut = rcut_cgs/udist
@@ -543,15 +536,7 @@ subroutine compute_Rtype_time(nphotosrc,xyz_photosrc,xyzh)
     t_recomb = max(t_recomb,t_recomb_src)
  enddo each_source
 
- ! testing
-! t_recomb = 1E7*(365*24*60*60)/utime  ! 1E1 Myr
-
- t_recomb_cgs = t_recomb*utime
- t_recomb_myr = t_recomb_cgs/(1E6*365*24*60*60)
- print*, 'Skipping R-type phase of time [Myr]: ',t_recomb_myr
-
 end subroutine compute_Rtype_time
-
 
 !
 ! Recombination coef alphaA as func of temp obtained from fitting table 2.1

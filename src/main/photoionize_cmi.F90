@@ -55,7 +55,7 @@ module photoionize_cmi
 !   - temp_hii            : *Presumed temperature of ionized gas*
 !   - fix_temp_hii        : *Heats ionized particles to temp_hii, else computes heating and cooling*
 !   - implicit_cmi        : *Update internal energy of particles with implicit method, else explicit*
-!   - skip_Rtype_phase    : *Skips the time of R-type phase expansion in heating and cooling*
+!   - treat_Rtype_phase   : *Change heating/cooling rates during R-type phase expansion of HII region*
 !
 ! :Dependencies: infile_utils, physcon, units, io, dim, boundaries, eos, part, kdtree, cooling,
 !                kdtree_cmi, hnode_cmi, heatcool_cmi
@@ -108,7 +108,7 @@ module photoionize_cmi
  real,    public :: temp_hii     = 1E4          ! K
  logical, public :: fix_temp_hii = .false.      ! else computes heating and cooling
  logical, public :: implicit_cmi = .true.       ! else updates u explicitly
- logical, public :: skip_Rtype_phase = .true.
+ logical, public :: treat_Rtype_phase = .true.
 
  ! Global storages required for updating u
  real,    public,   allocatable :: vxyzu_beforepred(:,:)  ! u before predictor step
@@ -154,7 +154,7 @@ module photoionize_cmi
  real    :: totlumin,solarl_photonsec,freq_photon,u_hii,udist_si,umass_si
  real    :: time0_wall,time0_cpu,time_now_wall,time_now_cpu
  real    :: time_ellapsed_wall,time_ellapsed_cpu
- logical :: skip_Rtype_time_now
+ logical :: is_Rtype_phase
  logical :: first_call,warned
  logical :: write_gamma = .true.    ! write heating rates to file (both phantom and CMI)
  logical :: print_cmi   = .false.   ! print CMI outputs to shell
@@ -404,12 +404,14 @@ end subroutine get_lumin
 !
 ! Routine to prepare for energy injections
 !
-subroutine energy_checks_cmi(xyzh)
+subroutine energy_checks_cmi(xyzh,dt)
  use physcon,      only:solarl,solarr,steboltz,pi
  use heatcool_cmi, only:check_to_stop_cooling,compute_Rtype_time
+ use io,           only:fatal
  real, intent(in) :: xyzh(:,:)
+ real, intent(in) :: dt
  integer :: isrc
- real    :: massmean,lumin_star_cgs,rstar_cgs
+ real    :: massmean,lumin_star_cgs,rstar_cgs,t_recomb
  real    :: rstar_solarr = 10.  !- radius of a typical O-star [R_sun]
 
  if (.not.fix_temp_hii) call check_to_stop_cooling(nphotosrc)
@@ -431,15 +433,20 @@ subroutine energy_checks_cmi(xyzh)
     endif
  endif
 
- if (skip_Rtype_phase) then
+ if (treat_Rtype_phase) then
     if (nphotosrc > nphotosrc_old) then   !- a new source is added
-       skip_Rtype_time_now = .true.
-       call compute_Rtype_time(nphotosrc,xyz_photosrc,xyzh)
+       is_Rtype_phase = .true.
+       !- Check that dt is greater than recombination timescale
+       call compute_Rtype_time(nphotosrc,xyz_photosrc,xyzh,t_recomb)
+       if (t_recomb > dt) call fatal('photoionize_cmi','dt < t_recomb - require larger timestep')
     else
-       if (skip_Rtype_time_now) skip_Rtype_time_now = .false.  !- switch back off
+       if (is_Rtype_phase) is_Rtype_phase = .false.  !- switch back off
     endif
     nphotosrc_old = nphotosrc
  endif
+ !- Note: CMI does not model the initial R-type phase during the expansion of HII region,
+ !        hence this phase should be an instantaneous process as far as the hydrodynamics
+ !        is concerned - dt should cover the time duration of R-type phase
 
 end subroutine energy_checks_cmi
 
@@ -619,7 +626,7 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
  !$omp parallel do default(none) shared(npart,nH_allparts,xyzh,vxyzu) &
  !$omp shared(vxyzu_beforepred,pmass,temp_star,dt,du_cmi) &
  !$omp shared(fix_temp_hii,u_hii,ufloor) &
- !$omp shared(skip_Rtype_time_now) &
+ !$omp shared(is_Rtype_phase) &
  !$omp shared(write_gamma,nH_buc,unit_energ,utime) &
  !$omp shared(catch_noroot_parts,pos_noroot,nH_noroot,temp_noroot) &
  !$omp shared(gmw,gamma,unit_ergg,inoroot) &
@@ -642,7 +649,7 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
              call heating_term(nH,rhoi,ui,temp_star,gammaheat)
              call cooling_term(ui,lambda)  ! for calculating timescale
              call get_ueq(rhoi,gammaheat,ui,numroots,ueq)
-             call compute_du(skip_Rtype_time_now,dt,rhoi,ui,ueq,gammaheat,lambda,du)
+             call compute_du(is_Rtype_phase,dt,rhoi,ui,ueq,gammaheat,lambda,du)
 
              !- check Teq of HII region
              if (nH < 0.5) then
@@ -748,7 +755,7 @@ subroutine energ_explicit_cmi(npart,xyzh,vxyzu,dt)
 
  !$omp parallel do default(none) shared(npart,nH_allparts,xyzh,vxyzu) &
  !$omp shared(temp_star,pmass,dt,dudt_cmi) &
- !$omp shared(skip_Rtype_time_now) &
+ !$omp shared(is_Rtype_phase) &
  !$omp private(ip,nH,rhoi,ui,gammaheat,lambda,dudt) &
  !$omp private(u_ionized) &
  !$omp reduction(+:npart_heated,uhii_mean)
@@ -759,7 +766,7 @@ subroutine energ_explicit_cmi(npart,xyzh,vxyzu,dt)
        ui   = vxyzu(4,ip)
        call heating_term(nH,rhoi,ui,temp_star,gammaheat)
        call cooling_term(ui,lambda)
-       call compute_dudt(skip_Rtype_time_now,dt,rhoi,ui,gammaheat,lambda,dudt)
+       call compute_dudt(is_Rtype_phase,dt,rhoi,ui,gammaheat,lambda,dudt)
        !- store dudt into global array
        dudt_cmi(ip) = dudt
        !- checking
@@ -1575,7 +1582,7 @@ subroutine write_options_photoionize(iunit)
  call write_inopt(temp_hii,'temp_hii','Temperature of ionized gas',iunit)
  call write_inopt(fix_temp_hii,'fix_temp_hii','Heat ionized particles to specified temp_hii',iunit)
  call write_inopt(implicit_cmi,'implicit_cmi','Use implicit method to update internal energies',iunit)
- call write_inopt(skip_Rtype_phase,'skip_Rtype_phase','Skips time of R-type phase expansion in heating',iunit)
+ call write_inopt(treat_Rtype_phase,'treat_Rtype_phase','Change heating/cooling rate during R-type phase',iunit)
 
 end subroutine write_options_photoionize
 
@@ -1672,8 +1679,8 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
  case('implicit_cmi')
     read(valstring,*,iostat=ierr) implicit_cmi
     ngot = ngot + 1
- case('skip_Rtype_phase')
-    read(valstring,*,iostat=ierr) skip_Rtype_phase
+ case('treat_Rtype_phase')
+    read(valstring,*,iostat=ierr) treat_Rtype_phase
     ngot = ngot + 1
  case default
     imatch = .false.
