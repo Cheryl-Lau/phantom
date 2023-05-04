@@ -196,7 +196,7 @@ end subroutine extract_cminodes_from_tree
 real function mag2(vec)
  real,   intent(in) :: vec(3)
 
- mag2 = vec(1)**2 + vec(2)**2 + vec(3)**2
+ mag2 = dot_product(vec,vec)
 
 end function mag2
 

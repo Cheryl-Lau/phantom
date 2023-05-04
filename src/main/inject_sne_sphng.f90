@@ -501,7 +501,7 @@ end subroutine gen_refpoints
 real function mag(vec)
  real, intent(in) :: vec(3)
 
- mag = sqrt(vec(1)**2 + vec(2)**2 + vec(3)**2)
+ mag = sqrt(dot_product(vec,vec))
 
 end function mag
 

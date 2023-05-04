@@ -124,7 +124,7 @@ subroutine init_ueq_table
  gmw0 = gmw
  gmw = 0.5   !- temporarily changing mean molecular weight
 
- ! Temp of local max and min of JML06 cooling curve (for root-search brackets)
+ ! Temp of local max and min of DeRijcke13 cooling curve (for root-search brackets)
  Tlocalmax = 198609.4917357372
  Tlocalmin = 31622776.6016837933
 
@@ -449,7 +449,7 @@ subroutine compute_du(is_Rtype_phase,dt,rho,u,ueq,gamma,lambda,du)
  tau = abs((u-ueq)/(rho*one_over_mH2*lambda - one_over_mH*gamma))
 
  !- During R-type phase recomb rate (i.e. cooling) is being brought up from 0,
- !  so it does approach the equil between gamma and orginal lambda too
+ !  so by the end it does approach the equil between gamma and orginal lambda
  !  but at a quicker rate. Here we model this process by simply changing tau
  !  to let it drift to ueq faster
  if (is_Rtype_phase) then
@@ -471,8 +471,6 @@ subroutine compute_dudt(is_Rtype_phase,dt,rho,u,gamma,lambda,dudt)
  real,    intent(in)    :: dt,rho,u
  real,    intent(inout) :: gamma,lambda
  real,    intent(out)   :: dudt
- integer :: numroots
- real    :: ueq,du,unew
 
  if (is_Rtype_phase) then
     lambda = 0.   !???

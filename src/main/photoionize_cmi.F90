@@ -96,10 +96,10 @@ module photoionize_cmi
 
  ! Options for extracting cmi-nodes from kdtree
  real,    public :: tree_accuracy_cmi = 0.1
- real,    public :: rcut_opennode_cgs = 4.6E18   ! 1.5 pc
- real,    public :: rcut_leafpart_cgs = 3.1E18   ! 1.0 pc
- real,    public :: delta_rcut_cgs    = 1.5E18   ! 0.5 pc
- real,    public :: nHlimit_fac       = 80       ! ionization front resolution; recommend 40-100
+ real,    public :: rcut_opennode_cgs = 3.1E18   ! 1.0 pc
+ real,    public :: rcut_leafpart_cgs = 1.5E18   ! 0.5 pc
+ real,    public :: delta_rcut_cgs    = 3.1E17   ! 0.1 pc
+ real,    public :: nHlimit_fac       = 100      ! ionization front resolution; recommend 40-100
  real,    public :: min_nodesize_toflag = 0.005  ! min node size as a fraction of root node
  logical, public :: auto_opennode = .true.
  logical, public :: auto_tree_acc = .false.
@@ -211,9 +211,11 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
     !- Check compile conditions
     compilecond_ok = .false.
 #ifndef PERIODIC
+#ifndef MPI
     compilecond_ok = .true.
 #endif
-    if (.not.compilecond_ok) call fatal('photoionize_cmi','current version does not support PERIODIC')
+#endif
+    if (.not.compilecond_ok) call fatal('photoionize_cmi','current version does not support PERIODIC or MPI')
  endif
 
  !- Check options for ionizing source
@@ -296,7 +298,7 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  call precompute_uterms
  if (implicit_cmi) call init_ueq_table
 
- !- For skipping R-type phase in heating
+ !- For indicating R-type phase for heating
  nphotosrc_old = 0
 
  !- For writing snapshots of nH map
@@ -445,8 +447,8 @@ subroutine energy_checks_cmi(xyzh,dt)
     nphotosrc_old = nphotosrc
  endif
  !- Note: CMI does not model the initial R-type phase during the expansion of HII region,
- !        hence this phase should be an instantaneous process as far as the hydrodynamics
- !        is concerned - dt should cover the time duration of R-type phase
+ !        hence this phase should be an instantaneous process wrt the hydrodynamics -
+ !        dt should cover the time duration of R-type phase
 
 end subroutine energy_checks_cmi
 
@@ -846,7 +848,6 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
                                     nnode_needopen,nneedopen,&
                                     nxyzrs_nextopen_updatewalk,nnextopen_updatewalk)
     if (ncminode == 0) call fatal('photoionize_cmi','no nodes found')
-
     !
     ! Solve for the smoothing lengths of nodes
     !
@@ -1129,7 +1130,7 @@ end subroutine remove_unnecessary_opennode
 real function mag2(vec)
  real, intent(in) :: vec(3)
 
- mag2 = vec(1)**2 + vec(2)**2 + vec(3)**2
+ mag2 = dot_product(vec,vec)
 
 end function mag2
 
