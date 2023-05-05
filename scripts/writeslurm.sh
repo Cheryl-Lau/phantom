@@ -1,18 +1,18 @@
-#!/bin/bash 
+#!/bin/bash
 #
-# Writes a slurm script to be passed into Kennedy 
+# Writes a slurm script to be passed into Kennedy
 #
 read -p 'Jobname: ' jobname
 read -p 'Infile: ' infile
 read -p 'Debug queue (y/n)? ' -e -i 'n' yn
- 
+
 echo '#!/bin/bash -l'
 echo '#SBATCH -J '$jobname
 echo '#SBATCH --nodes=1'
 case $yn in
    [Yy]* ) echo '#SBATCH -p debug';;
    [Nn]* ) echo '#SBATCH -p singlenode';;
-   * ) echo '#SBATCH -p singlenode';; 
+   * ) echo '#SBATCH -p singlenode';;
 esac
 echo '#SBATCH --ntasks=1'
 echo '#SBATCH --cpus-per-task=32'
@@ -21,11 +21,11 @@ case $yn in
    [Nn]* ) echo '#SBATCH --time=168:00:00';;
    * ) echo '#SBATCH --time=168:00:00';;
 esac
-echo '#SBATCH --output='$infile'.qout' 
+echo '#SBATCH --output='$infile'.qout'
 echo '#SBATCH --error='$infile'.err'
 echo '#SBATCH --mail-type=END,FAIL'
 echo '#SBATCH --mail-user='$USER'@st-andrews.ac.uk'
-echo '#SBATCH --mem=16G'
+echo '#SBATCH --mem=40G'
 
 echo 'export OMP_SCHEDULE="dynamic"'
 echo 'export OMP_NUM_THREADS=32'
@@ -42,8 +42,3 @@ echo 'echo "starting phantom run"'
 echo 'export outfile=`grep logfile "'$infile'" | sed "s/logfile =//g" | sed "s/\\!.*//g" | sed "s/\s//g"`'
 echo 'echo "writing output to $outfile"'
 echo './phantom '$infile' >& $outfile'
-
-
-
-
-
