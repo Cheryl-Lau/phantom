@@ -106,7 +106,7 @@ module photoionize_cmi
 
  ! Options for heating/cooling
  real,    public :: temp_hii     = 1E4          ! K
- logical, public :: fix_temp_hii = .true.      ! else computes heating and cooling
+ logical, public :: fix_temp_hii = .false.      ! else computes heating and cooling
  logical, public :: implicit_cmi = .true.       ! else updates u explicitly
  logical, public :: treat_Rtype_phase = .false.
 
@@ -129,8 +129,8 @@ module photoionize_cmi
 
  ! Arrays to control subsequent tree-walks
  integer, parameter   :: maxnode_open = 1E6
- integer, allocatable :: nnode_needopen(:)    !- for next iteration
- real,    allocatable :: nxyzrs_nextopen(:,:) !- for next timestep
+ integer, allocatable :: nnode_needopen(:)    ! for next iteration
+ real,    allocatable :: nxyzrs_nextopen(:,:) ! for next timestep
  real,    allocatable :: nxyzrs_nextopen_updatewalk(:,:)
  integer :: nnextopen,nnextopen_updatewalk
  integer :: ncminode_previter
@@ -143,10 +143,10 @@ module photoionize_cmi
  integer :: nsite_lastgrid
 
  integer, parameter :: maxoutfile_ult = 99999
- integer :: maxoutfile = 5000         !- max number of (ni)xyzhmnH output files
- integer :: ncall_writefile  = 10     !- interval to write (ni)xyzhmnH output file
+ integer :: maxoutfile = 5000         ! max number of (ni)xyzhmnH output files
+ integer :: ncall_writefile  = 10     ! interval to write (ni)xyzhmnH output file
  integer :: icall,iunit,ifile,iruncmi
- integer :: ncall_checktreewalk = 100
+ integer :: ncall_checktreewalk = 50  ! interval to check for unnecessarily-opened nodes
  integer :: nphotosrc_old
  real    :: xyz_photosrc_si(3,maxphotosrc),lumin_photosrc(maxphotosrc),mass_photosrc(maxphotosrc),masscrit_ionize
  real    :: tree_accuracy_cmi_old
@@ -176,7 +176,7 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  use eos,      only:gmw,gamma
  use io,       only:warning,fatal
  use units,    only:udist,umass,unit_ergg
- use dim,      only:maxvxyzu,maxp
+ use dim,      only:maxvxyzu
  use heatcool_cmi, only:init_ueq_table,precompute_uterms
  use omp_lib
  integer, intent(in) :: npart
@@ -466,7 +466,6 @@ subroutine compute_ionization_cmi(time,npart,xyzh,vxyzu)
  use part,     only:massoftype,igas,isdead_or_accreted
  use kdtree,   only:inodeparts,inoderange
  use io,       only:fatal,warning
- use units,    only:utime
  use omp_lib
  integer, intent(inout) :: npart
  real,    intent(in)    :: time
@@ -822,18 +821,6 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
  do inode = 1,maxnode_open
     nnode_needopen(inode) = 0
  enddo
- !
- ! Shift tree back up whenever possible
- !
- if (auto_opennode) then
-    icall = icall + 1
-    if (icall == ncall_checktreewalk) then
-       if (nnextopen_updatewalk > 0) then
-          call remove_unnecessary_opennode(ncminode)
-       endif
-       icall = 0
-    endif
- endif
 
  resolve_ionfront: do while (.not.node_checks_passed)
     write(*,'(1x,a35,i2)') 'Resolve ionization front iteration ',niter
@@ -994,6 +981,19 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
 
  print*,'treewalk_iterate done'
 
+  !
+  ! Shift tree back up whenever possible
+  !
+  if (auto_opennode) then
+     icall = icall + 1
+     if (icall == ncall_checktreewalk) then
+        if (nnextopen_updatewalk > 0) then
+           call remove_unnecessary_opennode(ncminode)
+        endif
+        icall = 0
+     endif
+  endif
+
 end subroutine treewalk_run_cmi_iterate
 
 !----------------------------------------------------------------
@@ -1070,11 +1070,11 @@ end subroutine collect_and_combine_cminodes
 !+
 !----------------------------------------------------------------
 subroutine remove_unnecessary_opennode(ncminode)
- use allocutils,  only:allocate_array
- integer, intent(in)    :: ncminode
- real,    allocatable   :: nHmin(:)
- integer :: nnextopen_old,inextopen,icminode,n_node,irowafter
- real    :: pos_opennode(3),rad_opennode2,pos_node(3),dist2,nH_node
+ use allocutils, only:allocate_array
+ integer, intent(in)  :: ncminode
+ real,    allocatable :: nHmin(:)
+ integer :: nnextopen_old,inextopen,isite,irowafter
+ real    :: pos_opennode(3),rad_opennode2,pos_site(3),dist2,nH_site
  real    :: nH,size,nH_limit,nHlimit_fac_rev
 
  nnextopen_old = nnextopen
@@ -1086,16 +1086,13 @@ subroutine remove_unnecessary_opennode(ncminode)
  all_opened: do inextopen = 1,nnextopen_old
     nHmin(inextopen) = 1. !- init
     pos_opennode  = nxyzrs_nextopen(2:4,inextopen)
-    rad_opennode2 = nxyzrs_nextopen(5,inextopen)**2.
-    current_nodes: do icminode = 1,ncminode
-       n_node = int(nixyzhmf_cminode(1,icminode))
-       if (n_node /= 0) then  !- is node
-          pos_node = nixyzhmf_cminode(3:5,icminode)
-          dist2 = mag2(pos_node(1:3)-pos_opennode(1:3))
-          if (dist2 < rad_opennode2) then
-             nH_node = nixyzhmf_cminode(8,icminode)
-             nHmin(inextopen) = min(nHmin(inextopen),nH_node)
-          endif
+    rad_opennode2 = nxyzrs_nextopen(5,inextopen)**2
+    current_nodes: do isite = 1,ncminode
+       pos_site = nixyzhmf_cminode(3:5,isite)
+       dist2 = mag2(pos_site(1:3)-pos_opennode(1:3))
+       if (dist2 < rad_opennode2) then
+          nH_site = nixyzhmf_cminode(8,isite)
+          nHmin(inextopen) = min(nHmin(inextopen),nH_site)
        endif
     enddo current_nodes
  enddo all_opened
@@ -1103,12 +1100,12 @@ subroutine remove_unnecessary_opennode(ncminode)
  !
  ! Remove entry in nxyzrs_nextopen(_updatewalk) if nH is now sufficiently high
  !
- nHlimit_fac_rev = nHlimit_fac + 5.  !- slightly higher than the opening-criterion
+ nHlimit_fac_rev = nHlimit_fac + 5  !- slightly higher than the opening-criterion
  inextopen = 1
  do while (inextopen <= nnextopen)
     nH = nHmin(inextopen)
     size = nxyzrs_nextopen(5,inextopen)
-    nH_limit = 1/nHlimit_fac_rev * (-1/size + nHlimit_fac_rev)
+    nH_limit = 1./nHlimit_fac_rev * (-1./size + nHlimit_fac_rev)
     if (nH > nH_limit .and. size > min_nodesize_toflag) then  !- can undo the resolve-iteration
        do irowafter = inextopen,nnextopen-1
           nxyzrs_nextopen(1:6,irowafter) = nxyzrs_nextopen(1:6,irowafter+1)
@@ -1122,7 +1119,9 @@ subroutine remove_unnecessary_opennode(ncminode)
  nnextopen_updatewalk = nnextopen
  nxyzrs_nextopen_updatewalk(:,:) = nxyzrs_nextopen(:,:)
 
- print*,'current nnextopen / new nnextopen: ',nnextopen_old,nnextopen
+ if (nnextopen < nnextopen_old) then
+    write(*,'(1x,a8,i5,a37)') 'Removed ', nnextopen_old-nnextopen,' nodes stored in nxyzrs_nextopen'
+ endif
 
  if (allocated(nHmin)) deallocate(nHmin)
 
