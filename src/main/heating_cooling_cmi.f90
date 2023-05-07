@@ -453,8 +453,8 @@ subroutine compute_du(is_Rtype_phase,dt,rho,u,ueq,gamma,lambda,du)
  !  but at a quicker rate. Here we model this process by simply changing tau
  !  to let it drift to ueq faster
  if (is_Rtype_phase) then
-    tau = abs((u-ueq)/(one_over_mH*gamma))   !???
-!    tau = 1E-4*tau   ! to immediately go to ~1E4 K
+!    tau = abs((u-ueq)/(one_over_mH*gamma))   !???
+    tau = 1E-4*tau   ! to immediately go to ~1E4 K
  endif
 
  unew = ueq + (u-ueq)*exp(-dt/tau)

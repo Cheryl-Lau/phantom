@@ -22,9 +22,9 @@ module photoionize_cmi
 !
 ! Photoionization heating can be done in the following modes -
 !  1. sinks as sources        / user-defined sources
-!  2. monochromatic source    / blackbody source               (blackbody only if using sinks)
+!  2. monochromatic source    / blackbody source         (blackbody only if using sinks)
 !  3. instantly heat to 1E4 K / compute heating and cooling
-!  4. update u implicitly     / update u explicitly            (if doing heating & cooling)
+!  4. update u implicitly     / update u explicitly      (implicit only if doing instant-heat)
 !
 ! :References: Petkova,et.al,2021,MNRAS,507,858
 !              Bisbas,et.al,2015,MNRAS,453,1324
@@ -85,20 +85,20 @@ module photoionize_cmi
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
  integer, public :: niter_mcrt = 10
- real,    public :: photon_eV  = 13.7   ! eV; used only if sink_ionsrc=F and monochrom_source=T
+ real,    public :: photon_eV  = 13.6   ! eV; used only if sink_ionsrc=F and monochrom_source=T
  real,    public :: temp_star  = 5E4    ! K;  used only if sink_ionsrc=F and monochrom_source=F
- real,    public :: tol_vsite  = 1E-3
+ real,    public :: tol_vsite  = 1E-1
  logical, public :: lloyd      = .true.
- logical, public :: monochrom_source = .false.   ! else blackbody spec
+ logical, public :: monochrom_source = .true.   ! else blackbody spec
 
  ! Move grid-construction up the tree
  logical, public :: photoionize_tree = .true.
 
  ! Options for extracting cmi-nodes from kdtree
- real,    public :: tree_accuracy_cmi = 0.1
- real,    public :: rcut_opennode_cgs = 3.1E18   ! 1.0 pc
- real,    public :: rcut_leafpart_cgs = 1.5E18   ! 0.5 pc
- real,    public :: delta_rcut_cgs    = 3.1E17   ! 0.1 pc
+ real,    public :: tree_accuracy_cmi = 0.25
+ real,    public :: rcut_opennode_cgs = 1.2E18   ! 0.4 pc
+ real,    public :: rcut_leafpart_cgs = 9.3E17   ! 0.3 pc
+ real,    public :: delta_rcut_cgs    = 3.1E16   ! 0.01 pc
  real,    public :: nHlimit_fac       = 100      ! ionization front resolution; recommend 40-100
  real,    public :: min_nodesize_toflag = 0.005  ! min node size as a fraction of root node
  logical, public :: auto_opennode = .true.
@@ -106,9 +106,9 @@ module photoionize_cmi
 
  ! Options for heating/cooling
  real,    public :: temp_hii     = 1E4          ! K
- logical, public :: fix_temp_hii = .false.      ! else computes heating and cooling
+ logical, public :: fix_temp_hii = .true.      ! else computes heating and cooling
  logical, public :: implicit_cmi = .true.       ! else updates u explicitly
- logical, public :: treat_Rtype_phase = .true.
+ logical, public :: treat_Rtype_phase = .false.
 
  ! Global storages required for updating u
  real,    public,   allocatable :: vxyzu_beforepred(:,:)  ! u before predictor step
@@ -156,8 +156,13 @@ module photoionize_cmi
  real    :: time_ellapsed_wall,time_ellapsed_cpu
  logical :: is_Rtype_phase
  logical :: first_call,warned
- logical :: write_gamma = .true.    ! write heating rates to file (both phantom and CMI)
- logical :: print_cmi   = .false.   ! print CMI outputs to shell
+
+ ! Switches for plotting/debugging
+ logical :: write_gamma = .false.          ! write heating rates (from both phantom and CMI)
+ logical :: print_cmi   = .false.          ! show CMI shell outputs
+ logical :: write_nH_u_distri  = .false.   ! write u of particles vs nH
+ logical :: write_node_prop    = .true.    ! write properties of the current set of cmi-nodes
+ logical :: catch_noroot_parts = .false.   ! write particles with no therm-equil roots
 
 contains
 
@@ -171,7 +176,7 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  use eos,      only:gmw,gamma
  use io,       only:warning,fatal
  use units,    only:udist,umass,unit_ergg
- use dim,      only:maxvxyzu,maxp_hard
+ use dim,      only:maxvxyzu,maxp
  use heatcool_cmi, only:init_ueq_table,precompute_uterms
  use omp_lib
  integer, intent(in) :: npart
@@ -279,7 +284,7 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
     print*,' temperature:     ',temp_hii_fromcsi,'K'
     gmw = gmw0  !- reset
  else
-    print*,'Photoionization heating/cooling activated - input temp_hii will not be used'
+    print*,'Photoionization heating/cooling activated'
  endif
 
  !- Estimate solar luminosity [photon/sec]
@@ -296,7 +301,7 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  !- Init for photoionization heating-cooling routines
  call reset_energ
  call precompute_uterms
- if (implicit_cmi) call init_ueq_table
+ if (implicit_cmi .and. .not.fix_temp_hii) call init_ueq_table
 
  !- For indicating R-type phase for heating
  nphotosrc_old = 0
@@ -461,7 +466,7 @@ subroutine compute_ionization_cmi(time,npart,xyzh,vxyzu)
  use part,     only:massoftype,igas,isdead_or_accreted
  use kdtree,   only:inodeparts,inoderange
  use io,       only:fatal,warning
- use units,    only:utime ! testing
+ use units,    only:utime
  use omp_lib
  integer, intent(inout) :: npart
  real,    intent(in)    :: time
@@ -469,10 +474,6 @@ subroutine compute_ionization_cmi(time,npart,xyzh,vxyzu)
  real,    allocatable   :: x(:),y(:),z(:),h(:),m(:),nH(:)
  integer :: ip,ip_cmi,npart_cmi,i,n,ipnode,isite,ncminode
  real    :: nH_part,nH_site
- real    :: time_cgs ! testing
-
- integer :: iunit_test
- character(len=50) :: ifile_char,filename_test
 
  if (nphotosrc == 0) return
 
@@ -501,21 +502,6 @@ subroutine compute_ionization_cmi(time,npart,xyzh,vxyzu)
        endif
     enddo over_entries
     call reset_cminode
-
-    ! Testing
-    if (mod(iruncmi,ncall_writefile) == 0) then
-       write(ifile_char,*) ifile-1
-       iunit_test = iunit+5000
-       filename_test = 'nH_u_parts_'//trim(adjustl(ifile_char))//'.txt'
-       open(iunit_test,file=filename_test,status='replace')
-       time_cgs = time*utime
-       write(iunit_test,*) time_cgs
-       do ip = 1,npart
-          write(iunit_test,*) nH_allparts(ip), vxyzu(4,ip)
-       enddo
-       close(iunit_test)
-    endif
-
  else
     !
     ! Pass all particles to grid-construction and density mapping
@@ -587,7 +573,7 @@ end subroutine compute_ionization_cmi
 ! Computes du_cmi(:); to be heated in step_leapfrog
 ! also updates the vxyzu (i.e. vpred from derivs)
 !
-subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
+subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
  use heatcool_cmi, only:heating_term,cooling_term,get_ueq,compute_du
  use part,         only:rhoh,massoftype,igas
  use physcon,      only:kboltz,mass_proton_cgs
@@ -595,16 +581,18 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
  use cooling,      only:ufloor
  use units,        only:unit_ergg,unit_energ,utime
  integer, intent(in)    :: npart
- real,    intent(in)    :: dt
+ real,    intent(in)    :: time,dt
  real,    intent(in)    :: xyzh(:,:)
  real,    intent(inout) :: vxyzu(:,:)
  integer, parameter :: nbuc = 100
  integer :: ip,npart_heated,ibuc,inoroot,numroots
+ integer :: iunit_unH
  real    :: nH,ui,ueq,pmass,gammaheat,lambda,rhoi,du
  real    :: ueq_mean,temp_ueq,gmw0
+ real    :: time_cgs
  real    :: pos_noroot(3,npart),nH_noroot(npart),temp_noroot(npart)
  real    :: nH_buc(nbuc),gamma_buc(nbuc),nentry_buc(nbuc)
- logical :: catch_noroot_parts = .false.  ! write particles with no equil roots to file
+ character(len=50) :: ifile_char,filename_unH
 
  if (nphotosrc == 0) return
 
@@ -725,6 +713,21 @@ subroutine energ_implicit_cmi(npart,xyzh,vxyzu,dt)
     close(5014)
  endif
 
+  if (write_nH_u_distri) then
+     if (mod(iruncmi,ncall_writefile) == 0) then
+        write(ifile_char,'(i5.5)') ifile-1
+        iunit_unH = iunit+5000
+        filename_unH = 'nH_u_parts_'//trim(adjustl(ifile_char))//'.txt'
+        open(iunit_unH,file=filename_unH,status='replace')
+        time_cgs = time*utime
+        write(iunit_unH,*) time_cgs
+        do ip = 1,npart
+           write(iunit_unH,*) nH_allparts(ip), vxyzu(4,ip)
+        enddo
+        close(iunit_unH)
+     endif
+  endif
+
  gmw = gmw0
 
 end subroutine energ_implicit_cmi
@@ -811,7 +814,6 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
  integer :: niter,inode,isite,n,inextopen,n_nextopen,maxnextopen
  real    :: size_node,size_root,nH_node,nH_part,nH_limit,tree_accuracy_cmi_new
  logical :: node_checks_passed
- logical :: write_node_prop = .true.
 
  !- Init
  node_checks_passed = .false.
@@ -1488,7 +1490,7 @@ end subroutine gen_filename
 !-----------------------------------------------------------------------
 subroutine allocate_cminode
  use allocutils, only:allocate_array
- use dim,        only:maxp_hard
+ use dim,        only:maxp
  call allocate_array('nxyzm_treetocmi',nxyzm_treetocmi,5,maxcminode+1)
  call allocate_array('h_solvertocmi',h_solvertocmi,maxcminode+1)
  call allocate_array('ixyzhm_leafparts',ixyzhm_leafparts,6,maxleafparts+1)
@@ -1497,10 +1499,10 @@ subroutine allocate_cminode
  call allocate_array('nnode_needopen',nnode_needopen,maxnode_open)
  call allocate_array('nxyzrs_nextopen',nxyzrs_nextopen,6,maxnode_open)
  call allocate_array('nxyzrs_nextopen_updatewalk',nxyzrs_nextopen_updatewalk,6,maxnode_open)
- call allocate_array('vxyzu_beforepred',vxyzu_beforepred,4,maxp_hard)
- call allocate_array('du_cmi',du_cmi,maxp_hard)
- call allocate_array('dudt_cmi',dudt_cmi,maxp_hard)
- call allocate_array('nH_allparts',nH_allparts,maxp_hard)
+ call allocate_array('vxyzu_beforepred',vxyzu_beforepred,4,maxp)
+ call allocate_array('du_cmi',du_cmi,maxp)
+ call allocate_array('dudt_cmi',dudt_cmi,maxp)
+ call allocate_array('nH_allparts',nH_allparts,maxp)
 end subroutine allocate_cminode
 
 subroutine reset_cminode
