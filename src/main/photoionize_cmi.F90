@@ -806,7 +806,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
  real,    intent(in)  :: xyzh(:,:)
  integer, intent(out) :: ncminode   !- total number of CMI sites (nodes+particles)
  real,    allocatable :: x(:),y(:),z(:),h(:),m(:),nH(:)
- integer :: maxiter = 50
+ integer :: maxiter = 100
  integer :: nneedopen    !- number of nodes at ionization front that needs to be opened at current iteration
  integer :: ncloseleaf   !- number of leaves to be replaced
  integer :: nleafparts   !- total number of particles in leaf nodes to be replaced
