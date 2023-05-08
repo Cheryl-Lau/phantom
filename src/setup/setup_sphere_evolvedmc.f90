@@ -107,6 +107,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use forces,       only:nexceedmaxbin   !!! for testing dtcool
  use options,      only:ipdv_heating,ishock_heating
  use stretchmap,   only:rho_func
+ use photoionize_cmi, only:monochrom_source,fix_temp_hii,treat_Rtype_phase
+ use photoionize_cmi, only:photoionize_tree,tree_accuracy_cmi,nHlimit_fac
+ use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
  procedure(rho_func), pointer :: density_func
  integer,           intent(in)    :: id
  integer,           intent(inout) :: npart
@@ -559,6 +562,16 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        dtmax_min = 0.0
        rhofinal_cgs = rhofinal_setup
     endif
+    ! Photoionization settings
+    monochrom_source  = .false.
+    fix_temp_hii      = .false.
+    treat_Rtype_phase = .true.
+    photoionize_tree  = .true.
+    tree_accuracy_cmi = 0.3
+    nHlimit_fac       = 80
+    rcut_opennode_cgs = 2.2E18   ! 0.7 pc
+    rcut_leafpart_cgs = 1.5E18   ! 0.5 pc
+    delta_rcut_cgs    = 3.1E17   ! 0.1 pc
  endif
  !
  !--Summarise the sphere

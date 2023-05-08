@@ -64,6 +64,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use cooling,      only:ufloor,Tfloor
  use timestep,     only:nout
  use prompting,    only:prompt
+ use photoionize_cmi, only:monochrom_source,fix_temp_hii,treat_Rtype_phase
+ use photoionize_cmi, only:photoionize_tree,tree_accuracy_cmi,nHlimit_fac
+ use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
  integer,           intent(in)    :: id
  integer,           intent(inout) :: npart
  integer,           intent(out)   :: npartoftype(:)
@@ -132,7 +135,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        !
        ! Get glass file
        !
-       glass_filename = 'glassCube_64.dat'
+       glass_filename = 'glassCube_128.dat'
        call prompt('Enter filename of glass cube',glass_filename)
        glass_filename = trim(adjustl(glass_filename))
     endif
@@ -402,6 +405,20 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  alphau    = 1.0
  ipdv_heating   = 1
  ishock_heating = 1
+
+ !
+ ! Photoionization settings
+ !
+ monochrom_source  = .true.
+ fix_temp_hii      = .true.
+ treat_Rtype_phase = .false.
+
+ photoionize_tree  = .true.
+ tree_accuracy_cmi = 0.25
+ nHlimit_fac       = 100
+ rcut_opennode_cgs = 1.2E18  ! 0.4 pc
+ rcut_leafpart_cgs = 9.3E17  ! 0.3 pc
+ delta_rcut_cgs    = 3.1E16  ! 0.01 pc
 
  !- Print summary - for checking
  print*,' -SUMMARY- '
