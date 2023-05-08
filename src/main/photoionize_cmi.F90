@@ -95,11 +95,11 @@ module photoionize_cmi
  logical, public :: photoionize_tree = .true.
 
  ! Options for extracting cmi-nodes from kdtree
- real,    public :: tree_accuracy_cmi = 0.3
- real,    public :: rcut_opennode_cgs = 2.2E18   ! 0.7 pc
- real,    public :: rcut_leafpart_cgs = 1.5E18   ! 0.5 pc
- real,    public :: delta_rcut_cgs    = 3.1E17   ! 0.1 pc
- real,    public :: nHlimit_fac       = 60       ! ionization front resolution; recommend 40-100
+ real,    public :: tree_accuracy_cmi = 0.2
+ real,    public :: rcut_opennode_cgs = 1.2E18   ! 0.4 pc
+ real,    public :: rcut_leafpart_cgs = 9.3E17   ! 0.3 pc
+ real,    public :: delta_rcut_cgs    = 3.1E16   ! 0.01 pc
+ real,    public :: nHlimit_fac       = 100      ! ionization front resolution; recommend 60-100
  real,    public :: min_nodesize_toflag = 0.005  ! min node size as a fraction of root node
  logical, public :: auto_opennode = .true.
  logical, public :: auto_tree_acc = .false.
