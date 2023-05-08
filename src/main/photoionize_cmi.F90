@@ -18,7 +18,7 @@ module photoionize_cmi
 !     Individual particles can be retained in regions which are close to the source.
 !     This code is capable of automatically adjusting the tree-walk to ensure that the
 !     ionization front is resolved. Activate auto_opennode and tweak parameters including
-!     nHlimit_fac, min_nodesize_toflag and tree_accuracy_cmi for best results.
+!     nHlimit_fac, delta_rcut_cgs and tree_accuracy_cmi for best results.
 !
 ! Photoionization heating can be done in the following modes -
 !  1. sinks as sources        / user-defined sources
@@ -55,7 +55,7 @@ module photoionize_cmi
 !   - temp_hii            : *Presumed temperature of ionized gas*
 !   - fix_temp_hii        : *Heats ionized particles to temp_hii, else computes heating and cooling*
 !   - implicit_cmi        : *Update internal energy of particles with implicit method, else explicit*
-!   - treat_Rtype_phase   : *Change heating/cooling rates during R-type phase expansion of HII region*
+!   - treat_Rtype_phase   : *Change heating/cooling rates during R-type phase of HII region*
 !
 ! :Dependencies: infile_utils, physcon, units, io, dim, boundaries, eos, part, kdtree, cooling,
 !                kdtree_cmi, hnode_cmi, heatcool_cmi
@@ -80,26 +80,26 @@ module photoionize_cmi
  !- or
  ! Manually set location, starting/ending time and luminosity [cgs units] of ionizing sources
  integer, public, parameter :: nsetphotosrc = 1
- real,    public :: xyztl_setphotosrc_cgs(6,nsetphotosrc) = reshape((/0.,0.,0.,1E-50,1E50,1E49 /),&
+ real,    public :: xyztl_setphotosrc_cgs(6,nsetphotosrc) = reshape((/0.,0.,0.,1E11,1E50,1E49 /),&
                                                                     shape=(/6,nsetphotosrc/))
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
  integer, public :: niter_mcrt = 10
- real,    public :: photon_eV  = 13.6   ! eV; used only if sink_ionsrc=F and monochrom_source=T
- real,    public :: temp_star  = 5E4    ! K;  used only if sink_ionsrc=F and monochrom_source=F
+ real,    public :: photon_eV  = 13.6   ! eV ; used only if sink_ionsrc=F and monochrom_source=T
+ real,    public :: temp_star  = 5E4    ! K  ; used only if sink_ionsrc=F and monochrom_source=F
  real,    public :: tol_vsite  = 1E-1
  logical, public :: lloyd      = .true.
- logical, public :: monochrom_source = .true.   ! else blackbody spec
+ logical, public :: monochrom_source = .false.   ! else blackbody spec
 
  ! Move grid-construction up the tree
  logical, public :: photoionize_tree = .true.
 
  ! Options for extracting cmi-nodes from kdtree
- real,    public :: tree_accuracy_cmi = 0.25
- real,    public :: rcut_opennode_cgs = 1.2E18   ! 0.4 pc
- real,    public :: rcut_leafpart_cgs = 9.3E17   ! 0.3 pc
- real,    public :: delta_rcut_cgs    = 3.1E16   ! 0.01 pc
- real,    public :: nHlimit_fac       = 100      ! ionization front resolution; recommend 40-100
+ real,    public :: tree_accuracy_cmi = 0.3
+ real,    public :: rcut_opennode_cgs = 2.2E18   ! 0.7 pc
+ real,    public :: rcut_leafpart_cgs = 1.5E18   ! 0.5 pc
+ real,    public :: delta_rcut_cgs    = 3.1E17   ! 0.1 pc
+ real,    public :: nHlimit_fac       = 60       ! ionization front resolution; recommend 40-100
  real,    public :: min_nodesize_toflag = 0.005  ! min node size as a fraction of root node
  logical, public :: auto_opennode = .true.
  logical, public :: auto_tree_acc = .false.
@@ -108,7 +108,7 @@ module photoionize_cmi
  real,    public :: temp_hii     = 1E4          ! K
  logical, public :: fix_temp_hii = .false.      ! else computes heating and cooling
  logical, public :: implicit_cmi = .true.       ! else updates u explicitly
- logical, public :: treat_Rtype_phase = .false.
+ logical, public :: treat_Rtype_phase = .true.
 
  ! Global storages required for updating u
  real,    public,   allocatable :: vxyzu_beforepred(:,:)  ! u before predictor step
@@ -158,7 +158,7 @@ module photoionize_cmi
  logical :: first_call,warned
 
  ! Switches for plotting/debugging
- logical :: write_gamma = .false.          ! write heating rates (from both phantom and CMI)
+ logical :: write_gamma = .false.          ! write heating rates vs nH (from both phantom and CMI)
  logical :: print_cmi   = .false.          ! show CMI shell outputs
  logical :: write_nH_u_distri  = .false.   ! write u of particles vs nH
  logical :: write_node_prop    = .true.    ! write properties of the current set of cmi-nodes
@@ -166,11 +166,11 @@ module photoionize_cmi
 
 contains
 
-!------------------------------------------------------------------------------
+!-----------------------------------------------------------------------------
 !+
 ! Initializations
 !+
-!------------------------------------------------------------------------------
+!-----------------------------------------------------------------------------
 subroutine init_ionizing_radiation_cmi(npart,xyzh)
  use physcon,  only:mass_proton_cgs,kboltz,c,planckh,solarl,eV
  use eos,      only:gmw,gamma
@@ -323,11 +323,11 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
 end subroutine init_ionizing_radiation_cmi
 
 
-!----------------------------------------------------------------
+!-----------------------------------------------------------------------------
 !+
 ! Routines to prepare for CMI-call and energy-updates at the beginning of each step
 !+
-!----------------------------------------------------------------
+!-----------------------------------------------------------------------------
 !
 ! Dynamically set the locations of the sources at current timestep
 ! Updates nphotosrc and xyz_photosrc
@@ -457,11 +457,11 @@ subroutine energy_checks_cmi(xyzh,dt)
 
 end subroutine energy_checks_cmi
 
-!----------------------------------------------------------------
+!-----------------------------------------------------------------------------
 !+
 ! Wrapper for computing nH of all particles at current timestep
 !+
-!----------------------------------------------------------------
+!-----------------------------------------------------------------------------
 subroutine compute_ionization_cmi(time,npart,xyzh,vxyzu)
  use part,     only:massoftype,igas,isdead_or_accreted
  use kdtree,   only:inodeparts,inoderange
@@ -551,7 +551,7 @@ subroutine compute_ionization_cmi(time,npart,xyzh,vxyzu)
 
 end subroutine compute_ionization_cmi
 
-!--------------------------------------------------------------------------------
+!-----------------------------------------------------------------------------
 !+
 ! Routines for updating the internal energy of particles using the final nH_parts(:)
 ! returned from CMI
@@ -567,7 +567,7 @@ end subroutine compute_ionization_cmi
 !          will heat forever. Here we'll drift it to Tmax, however the sim is likely
 !          problematic and we recommend checking the heating rates.
 !+
-!--------------------------------------------------------------------------------
+!-----------------------------------------------------------------------------
 !
 ! Computes du_cmi(:); to be heated in step_leapfrog
 ! also updates the vxyzu (i.e. vpred from derivs)
@@ -791,12 +791,12 @@ subroutine energ_explicit_cmi(npart,xyzh,vxyzu,dt)
 
 end subroutine energ_explicit_cmi
 
-!----------------------------------------------------------------
+!-----------------------------------------------------------------------------
 !+
 ! Iterate tree-walk and CMI-call until the ionization front is resolved
 ! Gives the final set of nixyzhmf_cminode
 !+
-!----------------------------------------------------------------
+!-----------------------------------------------------------------------------
 subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
  use linklist,   only:node,ifirstincell
  use kdtree_cmi, only:extract_cminodes_from_tree
@@ -996,7 +996,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
 
 end subroutine treewalk_run_cmi_iterate
 
-!----------------------------------------------------------------
+!-----------------------------------------------------------------------------
 !+
 ! Packing the final set of nodes to be then passed to CMI:
 !  - Combine xyzm_nodes and their h obtained from hnode_iterate solver.
@@ -1006,7 +1006,7 @@ end subroutine treewalk_run_cmi_iterate
 !   n: node index;      n = 0 if is particle
 !   i: particle index;  i = 0 if is node
 !+
-!----------------------------------------------------------------
+!-----------------------------------------------------------------------------
 subroutine collect_and_combine_cminodes(ncminode,nleafparts,ncloseleaf)
  use io,  only:fatal
  integer, intent(in)    :: nleafparts,ncloseleaf
@@ -1061,14 +1061,14 @@ subroutine collect_and_combine_cminodes(ncminode,nleafparts,ncloseleaf)
 
 end subroutine collect_and_combine_cminodes
 
-!----------------------------------------------------------------
+!-----------------------------------------------------------------------------
 !+
 ! Check all nodes that were previously opened to resolve into the ionization front;
 ! If they are no longer heavily ionized [determine this with the current nixyzhmf_cminode],
 ! move the tree back up by removing entries in nxyzrs_nextopen(_updatewalk).
 ! Note: rcut_opennode and rcut_leafpart will remain.
 !+
-!----------------------------------------------------------------
+!-----------------------------------------------------------------------------
 subroutine remove_unnecessary_opennode(ncminode)
  use allocutils, only:allocate_array
  integer, intent(in)  :: ncminode
@@ -1135,13 +1135,12 @@ real function mag2(vec)
 
 end function mag2
 
-!----------------------------------------------------------------
+!-----------------------------------------------------------------------------
 !+
-! Pass the positions, masses and smoothing lengths of given sites
-! to CMI and run MCRT simulation;
-! This applies to both tree nodes and particles.
+! Pass the positions, masses and smoothing lengths of given sites (nodes/particles)
+! to CMI and run MCRT simulation
 !+
-!----------------------------------------------------------------
+!-----------------------------------------------------------------------------
 subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
  use omp_lib
  integer, intent(in)  :: nsite
@@ -1169,11 +1168,11 @@ subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
 
 end subroutine run_cmacionize
 
-!-----------------------------------------------------------------------
+!-----------------------------------------------------------------------------
 !+
 ! Writes the Voronoi sites and the .param input files to be read by CMI
 !+
-!-----------------------------------------------------------------------
+!-----------------------------------------------------------------------------
 subroutine write_cmi_infiles(nsite,x,y,z,h,m)
  use io,  only:fatal
  integer, intent(in) :: nsite
@@ -1369,11 +1368,11 @@ subroutine write_cmi_infiles(nsite,x,y,z,h,m)
 
 end subroutine write_cmi_infiles
 
-!-----------------------------------------------------------------------
+!-----------------------------------------------------------------------------
 !+
 ! Routines for writing node/particle properties to snapshot files
 !+
-!-----------------------------------------------------------------------
+!-----------------------------------------------------------------------------
 subroutine init_write_snapshot
  integer :: ifile_search
  logical :: lastfile_found,iexist

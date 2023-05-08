@@ -895,7 +895,7 @@ ifeq ($(SETUP), starbench)
     PERIODIC=no
     GRAVITY=no
     ISOTHERMAL=no
-    IND_TIMESTEPS=yes
+    IND_TIMESTEPS=no
     KNOWN_SETUP=yes
     MAXP=5000000
 endif

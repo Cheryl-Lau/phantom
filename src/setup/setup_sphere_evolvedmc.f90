@@ -252,7 +252,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        call prompt('Do to intend to slightly randomize particle positions on the lattice?',pos_ranh)
     endif
 
-    rms_mach = 10.
+    rms_mach = 14.2
     call prompt('Enter the Mach number of the cloud turbulence',rms_mach,0.)
 
     if (use_dust) then
@@ -534,9 +534,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  infilename=trim(fileprefix)//'.in'
  inquire(file=infilename,exist=in_iexist)
  if (.not. in_iexist) then
-    tmax      = 3.15360E13/utime ! 1E0 Myr
-    dtmax     = 3.15360E9/utime  ! 1E-4 Myr
-    nout      = 10
+    tmax      = 3.15360E16/utime ! 1E3 Myr
+    dtmax     = 1.57680E10/utime ! 5E-4 Myr
+    nout      = 1
     nmaxdumps = 5000
     icooling  = 0
     Tfloor    = 3.
