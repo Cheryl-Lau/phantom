@@ -25,7 +25,8 @@ module easter_egg
  logical, public, save :: egged = .false.
 
  private
- integer :: iseed = -1234
+ integer :: iseed  = -1234
+ logical :: backed = .false.
  logical :: cleared
 
  contains
@@ -55,17 +56,24 @@ module easter_egg
         if (trim(adjustl(quit_in)) == 'y') exit
      elseif (command == 'b') then
         if (mem_stored) then
-           !- fetch the second-last stored grid
-           istore = 1
-           if (mod(iter,2) == 0) istore = 2
-           grid_real(1:ndim,1:ndim) = grid_mem(istore,1:ndim,1:ndim)
-           call write_to_shell(ndim,grid_real)
-           cycle tile_smash
+           if (.not.backed) then
+              backed = .true.
+              !- fetch the second-last stored grid
+              istore = 1
+              if (mod(iter,2) == 0) istore = 2
+              grid_real(1:ndim,1:ndim) = grid_mem(istore,1:ndim,1:ndim)
+              call write_to_shell(ndim,grid_real)
+              cycle tile_smash
+           else
+              print*,'You can only go back once @_@'
+              cycle tile_smash
+           endif
         else
-           print*,'Invalid input'
+           print*,'Go back to what ?_?'
            cycle tile_smash
         endif
      else
+        backed = .false.
         if (command == 'a') then
            idir = 0
         elseif (command == 'w') then
@@ -75,7 +83,7 @@ module easter_egg
         elseif (command == 's') then
            idir = 3
         else
-           print*,'Invalid input'
+           print*,'da heck you mean'
            cycle tile_smash
         endif
      endif
@@ -91,7 +99,7 @@ module easter_egg
 
      call check_end(ndim,grid_real,stop_game)
   enddo tile_smash
-  print*,'- GO BACK TO WORK YOU SLACKER -'
+  print*,'- GET BACK TO WORK YOU SLACKER -'
   call sleep(1)
 
  end subroutine bring_the_egg
