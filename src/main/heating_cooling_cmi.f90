@@ -505,7 +505,7 @@ subroutine compute_Rtype_time(nphotosrc,xyz_photosrc,xyzh,t_recomb)
  real    :: xyzcache(3,neighcachesize)
  real    :: pos_src(3),rcut,hmean,pmass,rhomean,rhomean_cgs,alphaB
  real    :: t_recomb_src
- real    :: rcut_cgs = 1E19    !- sample within 3pc around source
+ real    :: rcut_cgs = 3.1E18    !- sample within 1pc around source
 
  rcut = rcut_cgs/udist
  alphaB = get_alphaB(1E4)  !- assumes constant temp of 1E4 K in HII region

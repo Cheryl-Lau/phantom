@@ -539,7 +539,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  if (.not. in_iexist) then
     tmax      = 3.15360E16/utime ! 1E3 Myr
     dtmax     = 1.57680E10/utime ! 5E-4 Myr
-    nout      = 1
+    nout      = 10
     nmaxdumps = 5000
     icooling  = 0
     Tfloor    = 3.

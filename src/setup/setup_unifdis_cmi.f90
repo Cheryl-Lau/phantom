@@ -397,7 +397,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  ! Set runtime parameters
  !
  ieos      = 2     ! adiabatic eos
- nout      = 1
+ nout      = 10
  nfulldump = 1
  Tfloor    = 3.
  ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
