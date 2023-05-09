@@ -110,6 +110,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use photoionize_cmi, only:monochrom_source,fix_temp_hii,treat_Rtype_phase
  use photoionize_cmi, only:photoionize_tree,tree_accuracy_cmi,nHlimit_fac
  use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
+ use photoionize_cmi, only:old_sources_exist
  procedure(rho_func), pointer :: density_func
  integer,           intent(in)    :: id
  integer,           intent(inout) :: npart
@@ -537,9 +538,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  infilename=trim(fileprefix)//'.in'
  inquire(file=infilename,exist=in_iexist)
  if (.not. in_iexist) then
-    tmax      = 3.15360E16/utime ! 1E3 Myr
-    dtmax     = 1.57680E10/utime ! 5E-4 Myr
-    nout      = 10
+    tmax      = 3.15360E14/utime ! 1E1 Myr
+    dtmax     = 1.57680E11/utime ! 5E-3 Myr
+    nout      = 1
     nmaxdumps = 5000
     icooling  = 0
     Tfloor    = 3.
@@ -569,11 +570,12 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     monochrom_source  = .false.
     fix_temp_hii      = .false.
     treat_Rtype_phase = .true.
+    old_sources_exist = .true.
 
     photoionize_tree  = .true.
-    tree_accuracy_cmi = 0.3
-    nHlimit_fac       = 70
-    rcut_opennode_cgs = 6.2E18   ! 2.0 pc
+    tree_accuracy_cmi = 0.2
+    nHlimit_fac       = 40
+    rcut_opennode_cgs = 4.6E18   ! 1.5 pc
     rcut_leafpart_cgs = 3.1E18   ! 1.0 pc
     delta_rcut_cgs    = 3.1E17   ! 0.1 pc
 
