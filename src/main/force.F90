@@ -60,7 +60,7 @@ module forces
 
  public :: force, reconstruct_dv ! latter to avoid compiler warning
 
- integer, public :: nexceedmaxbin
+ integer, public :: nexceedmaxbin = 0
 
  !--indexing for xpartveci array
  integer, parameter :: &
@@ -2877,14 +2877,14 @@ subroutine finish_cell_and_store_results(icall,cell,fxyzu,xyzh,vxyzu,poten,dt,dv
        ! cooling timestep dt < fac*u/(du/dt)
        if (maxvxyzu >= 4 .and. .not.gr) then
 
-          if (abs(fxyzu(4,i)) > epsilon(0.) .and. eni > epsilon(0.)) then   ! original
-             dtcool = C_cool*abs(eni/fxyzu(4,i))
-          endif
-
-          !- Try: only consider contributions from cooling and not heating
-!          if (eni + dtc*fxyzu(4,i) < epsilon(0.) .and. eni > epsilon(0.)) then
+!          if (abs(fxyzu(4,i)) > epsilon(0.) .and. eni > epsilon(0.)) then   ! original
 !             dtcool = C_cool*abs(eni/fxyzu(4,i))
 !          endif
+
+          !- Try: only consider contributions from cooling and not heating
+          if (eni + dtc*fxyzu(4,i) < epsilon(0.) .and. eni > epsilon(0.)) then
+             dtcool = C_cool*abs(eni/fxyzu(4,i))
+          endif
 
           !- Catch particles with dtcool above ind. timestep maxbin
           ibinnew = max(int(log(2.*dtmax/dtcool)*dlog2-epsilon(vsmall)),0)
