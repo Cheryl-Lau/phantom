@@ -56,6 +56,9 @@ module photoionize_cmi
 !   - fix_temp_hii        : *Heats ionized particles to temp_hii, else computes heating and cooling*
 !   - implicit_cmi        : *Update internal energy of particles with implicit method, else explicit*
 !   - treat_Rtype_phase   : *Change heating/cooling rates during R-type phase of HII region*
+!   - old_sources_exist   : *Marks whether the ionizing source(s) already exist before simulation begins
+!                            [Must be specified by the user; Set to .true. if sim is started from a
+!                            dumpfile where the ionizing source(s) are already there]*
 !
 ! :Dependencies: infile_utils, physcon, units, io, dim, boundaries, eos, part, kdtree, cooling,
 !                kdtree_cmi, hnode_cmi, heatcool_cmi
@@ -109,6 +112,7 @@ module photoionize_cmi
  logical, public :: fix_temp_hii = .false.      ! else computes heating and cooling
  logical, public :: implicit_cmi = .true.       ! else updates u explicitly
  logical, public :: treat_Rtype_phase = .true.
+ logical, public :: old_sources_exist = .false. ! T if sim is started from a dumpfile with ionizing sources
 
  ! Global storages required for updating u
  real,    public,   allocatable :: vxyzu_beforepred(:,:)  ! u before predictor step
@@ -155,7 +159,7 @@ module photoionize_cmi
  real    :: time0_wall,time0_cpu,time_now_wall,time_now_cpu
  real    :: time_ellapsed_wall,time_ellapsed_cpu
  logical :: is_Rtype_phase
- logical :: first_call,warned
+ logical :: first_call,first_step,warned
 
  ! Switches for plotting/debugging
  logical :: write_gamma = .false.          ! write heating rates vs nH (from both phantom and CMI)
@@ -305,6 +309,7 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
 
  !- For indicating R-type phase for heating
  nphotosrc_old = 0
+ first_step = .true.
 
  !- For writing snapshots of nH map
  if (maxoutfile > maxoutfile_ult) call fatal('photoionize_cmi','maxoutfile must be within 5 digits')
@@ -420,6 +425,7 @@ subroutine energy_checks_cmi(xyzh,dt)
  integer :: isrc
  real    :: massmean,lumin_star_cgs,rstar_cgs,t_recomb
  real    :: rstar_solarr = 10.  !- radius of a typical O-star [R_sun]
+ logical :: new_source_injected
 
  if (.not.fix_temp_hii) call check_to_stop_cooling(nphotosrc)
 
@@ -441,7 +447,9 @@ subroutine energy_checks_cmi(xyzh,dt)
  endif
 
  if (treat_Rtype_phase) then
-    if (nphotosrc > nphotosrc_old) then   !- a new source is added
+    new_source_injected = nphotosrc > nphotosrc_old
+    if (first_step .and. old_sources_exist) new_source_injected = .false.
+    if (new_source_injected) then
        is_Rtype_phase = .true.
        !- Check that dt is greater than recombination timescale
        call compute_Rtype_time(nphotosrc,xyz_photosrc,xyzh,t_recomb)
@@ -537,6 +545,7 @@ subroutine compute_ionization_cmi(time,npart,xyzh,vxyzu)
  endif
 
  iruncmi = iruncmi + 1
+ first_step = .false.
 
  !
  ! Time the simulations
@@ -622,7 +631,8 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
  !$omp private(ibuc) &
  !$omp private(ip,nH,rhoi,ui,ueq,gammaheat,lambda,du,numroots) &
  !$omp reduction(+:ueq_mean,npart_heated) &
- !$omp reduction(+:gamma_buc,nentry_buc)
+ !$omp reduction(+:gamma_buc,nentry_buc) &
+ !$omp schedule(runtime)
  do ip = 1,npart
     nH = nH_allparts(ip)
     ui = vxyzu_beforepred(4,ip)  !- take vxyzu from before predictor as current u
@@ -762,7 +772,8 @@ subroutine energ_explicit_cmi(npart,xyzh,vxyzu,dt)
  !$omp shared(is_Rtype_phase) &
  !$omp private(ip,nH,rhoi,ui,gammaheat,lambda,dudt) &
  !$omp private(u_ionized) &
- !$omp reduction(+:npart_heated,uhii_mean)
+ !$omp reduction(+:npart_heated,uhii_mean) &
+ !$omp schedule(runtime)
  do ip = 1,npart
     nH = nH_allparts(ip)
     if (nH > -epsilon(nH)) then
@@ -1194,7 +1205,8 @@ subroutine write_cmi_infiles(nsite,x,y,z,h,m)
  zmin =  huge(zmin)
  !$omp parallel do default(none) shared(nsite,x,y,z,h,m) private(i) &
  !$omp reduction(min:xmin,ymin,zmin) &
- !$omp reduction(max:xmax,ymax,zmax)
+ !$omp reduction(max:xmax,ymax,zmax) &
+ !$omp schedule(runtime)
  do i = 1,nsite
     if (x(i) /= x(i) .or. y(i) /= y(i) .or. z(i) /= z(i) .or. &
         h(i) < tiny(h) .or. m(i) < tiny(m)) then
@@ -1584,6 +1596,7 @@ subroutine write_options_photoionize(iunit)
  call write_inopt(fix_temp_hii,'fix_temp_hii','Heat ionized particles to specified temp_hii',iunit)
  call write_inopt(implicit_cmi,'implicit_cmi','Use implicit method to update internal energies',iunit)
  call write_inopt(treat_Rtype_phase,'treat_Rtype_phase','Change heating/cooling rate during R-type phase',iunit)
+ call write_inopt(old_sources_exist,'old_sources_exist','Source(s) already exist in the starting dumpfile',iunit)
 
 end subroutine write_options_photoionize
 
@@ -1683,10 +1696,13 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
  case('treat_Rtype_phase')
     read(valstring,*,iostat=ierr) treat_Rtype_phase
     ngot = ngot + 1
+ case('old_sources_exist')
+    read(valstring,*,iostat=ierr) old_sources_exist
+    ngot = ngot + 1
  case default
     imatch = .false.
  end select
- igotall = ( ngot >= 22 )
+ igotall = ( ngot >= 23 )
 
 end subroutine read_options_photoionize
 
