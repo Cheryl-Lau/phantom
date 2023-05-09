@@ -992,18 +992,18 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
 
  print*,'treewalk_iterate done'
 
-  !
-  ! Shift tree back up whenever possible
-  !
-  if (auto_opennode) then
-     icall = icall + 1
-     if (icall == ncall_checktreewalk) then
-        if (nnextopen_updatewalk > 0) then
-           call remove_unnecessary_opennode(ncminode)
-        endif
-        icall = 0
-     endif
-  endif
+ !
+ ! Shift tree back up whenever possible
+ !
+ if (auto_opennode) then
+    icall = icall + 1
+    if (icall == ncall_checktreewalk) then
+       if (nnextopen_updatewalk > 0) then
+          call remove_unnecessary_opennode(ncminode)
+       endif
+       icall = 0
+    endif
+ endif
 
 end subroutine treewalk_run_cmi_iterate
 
