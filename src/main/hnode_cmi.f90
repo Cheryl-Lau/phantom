@@ -66,6 +66,10 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
  real    :: tottime_neigh,tottime_iterate
  logical :: brute_force
 
+ integer :: i,inosol
+ real    :: pos_node_nosol(3,10000)
+ logical :: node_failed
+
  write(*,'(2x,a30,i6,a6)') 'Solving smoothing lengths for ',ncminode,' nodes'
 
  if (ncminode < maxnode_bruteforce) then
@@ -80,12 +84,16 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
     if (nkmid == 0) call fatal('hnode_cmi','init_get_nodeneigh failed')
  endif
 
+ node_failed = .false.
+ inosol = 0
+
  avgneigh = 0
  tottime_neigh   = 0.
  tottime_iterate = 0.
  !$omp parallel do default(none) shared(ncminode,nxyzm_treetocmi,node) &
  !$omp shared(hfact_node,h_solvertocmi,tolh_node,brute_force) &
  !$omp shared(n_kmid,nkmid,avgneigh_est,size_kmid) &
+ !$omp shared(node_failed,inosol,pos_node_nosol) &
  !$omp private(icminode,na,pos_node,size_node,nnodeneigh,listnodeneigh,xyzcache_nodeneigh) &
  !$omp private(ierr) &
  !$omp private(time_neigh,time1_neigh,time2_neigh,time_iterate,time1_iterate,time2_iterate) &
@@ -119,7 +127,16 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
        call hnode_bisection(node,icminode,pos_node,size_node,ncminode,nnodeneigh,listnodeneigh,&
                             xyzcache_nodeneigh,avgneigh,h_solvertocmi,ierr)
     endif
-    if (ierr /= 0) call fatal('hnode_cmi','smoothing length fail to converge')
+
+    !- catch nodes where h failed to converge
+    if (ierr /= 0) then
+       !$omp critical
+       inosol = inosol + 1
+       pos_node_nosol(1:3,inosol) = pos_node(1:3)
+       node_failed = .true.
+       !$omp end critical
+    endif
+
     time2_iterate = omp_get_wtime()
 
     time_neigh = time2_neigh - time1_neigh
@@ -129,6 +146,15 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
 
  enddo over_na
  !$omp end parallel do
+
+ if (node_failed) then
+    open(2052,file='nodes_no_sol.txt',status='replace')
+    do i = 1,inosol
+       write(2052,*) pos_node_nosol(1:3,i)
+    enddo
+    close(2052)
+    call fatal('hnode_cmi','smoothing length fail to converge')
+ endif
 
  avgneigh = nint(real(avgneigh)/real(ncminode))
  write(*,'(3x,a41,i2)') '- Average number of neighbours per node: ',avgneigh
@@ -204,7 +230,7 @@ subroutine hnode_bisection(node,icminode,pos_na,size_na,ncminode,nnodeneigh,list
  ierr  = 0
  niter = 0
  hmin  = hfact_node*1E-2*size_na   !- Init search range
- hmax  = hfact_node*1E2*size_na
+ hmax  = hfact_node*1E+3*size_na
 
  do while (.not.converged)
     !- Eval func at hmin
