@@ -48,7 +48,7 @@ contains
 !-----------------------------------------------------------------------
 subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
  use dtypekdtree, only:kdnode
- use io,          only:fatal
+ use io,          only:fatal,warning
  use omp_lib
  type(kdnode), intent(in)    :: node(:)
  integer,      intent(in)    :: ncminode
@@ -58,17 +58,14 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
  integer :: icminode,na,nnodeneigh,avgneigh
  integer :: maxnode_bruteforce = 1E6
  integer :: n_kmid(maxkmid)
- integer :: nkmid,ierr
+ integer :: nkmid,ierr,i,inosol
  real    :: xyzcache_nodeneigh(3,neighcachesize)
  real    :: avgneigh_est,size_kmid
  real    :: pos_node(3),size_node
  real    :: time_neigh,time1_neigh,time2_neigh,time_iterate,time1_iterate,time2_iterate
  real    :: tottime_neigh,tottime_iterate
- logical :: brute_force
-
- integer :: i,inosol
  real    :: pos_node_nosol(3,10000)
- logical :: node_failed
+ logical :: brute_force,node_failed
 
  write(*,'(2x,a30,i6,a6)') 'Solving smoothing lengths for ',ncminode,' nodes'
 
@@ -128,13 +125,15 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
                             xyzcache_nodeneigh,avgneigh,h_solvertocmi,ierr)
     endif
 
-    !- catch nodes where h failed to converge
+    !- If h failed to converge, simply do h = hfact*node-separation
     if (ierr /= 0) then
        !$omp critical
        inosol = inosol + 1
        pos_node_nosol(1:3,inosol) = pos_node(1:3)
        node_failed = .true.
        !$omp end critical
+       h_solvertocmi(icminode) = hfact_node*2.*size_node
+       write(*,'(3x,a30,i7,a31)') 'Bisection also failed for node',na,', using node size to estimate h'
     endif
 
     time2_iterate = omp_get_wtime()
@@ -153,7 +152,7 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
        write(2052,*) pos_node_nosol(1:3,i)
     enddo
     close(2052)
-    call fatal('hnode_cmi','smoothing length fail to converge')
+    if (inosol >= 10) call warning('hnode_cmi','Many nodes have smoothing lengths not converging')
  endif
 
  avgneigh = nint(real(avgneigh)/real(ncminode))
@@ -201,7 +200,7 @@ subroutine hnode_newton_raphson(node,icminode,pos_na,size_na,ncminode,nnodeneigh
        avgneigh = avgneigh + nrealneigh
     endif
     niter = niter + 1
-    if (niter > 50) exit
+    if (niter > 100) exit
  enddo
  if (.not.converged) ierr = 1
 
@@ -230,7 +229,7 @@ subroutine hnode_bisection(node,icminode,pos_na,size_na,ncminode,nnodeneigh,list
  ierr  = 0
  niter = 0
  hmin  = hfact_node*1E-2*size_na   !- Init search range
- hmax  = hfact_node*1E+3*size_na
+ hmax  = hfact_node*1E+2*size_na
 
  do while (.not.converged)
     !- Eval func at hmin
@@ -254,7 +253,7 @@ subroutine hnode_bisection(node,icminode,pos_na,size_na,ncminode,nnodeneigh,list
        call fatal('hnode_cmi','an error occurred in bisection root-finding')
     endif
 
-    if (abs(hmax-hmin) < tolh_node) then
+    if (abs(hmax-hmin)/hmid < tolh_node) then
        hmid = (hmax+hmin)/2.
        if (hmid > 0.) then
           converged = .true.
@@ -263,7 +262,7 @@ subroutine hnode_bisection(node,icminode,pos_na,size_na,ncminode,nnodeneigh,list
        endif
     endif
     niter = niter + 1
-    if (niter > 500) exit
+    if (niter > 100) exit
  enddo
  if (.not.converged) ierr = 1
 
