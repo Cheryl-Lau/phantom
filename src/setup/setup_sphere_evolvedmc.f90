@@ -237,7 +237,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        call prompt('Do to intend to slightly randomize particle positions on the lattice?',pos_ranh)
     endif
 
-    rms_mach = 14.2
+    rms_mach = 12.5
     call prompt('Enter the Mach number of the cloud turbulence',rms_mach,0.)
 
     !
@@ -458,8 +458,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  inquire(file=infilename,exist=in_iexist)
  if (.not. in_iexist) then
     tmax      = 3.15360E14/utime ! 1E1 Myr
-    dtmax     = 1.57680E10/utime ! 5E-4 Myr
-    nout      = 1
+    dtmax     = 3.15360E10/utime ! 1E-3 Myr
+    nout      = 10
     nfulldump = 1
     nmaxdumps = -1
     dtwallmax = 1800.  ! s
@@ -488,7 +488,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     old_sources_exist = .true.
 
     photoionize_tree  = .true.
-    tree_accuracy_cmi = 0.2
+    tree_accuracy_cmi = 0.3
     nHlimit_fac       = 50
     rcut_opennode_cgs = 4.6E18   ! 1.5 pc
     rcut_leafpart_cgs = 3.1E18   ! 1.0 pc

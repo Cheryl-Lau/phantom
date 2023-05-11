@@ -83,7 +83,7 @@ module photoionize_cmi
  !- or
  ! Manually set location, starting/ending time and luminosity [cgs units] of ionizing sources
  integer, public, parameter :: nsetphotosrc = 1
- real,    public :: xyztl_setphotosrc_cgs(6,nsetphotosrc) = reshape((/0.,0.,0.,1E13,1E50,1E49 /),&
+ real,    public :: xyztl_setphotosrc_cgs(6,nsetphotosrc) = reshape((/0.,0.,0.,7.88E12,1E50,1E49 /),&
                                                                     shape=(/6,nsetphotosrc/))
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
@@ -686,7 +686,7 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
              du = ufloor - (vxyzu(4,ip) - du)
              vxyzu(4,ip) = ufloor
           endif
-        endif
+       endif
 
        !- store du into global array
        du_cmi(ip) = du

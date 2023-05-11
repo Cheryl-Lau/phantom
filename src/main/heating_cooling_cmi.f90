@@ -40,18 +40,18 @@ module heatcool_cmi
 
  logical, public :: stop_cooling  !- flag to stop cooling at current step
 
- !- Options for controlling heating/cooling physics
+ ! Options for controlling heating/cooling physics
  logical, public :: use_const_alpha   = .true.
  logical, public :: get_ueq_by_interp = .true.
 
- !- Heating from cosmic rays, X-rays, H2 formation and destruction etc. (as of KI02)
+ ! Heating from cosmic rays, X-rays, H2 formation and destruction etc. (as of KI02)
  real,    public :: gamma_background_cgs = 2E-26
 
  private
 
- !- Pre-computed table of equilibiurms ueq(rho,gamma)
- integer, parameter :: maxrho   = 5000
- integer, parameter :: maxgamma = 5000
+ ! Pre-computed table of equilibiurms ueq(rho,gamma)
+ integer, parameter :: maxrho   = 1000
+ integer, parameter :: maxgamma = 1000
  real   :: rho_gamma_ueq_table(maxrho,maxgamma,6)  ! stores: rho,gamma,numroots,ueq1,ueq2,ueq3
 
  real   :: rhomin_cgs   = 1E-23
@@ -61,10 +61,14 @@ module heatcool_cmi
  real   :: Tmin  = 1E0
  real   :: Tmax  = 1E9
 
- !- Pre-computed vars
+ ! Pre-computed vars
  real   :: one_over_mH,one_over_mH2,one_over_mH_cgs,one_over_mH2_cgs
  real   :: one_over_unit_gamma,one_over_unit_lambda
  real   :: mass_proton,pmass,pmass_cgs
+
+ ! Switches for plotting/debugging
+ logical :: write_ueq = .false.
+ logical :: write_Teq = .false.
 
 contains
 
@@ -116,8 +120,6 @@ subroutine init_ueq_table
  real    :: Tlocalmax,Tlocalmin,gamma_cgs,dgamma_cgs,drho_cgs,rho_cgs,nrho_cgs
  real    :: rho,gammaheat
  real    :: Teq1,Teq2,Teq3,ueq1,ueq2,ueq3,gmw0
- logical :: write_ueq = .false.
- logical :: write_Teq = .true.
 
  print*,'Pre-computing thermal equilibrium solutions'
 
