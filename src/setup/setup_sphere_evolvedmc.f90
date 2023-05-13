@@ -487,7 +487,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     treat_Rtype_phase = .true.
     old_sources_exist = .true.
 
-    photoionize_tree  = .false.
+    photoionize_tree  = .true.
     tree_accuracy_cmi = 0.3
     nHlimit_fac       = 50
     rcut_opennode_cgs = 4.6E18   ! 1.5 pc
