@@ -85,7 +85,7 @@ module photoionize_cmi
  !- or
  ! Manually set location, starting/ending time and luminosity [cgs units] of ionizing sources
  integer, public, parameter :: nsetphotosrc = 1
- real,    public :: xyztl_setphotosrc_cgs(6,nsetphotosrc) = reshape((/0.,0.,0.,7.88E12,1E50,1E49 /),&
+ real,    public :: xyztl_setphotosrc_cgs(6,nsetphotosrc) = reshape((/0.,0.,0.,1E-50,1E50,1E49 /),&
                                                                     shape=(/6,nsetphotosrc/))
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
@@ -559,7 +559,7 @@ subroutine compute_ionization_cmi(time,npart,xyzh,vxyzu)
  time_ellapsed_wall = time_now_wall - time0_wall
  time_ellapsed_cpu  = time_now_cpu  - time0_cpu
  open(2050,file='cpu_wall_time_record.txt',position='append')
- write(2050,*) iruncmi, time_ellapsed_cpu, time_ellapsed_wall
+ write(2050,*) iruncmi, time, time_ellapsed_cpu, time_ellapsed_wall
  close(2050)
 
 end subroutine compute_ionization_cmi
