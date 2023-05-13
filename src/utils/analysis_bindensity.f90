@@ -25,8 +25,9 @@ module analysis
  private
  integer, parameter :: num_rhobin = 100
  integer :: binned_rho(num_rhobin)
- real    :: logrhobin_min = -6. ! -4.
- real    :: logrhobin_max = 6.  ! 5.
+ real    :: rhobin_min_cgs = 5E-23
+ real    :: rhobin_max_cgs = 4E-18
+ real    :: logrhobin_min,logrhobin_max
 
 contains
 
@@ -41,6 +42,9 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  integer :: i,irhobin
  real    :: rho,drho,rhobin(num_rhobin)
  character(len=70) :: filename
+
+ logrhobin_min = log10(rhobin_min_cgs/unit_density)
+ logrhobin_max = log10(rhobin_max_cgs/unit_density)
 
  !
  ! Separation of rho in log-scale

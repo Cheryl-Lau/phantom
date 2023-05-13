@@ -72,6 +72,8 @@ module photoionize_cmi
  public :: energy_checks_cmi,energ_implicit_cmi,energ_explicit_cmi
  public :: read_options_photoionize,write_options_photoionize
 
+ logical, public :: inject_rad = .true.  ! switch on/off radiation for testing
+
  ! Position of sources emitting radiation at current time
  integer, public, parameter :: maxphotosrc = 10
  integer, public :: nphotosrc                    !- Current number of sources
@@ -392,6 +394,8 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
        enddo
     enddo
  endif
+
+ if (.not.inject_rad) nphotosrc = 0
 
 end subroutine set_ionizing_source_cmi
 

@@ -41,7 +41,7 @@ module inject
  real,    public :: frackin   = 0.5
  real,    public :: fractherm = 0.5
  real,    public :: pmsncrit_cgs = 1.59E34  ! 8 solarm
- logical, public :: sink_progenitor = .false.
+ logical, public :: sink_progenitor = .true.
 
  private
 
