@@ -43,8 +43,8 @@ module photoionize_cmi
 !   - tol_vsite           : *Tolerence in nodes' fractional position change above which the Voronoi
 !                            generating-sites will be updated*
 !   - lloyd               : *Do Lloyd iterations for Voronoi grid construction*
-!   - photoionize_tree    : *Construct Voronoi grid with tree nodes; else with particles*
-!   - tree_accuracy_cmi   : *threshold angle to open tree node during kdtree-walk*
+!   - photoionize_tree    : *Pass tree nodes as pseudo-particles to CMI, else pass all particles*
+!   - tree_accuracy_cmi   : *threshold angle to open tree node during tree-walk*
 !   - rcut_opennode_cgs   : *Radius within which we must get leaves*
 !   - rcut_leafpart_cgs   : *Radius within which we extract individual particles*
 !   - auto_opennode       : *Automatically adjust tree-walk according to CMI neutral frac output*
@@ -288,7 +288,7 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
     print*,' internal energy: ',u_hii*unit_ergg,'erg/g'
     print*,' sound speed:     ',csi_cgs,'cm/s'
     print*,' temperature:     ',temp_hii_fromcsi,'K'
-    gmw = gmw0  !- reset
+    gmw = gmw0
  else
     print*,'Photoionization heating/cooling activated'
  endif
@@ -418,7 +418,7 @@ subroutine get_lumin(mass_star,lumin_sun,lumin_star)
 end subroutine get_lumin
 
 !
-! Routine to prepare for energy injections
+! Prepare for energy injection
 !
 subroutine energy_checks_cmi(xyzh,dt)
  use physcon,      only:solarl,solarr,steboltz,pi
@@ -1580,14 +1580,14 @@ subroutine write_options_photoionize(iunit)
  write(iunit,"(/,a)") '# options controlling photoionization'
  call write_inopt(sink_ionsrc,'sink_ionsrc','Using sinks as ionizing sources',iunit)
  call write_inopt(masscrit_ionize_cgs,'masscrit_ionize_cgs','Critical sink mass to begin emitting radiation',iunit)
- call write_inopt(niter_mcrt,'niter_mcrt','number of photon-release iterations',iunit)
- call write_inopt(nphoton,'nphoton','number of photons per iteration',iunit)
+ call write_inopt(niter_mcrt,'niter_mcrt','Number of photon-release iterations',iunit)
+ call write_inopt(nphoton,'nphoton','Number of photons per iteration',iunit)
  call write_inopt(photon_eV,'photon_eV','Energy of ionizing photons in eV',iunit)
  call write_inopt(temp_star,'temp_star','Temperature of ionizing source',iunit)
  call write_inopt(tol_vsite,'tol_vsite','Threshold to update Voronoi gen-sites',iunit)
  call write_inopt(lloyd,'lloyd','Apply Lloyd iteration to construct Voronoi grid',iunit)
  call write_inopt(monochrom_source,'monochrom_source','Use monochromatic source',iunit)
- call write_inopt(photoionize_tree,'photoionize_tree','Construct Voronoi grid around tree nodes',iunit)
+ call write_inopt(photoionize_tree,'photoionize_tree','Pass tree nodes as pseudo-particles to CMI',iunit)
  call write_inopt(tree_accuracy_cmi,'tree_accuracy_cmi','Tree-opening criteria for cmi-nodes',iunit)
  call write_inopt(rcut_opennode_cgs,'rcut_opennode_cgs','Radius within which nodes must be leaves',iunit)
  call write_inopt(rcut_leafpart_cgs,'rcut_leafpart_cgs','Radius within which particles are extracted',iunit)
