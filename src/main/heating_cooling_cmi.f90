@@ -445,7 +445,7 @@ subroutine compute_du(is_Rtype_phase,dt,rho,u,ueq,gamma,lambda,du)
  logical, intent(in)  :: is_Rtype_phase
  real,    intent(in)  :: dt,rho,u,ueq,gamma,lambda
  real,    intent(out) :: du
- real :: unew,tau
+ real     :: unew,tau
 
  !- time required to radiate energy excess / gain energy
  tau = abs((u-ueq)/(rho*one_over_mH2*lambda - one_over_mH*gamma))
@@ -456,7 +456,7 @@ subroutine compute_du(is_Rtype_phase,dt,rho,u,ueq,gamma,lambda,du)
  !  to let it drift to ueq faster
  if (is_Rtype_phase) then
 !    tau = abs((u-ueq)/(one_over_mH*gamma))   !???
-    tau = 1E-4*tau   ! to immediately go to ~1E4 K
+    tau = tiny(tau)   ! to immediately go to ~1E4 K
  endif
 
  unew = ueq + (u-ueq)*exp(-dt/tau)

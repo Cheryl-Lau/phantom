@@ -21,7 +21,7 @@ module hnode_cmi
 ! :Runtime parameters:
 !   - hfact_node : *proportionality fac of hnode to mean local node spacing*
 !   - tolh_node  : *tolerance on hnode-iteration*
-!   - kmid       : *tree level to be used in the neighbour-find*
+!   - kmid       : *an arbitrary level midway on the tree to be used in the neighbour-find*
 !
 ! :Dependencies: infile_utils, io, dtypekdtree, kdtree, kernel
 !
@@ -32,7 +32,7 @@ module hnode_cmi
 
  real,    public :: hfact_node = 1.1
  real,    public :: tolh_node  = 1E-2
- integer, public :: kmid = 5
+ integer, public :: kmid = 10
 
  private
  integer, parameter :: maxnodeneigh   = 1E7
@@ -125,7 +125,8 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
                             xyzcache_nodeneigh,avgneigh,h_solvertocmi,ierr)
     endif
 
-    !- If h failed to converge, simply do h = hfact*node-separation
+    !- If h completely failed to converge, simply do h = hfact*node-separation
+    !  (acceptable since the h of nodes only affect the resolution in mapping but not the physics)
     if (ierr /= 0) then
        !$omp critical
        inosol = inosol + 1
