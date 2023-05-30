@@ -48,7 +48,7 @@ module photoionize_cmi
 !   - rcut_opennode_cgs   : *Radius within which we must get leaves*
 !   - rcut_leafpart_cgs   : *Radius within which we extract individual particles*
 !   - auto_opennode       : *Automatically adjust tree-walk according to CMI neutral frac output*
-!   - auto_tree_acc       : *Automatically adjust tree_accuracy_cmi based on runtime outputs*
+!   - auto_tree_acc       : *Automatically adjust tree_accuracy_cmi to avoid jumps in sparseness of nodes*
 !   - delta_rcut_cgs      : *Increase in rcut_opennode_cgs and rcut_leafpart_cgs in an iteration step*
 !   - nHlimit_fac         : *Free parameter which controls the resolution of the ionization front*
 !   - min_nodesize_toflag : *Minimum node size (relative to root node) to check neutral frac*
@@ -140,6 +140,7 @@ module photoionize_cmi
  real,    allocatable :: nxyzrs_nextopen_updatewalk(:,:)
  integer :: nnextopen,nnextopen_updatewalk
  integer :: ncminode_previter
+ real    :: tree_acc_tol = 0.1
 
  ! Arrays to store CMI outputs for computing du_cmi/dudt_cmi
  real,    allocatable :: nH_allparts(:)
@@ -826,7 +827,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
  integer :: ncloseleaf   !- number of leaves to be replaced
  integer :: nleafparts   !- total number of particles in leaf nodes to be replaced
  integer :: niter,inode,isite,n,inextopen,n_nextopen,maxnextopen
- real    :: size_node,size_root,nH_node,nH_part,nH_limit,tree_accuracy_cmi_new
+ real    :: size_node,size_root,nH_node,nH_part,nH_limit,mintheta
  logical :: node_checks_passed
 
  !- Init
@@ -848,7 +849,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
                                     nxyzm_treetocmi,ixyzhm_leafparts,nnode_toreplace,&
                                     ncminode,nleafparts,ncloseleaf,&
                                     maxcminode,maxleafparts,&
-                                    tree_accuracy_cmi,rcut_opennode,rcut_leafpart,&
+                                    tree_accuracy_cmi,mintheta,rcut_opennode,rcut_leafpart,&
                                     nnode_needopen,nneedopen,&
                                     nxyzrs_nextopen_updatewalk,nnextopen_updatewalk)
     if (ncminode == 0) call fatal('photoionize_cmi','no nodes found')
@@ -889,7 +890,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
     nixyzhmf_cminode(8,1:ncminode) = nH(1:ncminode) !- fill nixyzhmf_cminode(8,inode)
     call deallocate_cmi_inoutputs(x,y,z,h,m,nH)
 
-    !- For plotting ionization structure of nodes
+    !- For plotting current ionization structure of nodes
     if (write_node_prop) then
        open(2029,file='nixyzhmf_cminode.txt')
        write(2029,'(a25,a25,a25,a25,a25,a25,a25,a25)') 'n','i','x','y','z','h','m','nH'
@@ -979,18 +980,13 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
  endif
 
  !
- ! Lower tree_accuracy_cmi if too many nodes need to be opened
- ! likely that the radiation is escaping in all directions and reaching large distances
+ ! Adjusting tree_accuracy_cmi to avoid discontinuities in sparseness of nodes
+ ! between the leaves region and the higher-level nodes region
  !
  if (auto_tree_acc) then
-    maxnextopen = 1E3   !- define a max value for nnextopen to parametrize tree_accuracy
-    if (nnextopen >= maxnextopen) call fatal('photoionize_cmi','require a larger maxnextopen')
-    if (nnextopen > 300) then
-       tree_accuracy_cmi_new = tree_accuracy_cmi_old*(-0.4/maxnextopen*nnextopen+0.9)
-       if (tree_accuracy_cmi_new < tree_accuracy_cmi) then
-          tree_accuracy_cmi = tree_accuracy_cmi_new
-          write(*,'(2x,a33,f5.2)')'Adjusting tree-opening criteria: ',tree_accuracy_cmi
-       endif
+    if (abs(mintheta-tree_accuracy_cmi) > tree_acc_tol) then
+       tree_accuracy_cmi = mintheta
+       write(*,'(2x,a33,f5.2)')'Adjusting tree-opening criteria: ',tree_accuracy_cmi
     endif
  endif
 

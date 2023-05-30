@@ -36,7 +36,7 @@ subroutine extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
                                       nxyzm_treetocmi,ixyzhm_leafparts,nnode_toreplace,&
                                       ncminode,nleafparts,ncloseleaf,&
                                       maxcminode,maxleafparts,&
-                                      tree_accuracy_cmi,rcut_opennode,rcut_leafpart,&
+                                      tree_accuracy_cmi,mintheta,rcut_opennode,rcut_leafpart,&
                                       nnode_needopen,nneedopen,&
                                       nxyzrs_nextopen,nnextopen)
  use part,        only:massoftype,igas
@@ -58,11 +58,13 @@ subroutine extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
  integer,      intent(inout) :: ncminode,ncloseleaf,nleafparts
  integer,      intent(inout) :: nnode_toreplace(:)
  real,         intent(inout) :: nxyzm_treetocmi(:,:),ixyzhm_leafparts(:,:)
+ real,         intent(out)   :: mintheta
  integer, parameter :: istacksize = 300
  integer :: nstack(istacksize)
  integer :: n,istack,il,ir,isrc,ip,ipnode,inode,n_needopen,iregion
  real    :: dist2,pos_node(3),size_node,mass_node,pos_region(3),rad_region2,minsize_region
- real    :: rcut_opennode2,rcut_leafpart2,size_node2,tree_accuracy_cmi2
+ real    :: rcut_opennode2,rcut_leafpart2,rcut_opennode2_inbound
+ real    :: size_node2,tree_accuracy_cmi2,theta2,mintheta2
  logical :: open_node,open_node_onesrc,close_to_src
 
  write(*,'(2x,a60,f5.2)') 'Walking kdtree to extract cmi-nodes with opening criterion: ',tree_accuracy_cmi
@@ -84,6 +86,10 @@ subroutine extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
  ncloseleaf = 0  ! number of leaves to be replaced
  nleafparts = 0  ! number of particles within those leaves
 
+ !- Init params for extracting nodes at boundary of leaf region
+ mintheta2 = huge(mintheta2)
+ rcut_opennode2_inbound = rcut_opennode2 - 0.01*rcut_opennode2
+
  istack = 1
  nstack(istack) = irootnode
  over_stack: do while (istack /= 0)
@@ -102,9 +108,14 @@ subroutine extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
     close_to_src = .false.
     over_sources: do isrc = 1,nphotosrc
        dist2 = mag2(pos_node(1:3)-xyz_photosrc(1:3,isrc))
-       open_node_onesrc = ( size_node2/dist2 > tree_accuracy_cmi2 )
+       theta2 = size_node2/dist2
+       open_node_onesrc = ( theta2 > tree_accuracy_cmi2 )
        if (open_node_onesrc .or. dist2 < rcut_opennode2) then
           open_node = .true.
+          !- extract theta of those at boundary of leaf region
+          if (dist2 < rcut_opennode2 .and. dist2 > rcut_opennode2_inbound) then
+             mintheta2 = min(mintheta2,theta2)
+          endif
           if (dist2 < rcut_leafpart2) then
              close_to_src = .true.
              exit over_sources
@@ -189,6 +200,8 @@ subroutine extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
        nxyzm_treetocmi(5,ncminode)   = mass_node
     endif
  enddo over_stack
+
+ mintheta = sqrt(mintheta2)
 
 end subroutine extract_cminodes_from_tree
 
