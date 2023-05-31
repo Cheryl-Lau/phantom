@@ -450,14 +450,9 @@ subroutine compute_du(is_Rtype_phase,dt,rho,u,ueq,gamma,lambda,du)
  !- time required to radiate energy excess / gain energy
  tau = abs((u-ueq)/(rho*one_over_mH2*lambda - one_over_mH*gamma))
 
- !- During R-type phase recomb rate (i.e. cooling) is being brought up from 0,
- !  so by the end it does approach the equil between gamma and orginal lambda
- !  but at a quicker rate. Here we model this process by simply changing tau
- !  to let it drift to ueq faster
- if (is_Rtype_phase) then
-!    tau = abs((u-ueq)/(one_over_mH*gamma))   !???
-    tau = tiny(tau)   ! to immediately go to ~1E4 K
- endif
+! if (is_Rtype_phase) then
+!    tau = tiny(tau)   ! to immediately go to ~1E4 K
+! endif
 
  unew = ueq + (u-ueq)*exp(-dt/tau)
  du = unew - u
@@ -474,9 +469,9 @@ subroutine compute_dudt(is_Rtype_phase,dt,rho,u,gamma,lambda,dudt)
  real,    intent(inout) :: gamma,lambda
  real,    intent(out)   :: dudt
 
- if (is_Rtype_phase) then
-    lambda = 0.   !???
- endif
+! if (is_Rtype_phase) then
+!    lambda = 0.
+! endif
 
  dudt = one_over_mH*gamma - rho*one_over_mH2*lambda
 
