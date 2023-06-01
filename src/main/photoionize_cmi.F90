@@ -113,7 +113,7 @@ module photoionize_cmi
  real,    public :: temp_hii     = 1E4          ! K
  logical, public :: fix_temp_hii = .false.      ! else computes heating and cooling
  logical, public :: implicit_cmi = .true.       ! else updates u explicitly
- logical, public :: treat_Rtype_phase = .true.
+ logical, public :: treat_Rtype_phase = .false.
  logical, public :: old_sources_exist = .false. ! T if sim is started from a dumpfile with ionizing sources
 
  ! Global storages required for updating u
@@ -601,7 +601,7 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
  integer :: ip,npart_heated,ibuc,inoroot,numroots
  integer :: iunit_unH
  real    :: nH,ui,ueq,pmass,gammaheat,lambda,rhoi,du
- real    :: ueq_mean,temp_ueq,gmw0
+ real    :: ueq_mean,u_mean,temp_ueq,temp_u,gmw0,tau,tau_mean
  real    :: time_cgs
  real    :: pos_noroot(3,npart),nH_noroot(npart),temp_noroot(npart)
  real    :: nH_buc(nbuc),gamma_buc(nbuc),nentry_buc(nbuc)
@@ -623,9 +623,11 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
     nentry_buc = 0
  endif
 
+ inoroot  = 0
+ u_mean   = 0.
  ueq_mean = 0.
+ tau_mean = 0.
  npart_heated = 0
- inoroot = 0
  !$omp parallel do default(none) shared(npart,nH_allparts,xyzh,vxyzu) &
  !$omp shared(vxyzu_beforepred,pmass,temp_star,dt,du_cmi) &
  !$omp shared(fix_temp_hii,u_hii,ufloor) &
@@ -634,8 +636,8 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
  !$omp shared(catch_noroot_parts,pos_noroot,nH_noroot,temp_noroot) &
  !$omp shared(gmw,gamma,unit_ergg,inoroot) &
  !$omp private(ibuc) &
- !$omp private(ip,nH,rhoi,ui,ueq,gammaheat,lambda,du,numroots) &
- !$omp reduction(+:ueq_mean,npart_heated) &
+ !$omp private(ip,nH,rhoi,ui,ueq,gammaheat,lambda,du,tau,numroots) &
+ !$omp reduction(+:ueq_mean,u_mean,tau_mean,npart_heated) &
  !$omp reduction(+:gamma_buc,nentry_buc) &
  !$omp schedule(runtime)
  do ip = 1,npart
@@ -653,12 +655,14 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
              call heating_term(nH,rhoi,ui,temp_star,gammaheat)
              call cooling_term(ui,lambda)  ! for calculating timescale
              call get_ueq(rhoi,gammaheat,ui,numroots,ueq)
-             call compute_du(is_Rtype_phase,dt,rhoi,ui,ueq,gammaheat,lambda,du)
+             call compute_du(is_Rtype_phase,dt,rhoi,ui,ueq,gammaheat,lambda,tau,du)
 
-             !- check Teq of HII region
+             !- check current T and Teq of HII region
              if (nH < 0.5) then
                 npart_heated = npart_heated + 1
-                ueq_mean     = ueq_mean + ueq
+                u_mean   = u_mean + ui
+                ueq_mean = ueq_mean + ueq
+                tau_mean = tau_mean + tau
              endif
 
              !- check gamma distribution
@@ -702,7 +706,12 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
  if (.not.fix_temp_hii) then
     ueq_mean = ueq_mean/npart_heated
     temp_ueq = ueq_mean/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
-    print*,'Drifting HII region to temp [K]: ',temp_ueq
+    print*,'Drifting HII region to temp [K]:   ',temp_ueq
+    u_mean = u_mean/npart_heated
+    temp_u = u_mean/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
+    print*,'Current temp of HII region  [K]:   ',temp_u
+    tau_mean = tau_mean/npart_heated
+    print*,'Time remaining to reach Teq [Myr]: ',tau_mean*utime/(1E6*365*24*60*60)
  endif
 
  if (write_gamma) then
