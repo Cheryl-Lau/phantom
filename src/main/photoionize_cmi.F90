@@ -37,7 +37,6 @@ module photoionize_cmi
 !   - niter_mcrt          : *Number of iterations to release photon packets in MCRT simulation*
 !   - nphoton             : *Number of photon packets per iteration*
 !   - photon_eV           : *Energy of ionizing photons in eV*
-!   - temp_star           : *Temperature of the star (for setting the source and/or computing heating)*
 !   - monochrom_source    : *Use source with monochromatic frequency which corresponds to energy photon_eV,
 !                            else follows a planck distribution at temperature temp_star*
 !   - tol_vsite           : *Tolerence in nodes' fractional position change above which the Voronoi
@@ -83,18 +82,18 @@ module photoionize_cmi
  logical, public :: sink_ionsrc = .false.
  real,    public :: masscrit_ionize_cgs = 1.39237E34  ! 7 M_sun
  !- or
- ! Manually set location, starting/ending time and luminosity [cgs units] of ionizing sources
+ ! Manually set location, starting/ending time and ionizing photon flux [cgs units] of sources
  integer, public, parameter :: nsetphotosrc = 1
- real,    public :: xyztl_setphotosrc_cgs(6,nsetphotosrc) = reshape((/0.,0.,0.,1E-50,1E50,1E49 /),&
+ real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/0.,0.,0.,1E-50,1E50,1E49 /),&
                                                                     shape=(/6,nsetphotosrc/))
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
  integer, public :: niter_mcrt = 10
- real,    public :: photon_eV  = 13.6   ! eV ; used only if sink_ionsrc=F and monochrom_source=T
- real,    public :: temp_star  = 5E4    ! K  ; used only if sink_ionsrc=F and monochrom_source=F
+ real,    public :: photon_eV  = 13.6   ! used only if sink_ionsrc=F and monochrom_source=T
  real,    public :: tol_vsite  = 1E-1
  logical, public :: lloyd      = .true.
  logical, public :: monochrom_source = .false.   ! else blackbody spec
+ logical, public :: fix_ionphotoflux = .false.
 
  ! Move grid-construction up the tree
  logical, public :: photoionize_tree = .true.
@@ -155,10 +154,10 @@ module photoionize_cmi
  integer :: icall,iunit,ifile,iruncmi
  integer :: ncall_checktreewalk = 50  ! interval to check for unnecessarily-opened nodes
  integer :: nphotosrc_old
- real    :: xyz_photosrc_si(3,maxphotosrc),lumin_photosrc(maxphotosrc),mass_photosrc(maxphotosrc),masscrit_ionize
+ real    :: xyz_photosrc_si(3,maxphotosrc),ionflux_photosrc(maxphotosrc),mass_photosrc(maxphotosrc),masscrit_ionize
  real    :: tree_accuracy_cmi_old
  real    :: rcut_opennode,rcut_leafpart,delta_rcut
- real    :: totlumin,solarl_photonsec,freq_photon,u_hii,udist_si,umass_si
+ real    :: temp_star,totq,freq_photon,u_hii,udist_si,umass_si
  real    :: time0_wall,time0_cpu,time_now_wall,time_now_cpu
  real    :: time_ellapsed_wall,time_ellapsed_cpu
  logical :: is_Rtype_phase
@@ -235,10 +234,8 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
     if (sink_ionsrc) then
        call fatal('photoionize_cmi','cannot use monochromatic spectrum for emissions from sinks')
     else ! user-set
-       write(*,'(2x,a41,f5.2,a3)') 'Source: monochromatic with photon energy ',photon_eV,' eV'
-       if (fix_temp_hii) then
-          write(*,'(3x,a26)') 'temp_star will not be used'
-       else ! do heating/cooling
+       write(*,'(2x,a42,f5.2,a3)') 'Source: monochromatic photons with energy ',photon_eV,' eV'
+       if (.not.fix_temp_hii) then ! do heating/cooling
           temp_star = (photon_eV-13.6)*eV /(3./2.*kboltz)
           if (temp_star < tiny(temp_star)) call fatal('photoionize_cmi','photon_eV needs to be greater than 13.6 eV')
           write(*,'(3x,a33,es10.4,a2)') 'setting source temperature to be ',temp_star,' K'
@@ -249,9 +246,13 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
        write(*,'(2x,a37)') 'Source: sinks with blackbody spectrum'
        write(*,'(3x,a70)') 'temp_star will be computed using mass of sink particles during runtime'
     else ! user-set
-       write(*,'(2x,a42,es10.4,a2)') 'Source: blackbody spectrum of temperature ',temp_star,' K'
+       write(*,'(2x,a45)') 'Source: point sources with blackbody spectrum'
+       write(*,'(3x,a68)') 'temp_star will be computed using ionizing photon flux during runtime'
     endif
  endif
+ ! Note: temp_star is required if using blackbody source and/or doing heating, however,
+ !       both can only take one value regardless of the number of ionizing sources.
+ !       Here, we will average it over all present sources.
 
  !- Convert cgs units to SI units for CMI
  udist_si = udist/1E2
@@ -294,12 +295,9 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
     print*,'Photoionization heating/cooling activated'
  endif
 
- !- Estimate solar luminosity [photon/sec]
+ !- Calculate ionizing photon frequency [Hz]
  energ_photon_cgs = photon_eV*eV
- solarl_photonsec = solarl/energ_photon_cgs
-
- !- Calculate photon frequency [Hz]
- wavelength_cgs  = planckh*c/energ_photon_cgs
+ wavelength_cgs   = planckh*c/energ_photon_cgs
  freq_photon = c/wavelength_cgs
 
  !- Critical mass of sinks
@@ -348,12 +346,12 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
  real,    intent(in) :: time
  real,    intent(in) :: xyzmh_ptmass(:,:)
  integer :: isrc,ix,isink
- real    :: time_startsrc,time_endsrc,mptmass,lumin_star
+ real    :: time_startsrc,time_endsrc,mptmass,fluxq
 
  !- Init/Reset
  nphotosrc = 0
  xyz_photosrc   = 0.
- lumin_photosrc = 0.
+ ionflux_photosrc = 0.
  mass_photosrc  = 0.
 
  !
@@ -367,22 +365,21 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
           if (nphotosrc > maxphotosrc) call fatal('photoionize_cmi','number of sources &
                                                  & exceeded maxphotosrc')
           xyz_photosrc(1:3,nphotosrc) = xyzmh_ptmass(1:3,isink)
-          !- Compute luminosity [s^-1] with sink mass
-          call get_lumin(mptmass,solarl_photonsec,lumin_star)
-          lumin_photosrc(nphotosrc) = lumin_star
-          mass_photosrc(nphotosrc)  = mptmass
+          fluxq = get_ionflux_star(mptmass)
+          ionflux_photosrc(nphotosrc) = fluxq    ! [nphoton/s]
+          mass_photosrc(nphotosrc)    = mptmass
        endif
     enddo
  elseif (.not.sink_ionsrc) then !- Check time
     do isrc = 1,nsetphotosrc
-       time_startsrc = xyztl_setphotosrc_cgs(4,isrc)/utime
-       time_endsrc   = xyztl_setphotosrc_cgs(5,isrc)/utime
+       time_startsrc = xyztq_setphotosrc_cgs(4,isrc)/utime
+       time_endsrc   = xyztq_setphotosrc_cgs(5,isrc)/utime
        if (time > time_startsrc .and. time < time_endsrc) then
           nphotosrc = nphotosrc + 1
           if (nphotosrc > maxphotosrc) call fatal('photoionize_cmi','number of sources &
                                                  & exceeded maxphotosrc')
-          xyz_photosrc(1:3,nphotosrc) = xyztl_setphotosrc_cgs(1:3,isrc)/udist
-          lumin_photosrc(nphotosrc)   = xyztl_setphotosrc_cgs(6,isrc)  !- remain in [s^-1]
+          xyz_photosrc(1:3,nphotosrc) = xyztq_setphotosrc_cgs(1:3,isrc)/udist
+          ionflux_photosrc(nphotosrc) = xyztq_setphotosrc_cgs(6,isrc)  ! [nphoton/s]
        endif
     enddo
  endif
@@ -401,34 +398,16 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
 end subroutine set_ionizing_source_cmi
 
 !
-! Calculate luminosity from mass of sink particle
-! Note: Output lumin_star will have the same dimension & units as the input lumin_sun
-!       i.e. both in [nphotons/time] or both in [energy/time]
-!
-subroutine get_lumin(mass_star,lumin_sun,lumin_star)
- use physcon,  only:solarm
- use units,    only:umass
- real, intent(in)  :: mass_star   ! code units
- real, intent(in)  :: lumin_sun   ! cgs or code units
- real, intent(out) :: lumin_star  ! cgs or code units
- real :: mass_star_cgs
-
- mass_star_cgs = mass_star*umass
- lumin_star    = lumin_sun * (mass_star_cgs/solarm)**(3.5)
-
-end subroutine get_lumin
-
-!
 ! Prepare for energy injection
 !
 subroutine energy_checks_cmi(xyzh,dt)
- use physcon,      only:solarl,solarr,steboltz,pi
+ use physcon,      only:solarr,steboltz,pi
  use heatcool_cmi, only:check_to_stop_cooling,compute_Rtype_time
  use io,           only:fatal
  real, intent(in) :: xyzh(:,:)
  real, intent(in) :: dt
  integer :: isrc
- real    :: massmean,lumin_star_cgs,rstar_cgs,t_recomb
+ real    :: massmean,lumin_star_cgs,rstar_cgs,t_recomb,qmean
  real    :: rstar_solarr = 10.  !- radius of a typical O-star [R_sun]
  logical :: new_source_injected
 
@@ -438,16 +417,25 @@ subroutine energy_checks_cmi(xyzh,dt)
     !- Ready to rerun CMI
     call reset_energ
 
-    !- Estimate temperature of star with mean mass of current sources
     if (sink_ionsrc .and. .not.monochrom_source) then
+       !- Estimate temperature of star with mean mass of current sources
        massmean = 0.
        do isrc = 1,nphotosrc
           massmean = massmean + mass_photosrc(isrc)
        enddo
        massmean = massmean/nphotosrc
-       call get_lumin(massmean,solarl,lumin_star_cgs)
+       lumin_star_cgs = get_lumin_star(massmean)
        rstar_cgs = rstar_solarr*solarr
        temp_star = (lumin_star_cgs/(4.*pi*rstar_cgs**2*steboltz))**(1./4.)
+
+    elseif (.not.sink_ionsrc .and. .not.monochrom_source) then
+       !- Estimate temperature of star with mean ionizing photon flux of current sources
+       qmean = 0.
+       do isrc = 1,nphotosrc
+          qmean = qmean + ionflux_photosrc(isrc)
+       enddo
+       qmean = qmean/nphotosrc
+       temp_star = get_temp_star(qmean)
     endif
  endif
 
@@ -469,6 +457,51 @@ subroutine energy_checks_cmi(xyzh,dt)
  !        dt should cover the time duration of R-type phase
 
 end subroutine energy_checks_cmi
+
+
+!
+! Calculate luminosity [cgs units] from mass of sink particle [code units]
+!
+real function get_lumin_star(mass_star)
+ use physcon,  only:solarm,solarl
+ use units,    only:umass
+ real, intent(in)  :: mass_star
+ real :: mass_star_cgs
+
+ mass_star_cgs  = mass_star*umass
+ get_lumin_star = solarl * (mass_star_cgs/solarm)**(3.5)
+
+end function get_lumin_star
+
+!
+! Get ionizing photon flux Q [cgs units] from mass of sink particle [code units]
+! obtained from fitting mass-flux in table 1 of Diaz-Miller et al. 1998
+!
+real function get_ionflux_star(mass_star)
+ use units, only:umass
+ real, intent(in) :: mass_star
+ real :: mass_star_cgs
+
+ mass_star_cgs = mass_star*umass
+ if (mass_star_cgs > 3.65E34) then
+    get_ionflux_star = 10**(2.817*log10(mass_star_cgs) - 49.561)
+ else
+    get_ionflux_star = 10**(12.548*log10(mass_star_cgs) - 385.885)
+ endif
+
+end function get_ionflux_star
+
+!
+! Get temperature from ionizing photon flux Q of source
+! obtained from fitting flux-temp in table 1 of Diaz-Miller et al. 1998
+!
+real function get_temp_star(ionflux_src)
+ real, intent(in) :: ionflux_src
+
+ get_temp_star =  0.887 * exp(0.209*log10(ionflux_src) + 0.278) + 7613.222
+
+end function get_temp_star
+
 
 !-----------------------------------------------------------------------------
 !+
@@ -589,7 +622,7 @@ end subroutine compute_ionization_cmi
 subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
  use heatcool_cmi, only:heating_term,cooling_term,get_ueq,compute_du
  use part,         only:rhoh,massoftype,igas
- use physcon,      only:kboltz,mass_proton_cgs
+ use physcon,      only:kboltz,mass_proton_cgs,years
  use eos,          only:gamma,gmw
  use cooling,      only:ufloor
  use units,        only:unit_ergg,unit_energ,utime
@@ -711,7 +744,7 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
     temp_u = u_mean/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
     print*,'Current temp of HII region  [K]:   ',temp_u
     tau_mean = tau_mean/npart_heated
-    print*,'Time remaining to reach Teq [Myr]: ',tau_mean*utime/(1E6*365*24*60*60)
+    print*,'Time remaining to reach Teq [Myr]: ',tau_mean*utime/(1E6*years)
  endif
 
  if (write_gamma) then
@@ -835,7 +868,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
  integer :: nneedopen    !- number of nodes at ionization front that needs to be opened at current iteration
  integer :: ncloseleaf   !- number of leaves to be replaced
  integer :: nleafparts   !- total number of particles in leaf nodes to be replaced
- integer :: niter,inode,isite,n,inextopen,n_nextopen,maxnextopen
+ integer :: niter,inode,isite,n,inextopen,n_nextopen
  real    :: size_node,size_root,nH_node,nH_part,nH_limit,mintheta
  logical :: node_checks_passed
 
@@ -1275,18 +1308,18 @@ subroutine write_cmi_infiles(nsite,x,y,z,h,m)
  endif
 
  !
- ! Write file containing position and luminosity of sources
+ ! Write file containing position and flux of sources
  !
  open(2025,file='source_positions.txt')
  write(2025,*) nphotosrc
- !- total luminosity of all sources
- totlumin = 0.
+ !- total ionizing photon flux Q of all sources
+ totq = 0.
  do isrc = 1,nphotosrc
-    totlumin = totlumin + lumin_photosrc(isrc)
+    totq = totq + ionflux_photosrc(isrc)
  enddo
- write(2025,*) totlumin
+ write(2025,*) totq
  do isrc = 1,nphotosrc
-    write(2025,*) xyz_photosrc_si(1:3,isrc), lumin_photosrc(isrc)/totlumin
+    write(2025,*) xyz_photosrc_si(1:3,isrc), ionflux_photosrc(isrc)/totq
  enddo
  close(2025)
 
@@ -1588,7 +1621,6 @@ subroutine write_options_photoionize(iunit)
  call write_inopt(niter_mcrt,'niter_mcrt','Number of photon-release iterations',iunit)
  call write_inopt(nphoton,'nphoton','Number of photons per iteration',iunit)
  call write_inopt(photon_eV,'photon_eV','Energy of ionizing photons in eV',iunit)
- call write_inopt(temp_star,'temp_star','Temperature of ionizing source',iunit)
  call write_inopt(tol_vsite,'tol_vsite','Threshold to update Voronoi gen-sites',iunit)
  call write_inopt(lloyd,'lloyd','Apply Lloyd iteration to construct Voronoi grid',iunit)
  call write_inopt(monochrom_source,'monochrom_source','Use monochromatic source',iunit)
@@ -1645,10 +1677,6 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
     read(valstring,*,iostat=ierr) photon_eV
     ngot = ngot + 1
     if (photon_eV <= 0.) call fatal(label,'invalid setting for photon_eV (<=0)')
- case('temp_star')
-    read(valstring,*,iostat=ierr) temp_star
-    ngot = ngot + 1
-    if (temp_star <= 0.) call fatal(label,'invalid setting for temp_star (<=0)')
  case('tol_vsite')
     read(valstring,*,iostat=ierr) tol_vsite
     ngot = ngot + 1
@@ -1711,7 +1739,7 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
  case default
     imatch = .false.
  end select
- igotall = ( ngot >= 23 )
+ igotall = ( ngot >= 22 )
 
 end subroutine read_options_photoionize
 
