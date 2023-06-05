@@ -442,7 +442,6 @@ end subroutine get_ueq
 !
 subroutine compute_du(is_Rtype_phase,dt,rho,u,ueq,gamma,lambda,tau,du)
  use io,  only:warning
- use units, only:utime ! testing
  logical, intent(in)  :: is_Rtype_phase
  real,    intent(in)  :: dt,rho,u,ueq,gamma,lambda
  real,    intent(out) :: tau,du
@@ -450,8 +449,6 @@ subroutine compute_du(is_Rtype_phase,dt,rho,u,ueq,gamma,lambda,tau,du)
 
  !- time required to radiate energy excess / gain energy
  tau = abs((u-ueq)/(rho*one_over_mH2*lambda - one_over_mH*gamma))
-
-! print*,'time to ueq [Myr] ',tau*utime/(1E6*365*24*60*60)
 
 ! if (is_Rtype_phase) then
 !    tau = tiny(tau)   ! to immediately go to ~1E4 K
