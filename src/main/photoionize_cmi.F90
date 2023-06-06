@@ -93,7 +93,6 @@ module photoionize_cmi
  real,    public :: tol_vsite  = 1E-1
  logical, public :: lloyd      = .true.
  logical, public :: monochrom_source = .false.   ! else blackbody spec
- logical, public :: fix_ionphotoflux = .false.
 
  ! Move grid-construction up the tree
  logical, public :: photoionize_tree = .true.
@@ -463,8 +462,8 @@ end subroutine energy_checks_cmi
 ! Calculate luminosity [cgs units] from mass of sink particle [code units]
 !
 real function get_lumin_star(mass_star)
- use physcon,  only:solarm,solarl
- use units,    only:umass
+ use physcon, only:solarm,solarl
+ use units,   only:umass
  real, intent(in)  :: mass_star
  real :: mass_star_cgs
 
@@ -664,7 +663,6 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
  !$omp parallel do default(none) shared(npart,nH_allparts,xyzh,vxyzu) &
  !$omp shared(vxyzu_beforepred,pmass,temp_star,dt,du_cmi) &
  !$omp shared(fix_temp_hii,u_hii,ufloor) &
- !$omp shared(is_Rtype_phase) &
  !$omp shared(write_gamma,nH_buc,unit_energ,utime) &
  !$omp shared(catch_noroot_parts,pos_noroot,nH_noroot,temp_noroot) &
  !$omp shared(gmw,gamma,unit_ergg,inoroot) &
@@ -688,7 +686,7 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
              call heating_term(nH,rhoi,ui,temp_star,gammaheat)
              call cooling_term(ui,lambda)  ! for calculating timescale
              call get_ueq(rhoi,gammaheat,ui,numroots,ueq)
-             call compute_du(is_Rtype_phase,dt,rhoi,ui,ueq,gammaheat,lambda,tau,du)
+             call compute_du(dt,rhoi,ui,ueq,gammaheat,lambda,tau,du)
 
              !- check current T and Teq of HII region
              if (nH < 0.5) then
@@ -816,7 +814,6 @@ subroutine energ_explicit_cmi(npart,xyzh,vxyzu,dt)
 
  !$omp parallel do default(none) shared(npart,nH_allparts,xyzh,vxyzu) &
  !$omp shared(temp_star,pmass,dt,dudt_cmi) &
- !$omp shared(is_Rtype_phase) &
  !$omp private(ip,nH,rhoi,ui,gammaheat,lambda,dudt) &
  !$omp private(u_ionized) &
  !$omp reduction(+:npart_heated,uhii_mean) &
@@ -828,7 +825,7 @@ subroutine energ_explicit_cmi(npart,xyzh,vxyzu,dt)
        ui   = vxyzu(4,ip)
        call heating_term(nH,rhoi,ui,temp_star,gammaheat)
        call cooling_term(ui,lambda)
-       call compute_dudt(is_Rtype_phase,dt,rhoi,ui,gammaheat,lambda,dudt)
+       call compute_dudt(dt,rhoi,ui,gammaheat,lambda,dudt)
        !- store dudt into global array
        dudt_cmi(ip) = dudt
        !- checking

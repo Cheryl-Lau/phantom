@@ -440,38 +440,26 @@ end subroutine get_ueq
 !
 ! With the ueq, compute new u after dt to give du in code units as of VS07
 !
-subroutine compute_du(is_Rtype_phase,dt,rho,u,ueq,gamma,lambda,tau,du)
- use io,  only:warning
- logical, intent(in)  :: is_Rtype_phase
- real,    intent(in)  :: dt,rho,u,ueq,gamma,lambda
- real,    intent(out) :: tau,du
- real     :: unew
+subroutine compute_du(dt,rho,u,ueq,gamma,lambda,tau,du)
+ real, intent(in)  :: dt,rho,u,ueq,gamma,lambda
+ real, intent(out) :: tau,du
+ real  :: unew
 
  !- time required to radiate energy excess / gain energy
- tau = abs((u-ueq)/(rho*one_over_mH2*lambda - one_over_mH*gamma))
-
-! if (is_Rtype_phase) then
-!    tau = tiny(tau)   ! to immediately go to ~1E4 K
-! endif
+ tau  = abs((u-ueq)/(rho*one_over_mH2*lambda - one_over_mH*gamma))
 
  unew = ueq + (u-ueq)*exp(-dt/tau)
- du = unew - u
+ du   = unew - u
 
 end subroutine compute_du
 
 !
 ! Balance heating and cooling term to give dudt in code units
 !
-subroutine compute_dudt(is_Rtype_phase,dt,rho,u,gamma,lambda,dudt)
- use io,  only:warning
- logical, intent(in)    :: is_Rtype_phase
- real,    intent(in)    :: dt,rho,u
- real,    intent(inout) :: gamma,lambda
- real,    intent(out)   :: dudt
-
-! if (is_Rtype_phase) then
-!    lambda = 0.
-! endif
+subroutine compute_dudt(dt,rho,u,gamma,lambda,dudt)
+ real, intent(in)    :: dt,rho,u
+ real, intent(inout) :: gamma,lambda
+ real, intent(out)   :: dudt
 
  dudt = one_over_mH*gamma - rho*one_over_mH2*lambda
 
