@@ -239,7 +239,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        call prompt('Do to intend to slightly randomize particle positions on the lattice?',pos_ranh)
     endif
 
-    rms_mach = 6.5
+    rms_mach = 5.5
     call prompt('Enter the Mach number of the cloud turbulence',rms_mach,0.)
 
     !

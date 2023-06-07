@@ -900,7 +900,7 @@ ifeq ($(SETUP), rhdsne)
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
     MAXP=1000000
-    NCELLSMAX=2*maxp
+    NCELLSMAX=3*maxp
 endif
 
 ifeq ($(SETUP), rhdsne_hpc)
@@ -917,7 +917,7 @@ ifeq ($(SETUP), rhdsne_hpc)
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
     MAXP=10000000
-    NCELLSMAX=2*maxp
+    NCELLSMAX=4*maxp
 endif
 
 ifeq ($(SETUP), mhdvortex)
