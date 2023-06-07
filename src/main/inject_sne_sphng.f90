@@ -9,7 +9,7 @@ module inject
 ! Routine for injecting Type II supernovae
 !
 ! :References: Lucas,et.al,2020,MNRAS,493,4700
-!              Maeder,2009,Springer,P.628,Table 25.6
+!              Maeder,2009,Springer
 !
 ! :Owner: Cheryl Lau (based on origional SPHNG addsupernova.f by Ian Bonnell)
 !
@@ -41,7 +41,7 @@ module inject
  real,    public :: frackin   = 0.5
  real,    public :: fractherm = 0.5
  real,    public :: pmsncrit_cgs = 1.59E34  ! 8 solarm
- logical, public :: sink_progenitor = .true.
+ logical, public :: sink_progenitor = .false.
 
  private
 
@@ -389,10 +389,11 @@ subroutine check_sink(xyzmh_ptmass,vxyz_ptmass,nptmass,pmsncrit,time)
     snflag_sinkip = snflag_sink(ip)
     if (mptmass >= pmsncrit .and. .not.snflag_sinkip) then
        !
-       ! Time to inject sn - estimated using lifetime of star as MS (Maeder 2009)
+       ! Time to inject sn - estimated using star MS lifetime (obtained by fitting Table 25.6, P.628, Maeder 2009)
        !
-       mptmass_solarm = mptmass*umass/solarm  !- convert to units of solarm
-       t_ms_cgs = 9.57E8 * mptmass_solarm**(-1.59) *(365*24*3600)
+       mptmass_solarm = mptmass*umass/solarm
+       t_ms_cgs = (1.165E8/(mptmass_solarm-4.242) + 1.143E6) *365*24*3600
+       write(*,'(1x,a5,i4,a38,f5.2,a4)') 'Sink ',ip,' set as progenitor - detonating after ',t_ms_cgs/(1E6*365*24*3600),' Myr'
        t_sn = time + t_ms_cgs/utime
        !
        ! Store sn into queue
@@ -405,6 +406,10 @@ subroutine check_sink(xyzmh_ptmass,vxyz_ptmass,nptmass,pmsncrit,time)
        vxyz_allsn(1:3,nallsn)  = vxyz_ptmass(1:3,ip)
        m_allsn(nallsn)     = mptmass
        iprog_allsn(nallsn) = ip
+       !
+       ! Flag sink to avoid being placed into queue again
+       !
+       snflag_sink(ip) = .true.
     endif
  enddo over_sinks
 
