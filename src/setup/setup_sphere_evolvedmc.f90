@@ -542,7 +542,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     print fmt,' Semi-axis {b} of ellipsoid    : ',r_ellipsoid(2),r_ellipsoid(2)*udist,' cm'
     print fmt,' Semi-axis {c} of ellipsoid    : ',r_ellipsoid(3),r_ellipsoid(3)*udist,' cm'
  endif
- if (BEsphere) then
+ if (BEsphere) then 
     print fmt,' Mean rho sphere         : ',dens_sphere,dens_sphere*unit_density,' g/cm^3'
     print fmt,' central density         : ',central_density,central_density*unit_density,' g/cm^3'
     print fmt,' edge density            : ',edge_density,edge_density*unit_density,' g/cm^3'
