@@ -6,12 +6,11 @@
 !--------------------------------------------------------------------------!
 module setup
 !
-! This module sets up a sphere with no surrounding medium
-! Used for evolving a cloud before injecting SN
+! This module sets up a sphere or ellipsoid with no surrounding medium
 !
 ! :References: None
 !
-! :Owner: Daniel Price
+! :Owner: Cheryl Lau
 !
 ! :Runtime parameters:
 !   - BEfac            : *over-density factor of the BE sphere [code units]*
@@ -22,7 +21,6 @@ module setup
 !   - Bzero            : *Magnetic field strength in Gauss*
 !   - ang_Bomega       : *Angle (degrees) between B and rotation axis*
 !   - angvel           : *angular velocity in rad/s*
-!   - cs_sphere_cgs    : *sound speed in sphere/ellipsoid in cm/s*
 !   - dist_unit        : *distance unit (e.g. au)*
 !   - h_acc            : *accretion radius (code units)*
 !   - h_soft_sinksink  : *sink-sink softening radius (code units)*
@@ -56,7 +54,7 @@ module setup
  private
  !--private module variables
  real :: xmini(3),xmaxi(3)
- real :: totmass_sphere,r_sphere,r_ellipsoid(3),cs_sphere,cs_sphere_cgs
+ real :: totmass_sphere,r_sphere,r_ellipsoid(3),temp_sphere
  real :: angvel,Bzero_G,masstoflux,ang_Bomega,rms_mach
  real :: rho_pert_amp,lbox,lbox_x,lbox_y,lbox_z
  real :: BErho_cen,BErad_phys,BErad_norm,BEmass,BEfac
@@ -104,7 +102,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use photoionize_cmi, only:monochrom_source,fix_temp_hii,treat_Rtype_phase
  use photoionize_cmi, only:photoionize_tree,tree_accuracy_cmi,nHlimit_fac
  use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
- use photoionize_cmi, only:old_sources_exist
+ use photoionize_cmi, only:old_sources_exist,sink_ionsrc
  procedure(rho_func), pointer :: density_func
  integer,           intent(in)    :: id
  integer,           intent(inout) :: npart
@@ -123,14 +121,15 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  integer            :: iBE
  real               :: rmin,rmax
  real               :: totmass,vol_box,psep,psep_box
- real               :: vol_sphere,dens_sphere,dens_medium,cs_medium,angvel_code,przero
+ real               :: vol_sphere,dens_sphere,dens_medium,angvel_code,przero,u_sphere,cs_sphere,cs_sphere_cgs
  real               :: totmass_box,t_ff,r2,area,Bzero,rmasstoflux_crit
  real               :: rxy2,rxyz2,phi,dphi,central_density,edge_density,rmsmach,v2i,turbfac,turbboxsize
  real               :: r_sn_cgs,engsn_cgs,pmsncrit_cgs
  real               :: vxyz_avg,vxyz_min,vxyz_max,vxyz_avg_cgs,vxyz_min_cgs,vxyz_max_cgs
+ real               :: jeans_mass,jeans_mass_cgs,n_cgs
  real, allocatable  :: rtab(:),rhotab(:)
  logical            :: iexist,in_iexist
- logical            :: make_sinks = .true.
+ logical            :: make_sinks
  character(len=120) :: filex,filey,filez
  character(len=100) :: filename,infilename,cwd
  character(len=40)  :: fmt
@@ -173,7 +172,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     npmax = int(2.0/3.0*size(xyzh(1,:))) ! approx max number allowed in sphere given size(xyzh(1,:))
     print*, 'npmax', npmax
-    np = 1E6
+    np = 1E5
     !
     ! prompt user for settings
     !
@@ -221,8 +220,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        stop
     endif
 
-    cs_sphere_cgs = 21888.0  ! cm/s ~ 8K assuming mu = 2.31 & gamma = 5/3
-    call prompt('Enter sound speed in sphere in units of cm/s',cs_sphere_cgs,0.)
+    temp_sphere = 32.
+    call prompt('Enter temperature of sphere in K',temp_sphere,0.)
 
     angvel = 0.
     call prompt('Enter angular rotation speed in rad/s ',angvel,0.)
@@ -237,21 +236,30 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        call prompt('Do to intend to slightly randomize particle positions on the lattice?',pos_ranh)
     endif
 
-    rms_mach = 12.5
+    rms_mach = 6.5
     call prompt('Enter the Mach number of the cloud turbulence',rms_mach,0.)
 
     !
     ! sink particle details to go to .in file
     !
+    make_sinks = .true.
     call prompt('Do you wish to dynamically create sink particles? ',make_sinks)
     if (make_sinks) then
-       h_acc_char  = '1.d-3pc'
+       h_acc_char  = '0.005pc'
        call prompt('Enter the accretion radius of the sink (with units; e.g. au,pc,kpc,0.1pc) ',h_acc_char)
        call select_unit(h_acc_char,h_acc_in,ierr)
        h_acc_setup = h_acc_in
-       if (ierr==0 ) h_acc_setup = h_acc_setup/udist
+       if (ierr == 0) h_acc_setup = h_acc_setup/udist
        r_crit_setup        = 5.0*h_acc_setup
-       rho_crit_cgs_setup  = 1.d-15   ! 10^5 times the initial MC density (Bate etal 1995); default 1.e-10
+       !- sink rho_crit = 10^5 times the initial MC density (Bate et al 1995); default 1E-10
+       if (is_sphere) then
+          print*,'recommended sink rho_crit [g cm^-3]: ',1.d5*totmass_sphere*umass/(4./3.*pi*(r_sphere*udist)**3)
+       else
+          print*,'recommended sink rho_crit [g cm^-3]: ',1.d5*totmass_sphere*umass/(4./3.*pi*r_ellipsoid(1)* &
+                                                         r_ellipsoid(2)*r_ellipsoid(3)*udist**3)
+       endif
+       rho_crit_cgs_setup = 1.d-16
+       call prompt('Enter the critical density of sink formation in g/cm^3',rho_crit_cgs_setup,0.)
        icreate_sinks_setup = 1
     else
        icreate_sinks_setup = 0
@@ -289,12 +297,25 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  print*,'xmini(3)',xmini(3)
  call set_boundary(xmini(1),xmaxi(1),xmini(2),xmaxi(2),xmini(3),xmaxi(3))
  !
- ! convert units of sound speed
+ ! set gamma
  !
- if (cs_in_code) then
-    cs_sphere_cgs = cs_sphere*unit_velocity
+ if (maxvxyzu >=4 ) then
+    gamma    = 5./3.
  else
-    cs_sphere     = cs_sphere_cgs/unit_velocity
+    gamma    = 1.
+ endif
+ !
+ ! sound speed
+ !
+ cs_sphere_cgs = sqrt(temp_sphere*(gamma*kboltz)/(gmw*mass_proton_cgs))
+ cs_sphere     = cs_sphere_cgs/unit_velocity
+ !
+ ! Polytropic constant
+ !
+ if (maxvxyzu < 4 .or. gamma <= 1.) then
+    polyk = cs_sphere**2
+ else
+    polyk = 0.
  endif
  !
  ! Bonnor-Ebert profile (if requested)
@@ -314,11 +335,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  time        = 0.
  hfact       = hfact_default
- if (maxvxyzu >=4 ) then
-    gamma    = 5./3.
- else
-    gamma    = 1.
- endif
  angvel_code = angvel*utime
  rhozero     = totmass_sphere / vol_sphere
  dens_sphere = rhozero
@@ -334,10 +350,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
                        exactN=.true.,np_requested=np,mask=i_belong)
     else
        density_func => gauss_density_func
-!       call set_sphere(trim(lattice),id,master,0.,r_sphere,psep,hfact,npart,xyzh,nptot=npart_total,&
-!                       rhofunc=density_func,exactN=.true.,np_requested=np,mask=i_belong)
        call set_sphere(trim(lattice),id,master,0.,r_sphere,psep,hfact,npart,xyzh,nptot=npart_total,&
-                       exactN=.true.,np_requested=np,mask=i_belong)
+                       rhofunc=density_func,exactN=.true.,np_requested=np,mask=i_belong)
+!       call set_sphere(trim(lattice),id,master,0.,r_sphere,psep,hfact,npart,xyzh,nptot=npart_total,&
+!                       exactN=.true.,np_requested=np,mask=i_belong)
        if (trim(lattice)/='random') print "(a,es10.3)",' Particle separation in sphere = ',psep
     endif
     print "(a)",' Initialised sphere'
@@ -378,12 +394,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  ! (if random, recentering may shift particles outside of the defined range)
  !
  if (trim(lattice)/='random') call reset_centreofmass(npart,xyzh,vxyzu)
-
- !
- ! temperature set to give a pressure equilibrium
- !
- polyk  = cs_sphere**2
- polyk2 = cs_medium**2
 
  !
  ! Turbulent velocity field
@@ -446,11 +456,16 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     if (r2 < rmax**2) then
        vxyzu(1,i) = vxyzu(1,i) - angvel_code*xyzh(2,i)
        vxyzu(2,i) = vxyzu(2,i) + angvel_code*xyzh(1,i)
-       if (maxvxyzu >= 4) vxyzu(4,i) = 1.5*polyk
-    else
-       if (maxvxyzu >= 4) vxyzu(4,i) = 1.5*polyk2
     endif
  enddo
+ !
+ ! Initial temperature
+ !
+ u_sphere = kboltz * temp_sphere / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
+ do i = 1,npart
+    vxyzu(4,i) = u_sphere
+ enddo
+
  !
  ! Set default runtime parameters if .in file does not exist
  !
@@ -482,19 +497,28 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Photoionization settings
     !
+    sink_ionsrc = .false.
     monochrom_source  = .false.
     fix_temp_hii      = .false.
     treat_Rtype_phase = .true.
-    old_sources_exist = .true.
+    old_sources_exist = .false.
 
     photoionize_tree  = .true.
     tree_accuracy_cmi = 0.3
     nHlimit_fac       = 50
-    rcut_opennode_cgs = 4.6E18   ! 1.5 pc
-    rcut_leafpart_cgs = 3.1E18   ! 1.0 pc
+    rcut_opennode_cgs = 1.9E19   ! 6.0 pc
+    rcut_leafpart_cgs = 1.2E19   ! 4.0 pc
     delta_rcut_cgs    = 3.1E17   ! 0.1 pc
-
  endif
+
+ !
+ ! Calculate the approx number of stars it will form
+ !
+ jeans_mass = pi/6.*cs_sphere**3/dens_sphere**(1./2.)
+! n_cgs = dens_sphere*unit_density/3.9E-24
+! jeans_mass_cgs = 2*solarm*(cs_sphere_cgs/0.2E5)**3*(n_cgs/1E3)**(-1./2.)
+! jeans_mass = jeans_mass_cgs/umass
+
  !
  !--Summarise the sphere
  !
@@ -506,42 +530,44 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     print "(a,i10)",' Input number of particles in ellipsoid = ',np
  endif
  print "(1x,50('-'))"
- print "(a)",'  Quantity         (code units)  (physical units)'
+ print "(a)",'  Quantity               (code units)  (physical units)'
  print "(1x,50('-'))"
  fmt = "((a,1pg10.3,3x,1pg10.3),a)"
- print fmt,' Total mass       : ',totmass,totmass*umass,' g'
  if (is_sphere) then
-    print fmt,' Mass in sphere   : ',totmass_sphere,totmass_sphere*umass,' g'
-    print fmt,' Radius of sphere : ',r_sphere,r_sphere*udist,' cm'
+    print fmt,' Mass in sphere          : ',totmass_sphere,totmass_sphere*umass,' g'
+    print fmt,' Radius of sphere        : ',r_sphere,r_sphere*udist,' cm'
  else
-    print fmt,' Mass in ellipsoid   : ',totmass_sphere,totmass_sphere*umass,' g'
-    print fmt,' Semi-axis {a} of ellipsoid : ',r_ellipsoid(1),r_ellipsoid(1)*udist,' cm'
-    print fmt,' Semi-axis {b} of ellipsoid : ',r_ellipsoid(2),r_ellipsoid(2)*udist,' cm'
-    print fmt,' Semi-axis {c} of ellipsoid : ',r_ellipsoid(3),r_ellipsoid(3)*udist,' cm'
+    print fmt,' Mass in ellipsoid       : ',totmass_sphere,totmass_sphere*umass,' g'
+    print fmt,' Semi-axis {a} of ellipsoid    : ',r_ellipsoid(1),r_ellipsoid(1)*udist,' cm'
+    print fmt,' Semi-axis {b} of ellipsoid    : ',r_ellipsoid(2),r_ellipsoid(2)*udist,' cm'
+    print fmt,' Semi-axis {c} of ellipsoid    : ',r_ellipsoid(3),r_ellipsoid(3)*udist,' cm'
  endif
  if (BEsphere) then
-    print fmt,' Mean rho sphere  : ',dens_sphere,dens_sphere*unit_density,' g/cm^3'
-    print fmt,' central density  : ',central_density,central_density*unit_density,' g/cm^3'
-    print fmt,' edge density     : ',edge_density,edge_density*unit_density,' g/cm^3'
-    print fmt,' Mean rho medium  : ',dens_medium,dens_medium*unit_density,' g/cm^3'
+    print fmt,' Mean rho sphere         : ',dens_sphere,dens_sphere*unit_density,' g/cm^3'
+    print fmt,' central density         : ',central_density,central_density*unit_density,' g/cm^3'
+    print fmt,' edge density            : ',edge_density,edge_density*unit_density,' g/cm^3'
+    print fmt,' Mean rho medium         : ',dens_medium,dens_medium*unit_density,' g/cm^3'
  else
     if (is_sphere) then
-       print fmt,' Density sphere   : ',dens_sphere,dens_sphere*unit_density,' g/cm^3'
+       print fmt,' Density sphere          : ',dens_sphere,dens_sphere*unit_density,' g/cm^3'
     else
-       print fmt,' Density ellipsoid   : ',dens_sphere,dens_sphere*unit_density,' g/cm^3'
+       print fmt,' Density ellipsoid       : ',dens_sphere,dens_sphere*unit_density,' g/cm^3'
     endif
-    print fmt,' Density medium   : ',dens_medium,dens_medium*unit_density,' g/cm^3'
  endif
  if (is_sphere) then
-    print fmt,' cs in sphere     : ',cs_sphere,cs_sphere_cgs,' cm/s'
+    print fmt,' temp in sphere          : ',temp_sphere,temp_sphere,' K'
+    print fmt,' cs in sphere            : ',cs_sphere,cs_sphere_cgs,' cm/s'
  else
-    print fmt,' cs in ellipsoid     : ',cs_sphere,cs_sphere_cgs,' cm/s'
+    print fmt,' temp in ellipsoid       : ',temp_sphere,' K'
+    print fmt,' cs in ellipsoid         : ',cs_sphere,cs_sphere_cgs,' cm/s'
  endif
- print fmt,' cs in medium     : ',cs_medium,cs_medium*unit_velocity,' cm/s'
- print fmt,' Free fall time   : ',t_ff,t_ff*utime/years,' yrs'
- print fmt,' Angular velocity : ',angvel_code,angvel,' rad/s'
- print fmt,' Turbulent Mach no: ',rms_mach
- print fmt,' Omega*t_ff       : ',angvel_code*t_ff
+ print fmt,' Free fall time          : ',t_ff,t_ff*utime/(1E6*years),' Myr'
+ print fmt,' Number of Jeans mass    : ',totmass_sphere/jeans_mass
+
+ print fmt,' Angular velocity        : ',angvel_code,angvel,' rad/s'
+ print fmt,' Turbulence Mach no      : ',rms_mach
+ print fmt,' Turbulence avg velocity : ',vxyz_avg,vxyz_avg_cgs*1E-5,' km/s'
+ print fmt,' Omega*t_ff              : ',angvel_code*t_ff
  print "(1x,50('-'))"
 
 end subroutine setpart
@@ -625,9 +651,9 @@ subroutine write_setupfile(filename)
     call write_inopt(pos_ranh,'pos_ranh','the intent is to slightly randomize particle positions on lattice',iunit)
  endif
  if (is_sphere) then
-    call write_inopt(cs_sphere_cgs,'cs_sphere_cgs','sound speed in sphere in cm/s',iunit)
+    call write_inopt(temp_sphere,'temp_sphere','temperature of sphere in K',iunit)
  else
-    call write_inopt(cs_sphere_cgs,'cs_sphere_cgs','sound speed in ellipsoid in cm/s',iunit)
+    call write_inopt(temp_sphere,'temp_sphere','temperature of ellipsoid in K',iunit)
  endif
  call write_inopt(angvel,'angvel','angular velocity in rad/s',iunit)
  call write_inopt(rms_mach,'rms_mach','turbulent rms mach number',iunit)
@@ -706,16 +732,7 @@ subroutine read_setupfile(filename,ierr)
     call read_inopt(totmass_sphere,'totmass_sphere',db,ierr)
  endif
 
- call read_inopt(cs_sphere,'cs_sphere',db,jerr)
- call read_inopt(cs_sphere_cgs,'cs_sphere_cgs',db,kerr)
- cs_in_code = .false.  ! for backwards compatibility
- if (jerr /= 0 .and. kerr == 0) then
-    cs_in_code = .false.
- elseif (jerr == 0 .and. kerr /= 0) then
-    cs_in_code = .true.
- else
-    ierr = ierr + 1
- endif
+ call read_inopt(temp_sphere,'temp_sphere',db,ierr)
  call read_inopt(angvel,'angvel',db,ierr)
  call read_inopt(rms_mach,'rms_mach',db,ierr)
  mu_not_B = .true.

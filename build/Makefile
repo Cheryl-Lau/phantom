@@ -868,6 +868,22 @@ ifeq ($(SETUP), cmi)
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
     MAXP=1000000
+    NCELLSMAX=2*maxp
+endif
+
+ifeq ($(SETUP), cmi_hpc)
+#	 Coupling Phantom to CMacIonize for adding ionizing radiation - HPC ver
+    SETUPFILE=velfield_fromcubes.f90 setup_sphere_evolvedmc_hpc.f90
+    FPPFLAGS= -DPHOTOION
+    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
+    CMACIONIZE=yes
+    PERIODIC=no
+    GRAVITY=yes
+    ISOTHERMAL=no
+    IND_TIMESTEPS=yes
+    KNOWN_SETUP=yes
+    MAXP=10000000
+    NCELLSMAX=2*maxp
 endif
 
 ifeq ($(SETUP), rhdsne)
@@ -884,6 +900,7 @@ ifeq ($(SETUP), rhdsne)
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
     MAXP=10000000
+    NCELLSMAX=2*maxp
 endif
 
 ifeq ($(SETUP), starbench)
