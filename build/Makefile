@@ -871,38 +871,6 @@ ifeq ($(SETUP), cmi)
     NCELLSMAX=2*maxp
 endif
 
-ifeq ($(SETUP), cmi_hpc)
-#	 Coupling Phantom to CMacIonize for adding ionizing radiation - HPC ver
-    SETUPFILE=velfield_fromcubes.f90 setup_sphere_evolvedmc_hpc.f90
-    FPPFLAGS= -DPHOTOION
-    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
-    CMACIONIZE_KENNEDY=yes
-    PERIODIC=no
-    GRAVITY=yes
-    ISOTHERMAL=no
-    IND_TIMESTEPS=yes
-    KNOWN_SETUP=yes
-    MAXP=10000000
-    NCELLSMAX=2*maxp
-endif
-
-ifeq ($(SETUP), rhdsne)
-#	 Injecting supernova with photoionization (calling CMI)
-    SETUPFILE=velfield_fromcubes.f90 setup_sphere_evolvedmc.f90
-    SRCINJECT=inject_sne_sphng.f90
-    ANALYSIS=analysis_bindensity.f90
-    FPPFLAGS= -DPHOTOION
-    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
-    CMACIONIZE=yes
-    PERIODIC=no
-    GRAVITY=yes
-    ISOTHERMAL=no
-    IND_TIMESTEPS=yes
-    KNOWN_SETUP=yes
-    MAXP=10000000
-    NCELLSMAX=2*maxp
-endif
-
 ifeq ($(SETUP), starbench)
 #	 Benchmark test for the Phantom-CMI RHD scheme
     SETUPFILE=setup_unifdis_cmi.f90
@@ -916,6 +884,40 @@ ifeq ($(SETUP), starbench)
     IND_TIMESTEPS=no
     KNOWN_SETUP=yes
     MAXP=5000000
+endif
+
+ifeq ($(SETUP), rhdsne)
+#	 Injecting supernova with CMI photoionization
+    SETUPFILE=velfield_fromcubes.f90 setup_sphere_rhdsne.f90
+    SRCINJECT=inject_sne_sphng.f90
+    ANALYSIS=analysis_bindensity.f90
+    FPPFLAGS= -DPHOTOION
+    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
+    CMACIONIZE=yes
+    PERIODIC=no
+    GRAVITY=yes
+    ISOTHERMAL=no
+    IND_TIMESTEPS=yes
+    KNOWN_SETUP=yes
+    MAXP=1000000
+    NCELLSMAX=2*maxp
+endif
+
+ifeq ($(SETUP), rhdsne_hpc)
+#	 Injecting supernova with CMI photoionization
+    SETUPFILE=velfield_fromcubes.f90 setup_sphere_rhdsne_hpc.f90
+    SRCINJECT=inject_sne_sphng.f90
+    ANALYSIS=analysis_bindensity.f90
+    FPPFLAGS= -DPHOTOION
+    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
+    CMACIONIZE_KENNEDY=yes
+    PERIODIC=no
+    GRAVITY=yes
+    ISOTHERMAL=no
+    IND_TIMESTEPS=yes
+    KNOWN_SETUP=yes
+    MAXP=10000000
+    NCELLSMAX=2*maxp
 endif
 
 ifeq ($(SETUP), mhdvortex)

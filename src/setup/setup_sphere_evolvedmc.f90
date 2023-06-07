@@ -74,7 +74,7 @@ contains
 !+
 !----------------------------------------------------------------
 subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,time,fileprefix)
- use physcon,      only:pi,solarm,hours,years,au,kboltz,mass_proton_cgs
+ use physcon,      only:pi,solarm,hours,years,au,pc,kboltz,mass_proton_cgs
  use dim,          only:maxvxyzu,h2chemistry,gr
  use setup_params, only:rhozero,npart_total,ihavesetupB  !,rmax
  use io,           only:master,fatal,iprint,iverbose
@@ -86,6 +86,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use units,        only:set_units,select_unit,utime,unit_density,unit_Bfield,unit_velocity,unit_pressure,unit_energ,unit_ergg
  use eos,          only:polyk2,ieos,gmw
  use part,         only:Bxyz,Bextx,Bexty,Bextz,igas,idust,abundance,iHI,set_particle_type
+ use part,         only:nptmass,xyzmh_ptmass,vxyz_ptmass,ihacc,ihsoft
  use timestep,     only:dtmax,tmax,dtwallmax,C_cour,C_force,C_cool,tolv,nout
  use centreofmass, only:reset_centreofmass
  use options,      only:nfulldump,nmaxdumps,icooling,alpha,alphau
@@ -99,10 +100,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use random,       only:ran2
  use options,      only:ipdv_heating,ishock_heating
  use stretchmap,   only:rho_func
- use photoionize_cmi, only:monochrom_source,fix_temp_hii,treat_Rtype_phase
- use photoionize_cmi, only:photoionize_tree,tree_accuracy_cmi,nHlimit_fac
- use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
- use photoionize_cmi, only:old_sources_exist,sink_ionsrc
  procedure(rho_func), pointer :: density_func
  integer,           intent(in)    :: id
  integer,           intent(inout) :: npart
@@ -130,6 +127,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real, allocatable  :: rtab(:),rhotab(:)
  logical            :: iexist,in_iexist
  logical            :: make_sinks
+ logical            :: place_sink = .true.
  character(len=120) :: filex,filey,filez
  character(len=100) :: filename,infilename,cwd
  character(len=40)  :: fmt
@@ -467,6 +465,19 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  enddo
 
  !
+ ! Manually place a sink as feedback source
+ !
+ if (place_sink) then
+    nptmass                      = 1
+    xyzmh_ptmass(:,:)            = 0.
+    xyzmh_ptmass(1:3,nptmass)    = 0.
+    xyzmh_ptmass(4,nptmass)      = 20.*solarm/umass
+    xyzmh_ptmass(ihacc,nptmass)  = 0.005*pc/udist
+    xyzmh_ptmass(ihsoft,nptmass) = 0.005*pc/udist
+    vxyz_ptmass                  = 0.
+ endif
+
+ !
  ! Set default runtime parameters if .in file does not exist
  !
  infilename=trim(fileprefix)//'.in'
@@ -493,22 +504,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     r_crit          = r_crit_setup
     h_acc           = h_acc_setup
     h_soft_sinksink = h_soft_sinksink_setup
-
-    !
-    ! Photoionization settings
-    !
-    sink_ionsrc = .false.
-    monochrom_source  = .false.
-    fix_temp_hii      = .false.
-    treat_Rtype_phase = .true.
-    old_sources_exist = .false.
-
-    photoionize_tree  = .true.
-    tree_accuracy_cmi = 0.3
-    nHlimit_fac       = 50
-    rcut_opennode_cgs = 1.9E19   ! 6.0 pc
-    rcut_leafpart_cgs = 1.2E19   ! 4.0 pc
-    delta_rcut_cgs    = 3.1E17   ! 0.1 pc
  endif
 
  !
@@ -542,7 +537,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     print fmt,' Semi-axis {b} of ellipsoid    : ',r_ellipsoid(2),r_ellipsoid(2)*udist,' cm'
     print fmt,' Semi-axis {c} of ellipsoid    : ',r_ellipsoid(3),r_ellipsoid(3)*udist,' cm'
  endif
- if (BEsphere) then 
+ if (BEsphere) then
     print fmt,' Mean rho sphere         : ',dens_sphere,dens_sphere*unit_density,' g/cm^3'
     print fmt,' central density         : ',central_density,central_density*unit_density,' g/cm^3'
     print fmt,' edge density            : ',edge_density,edge_density*unit_density,' g/cm^3'
