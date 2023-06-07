@@ -626,6 +626,7 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
  use eos,          only:gamma,gmw
  use cooling,      only:ufloor
  use units,        only:unit_ergg,unit_energ,utime
+ use io,           only:warning
  integer, intent(in)    :: npart
  real,    intent(in)    :: time,dt
  real,    intent(in)    :: xyzh(:,:)
@@ -690,7 +691,7 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
              call compute_du(dt,rhoi,ui,ueq,gammaheat,lambda,tau,du)
 
              !- check current T and Teq of HII region
-             if (nH < 0.5) then
+             if (nH < 0.8) then
                 npart_heated = npart_heated + 1
                 u_mean   = u_mean + ui
                 ueq_mean = ueq_mean + ueq
@@ -736,14 +737,18 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
  !$omp end parallel do
 
  if (.not.fix_temp_hii) then
-    ueq_mean = ueq_mean/npart_heated
-    temp_ueq = ueq_mean/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
-    print*,'Drifting HII region to temp [K]:   ',temp_ueq
-    u_mean = u_mean/npart_heated
-    temp_u = u_mean/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
-    print*,'Current temp of HII region  [K]:   ',temp_u
-    tau_mean = tau_mean/npart_heated
-    print*,'Time remaining to reach Teq [Myr]: ',tau_mean*utime/(1E6*years)
+    if (npart_heated == 0) then
+       call warning('photoionize_cmi','no ionized particles')
+    else
+       ueq_mean = ueq_mean/npart_heated
+       temp_ueq = ueq_mean/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
+       print*,'Drifting HII region to temp [K]:   ',temp_ueq
+       u_mean = u_mean/npart_heated
+       temp_u = u_mean/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
+       print*,'Current temp of HII region  [K]:   ',temp_u
+       tau_mean = tau_mean/npart_heated
+       print*,'Time remaining to reach Teq [Myr]: ',tau_mean*utime/(1E6*years)
+    endif
  endif
 
  if (write_gamma) then
@@ -796,6 +801,7 @@ subroutine energ_explicit_cmi(npart,xyzh,vxyzu,dt)
  use physcon,      only:kboltz,mass_proton_cgs
  use eos,          only:gamma,gmw
  use units,        only:unit_ergg
+ use io,           only:warning
  integer, intent(in) :: npart
  real,    intent(in) :: dt
  real,    intent(in) :: xyzh(:,:)
@@ -830,7 +836,7 @@ subroutine energ_explicit_cmi(npart,xyzh,vxyzu,dt)
        !- store dudt into global array
        dudt_cmi(ip) = dudt
        !- checking
-       if (nH < 0.5) then
+       if (nH < 0.8) then
           u_ionized = vxyzu(4,ip)
           npart_heated = npart_heated + 1
           uhii_mean    = uhii_mean + u_ionized
@@ -839,9 +845,13 @@ subroutine energ_explicit_cmi(npart,xyzh,vxyzu,dt)
  enddo
  !$omp end parallel do
 
- uhii_mean = uhii_mean/npart_heated
- temp_ionized = uhii_mean/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
- print*,'Current temp of HII region [K]: ',temp_ionized
+ if (npart_heated == 0) then
+    call warning('photoionize_cmi','no ionized particles')
+ else
+    uhii_mean = uhii_mean/npart_heated
+    temp_ionized = uhii_mean/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
+    print*,'Current temp of HII region [K]: ',temp_ionized
+ endif
 
  gmw = gmw0
 
