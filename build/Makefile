@@ -876,7 +876,7 @@ ifeq ($(SETUP), cmi_hpc)
     SETUPFILE=velfield_fromcubes.f90 setup_sphere_evolvedmc_hpc.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
-    CMACIONIZE=yes
+    CMACIONIZE_KENNEDY=yes
     PERIODIC=no
     GRAVITY=yes
     ISOTHERMAL=no
@@ -1327,6 +1327,10 @@ ifeq ($(CMACIONIZE), yes)
     LDFLAGS+= -L/$(CMI_DIR)/build/lib -lCMIFortranLibrary -lCMILibrary -lLegacyEngine -lSharedEngine $(HDF5ROOT)/lib/libhdf5.so \
     /usr/lib/x86_64-linux-gnu/libz.so /usr/lib/x86_64-linux-gnu/libdl.so /usr/lib/x86_64-linux-gnu/libm.so \
     /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -lstdc++ -lc
+endif
+
+ifeq ($(CMACIONIZE_KENNEDY),yes)
+    LDFLAGS+= -L/$(CMI_DIR)/build/lib -lCMIFortranLibrary -lCMILibrary -lLegacyEngine -lSharedEngine /usr/lib64/libhdf5.so -lstdc++ -lc
 endif
 
 
