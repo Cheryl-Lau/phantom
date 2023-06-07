@@ -28,6 +28,7 @@ module photoionize_cmi
 !
 ! :References: Petkova,et.al,2021,MNRAS,507,858
 !              Bisbas,et.al,2015,MNRAS,453,1324
+!              Diaz-Miller,et.al,1998,ApJ,501,192
 !
 ! :Owner: Cheryl Lau (adapted from Maya Petkova's analysis mod)
 !
@@ -84,7 +85,7 @@ module photoionize_cmi
  !- or
  ! Manually set location, starting/ending time and ionizing photon flux [cgs units] of sources
  integer, public, parameter :: nsetphotosrc = 1
- real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/0.,0.,0.,1E-50,1E50,1E49 /),&
+ real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/0.,0.,0.,1E13,1E50,1E49 /),&
                                                                     shape=(/6,nsetphotosrc/))
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6

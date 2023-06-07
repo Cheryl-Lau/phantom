@@ -73,8 +73,8 @@ subroutine extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
 
  if (maxlevel > maxlevel_indexed) then
     call fatal('kdtree_cmi','This module only works if maxlevel is within maxlevel_indexed. &
-             &  Recompile with larger MAXP or use individual particles instead by setting &
-             &  the variable photoionize_tree (in module photoionize_cmi) to false.')
+              &Recompile with larger MAXP/NCELLSMAX or use individual particles instead by &
+              &setting the variable photoionize_tree (in module photoionize_cmi) to false.')
  endif
 
  rcut_opennode2 = rcut_opennode**2.
