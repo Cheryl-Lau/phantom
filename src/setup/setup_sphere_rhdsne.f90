@@ -18,27 +18,18 @@ module setup
 !   - BErad_norm       : *normalised radius of the BE sphere*
 !   - BErad_phys       : *physical radius of the BE sphere [code units]*
 !   - BErho_cen        : *central density of the BE sphere [code units]*
-!   - Bzero            : *Magnetic field strength in Gauss*
-!   - ang_Bomega       : *Angle (degrees) between B and rotation axis*
 !   - angvel           : *angular velocity in rad/s*
 !   - dist_unit        : *distance unit (e.g. au)*
-!   - h_acc            : *accretion radius (code units)*
-!   - h_soft_sinksink  : *sink-sink softening radius (code units)*
 !   - iBE_options      : *The set of parameters to define the BE sphere*
-!   - icreate_sinks    : *1: create sinks.  0: do not create sinks*
 !   - is_sphere        : *set up a sphere; otherwise an ellipsoid*
 !   - lattice          : *either 'random' or 'closepacked'*
 !   - lbox             : *length of a box side in terms of spherical radii*
 !   - lbox_x/y/z       : *dimensions of rectangular box in terms of elliptical semiaxes*
 !   - mass_unit        : *mass unit (e.g. solarm)*
-!   - masstoflux       : *mass-to-magnetic flux ratio in units of critical value*
-!   - mc_method        : *applying Monte Carlo method to randomize particles; equivalent to lattice='random'*
 !   - np               : *requested number of particles in sphere*
-!   - pos_ranh         : *the intent is to slightly randomize particle positions on closepacked lattice*
 !   - r_crit           : *critical radius (code units)*
 !   - r_sphere         : *radius of sphere in code units*
 !   - r_ellipsoid      : *semi-axes of ellipsoid a, b and c in code units*
-!   - rho_pert_amp     : *amplitude of density perturbation*
 !   - totmass_sphere   : *mass of sphere/ellipsoid in code units*
 !   - use_BE_sphere    : *centrally condense as a BE sphere*
 !
@@ -46,8 +37,6 @@ module setup
 !   io, kernel, options, part, physcon, prompting, ptmass, rho_profile,
 !   setup_params, spherical, timestep, unifdis, units
 !
- use part,    only:periodic
- use dim,     only:use_dust,maxvxyzu,periodic
  implicit none
  public :: setpart
 
@@ -55,14 +44,12 @@ module setup
  !--private module variables
  real :: xmini(3),xmaxi(3)
  real :: totmass_sphere,r_sphere,r_ellipsoid(3),temp_sphere
- real :: angvel,Bzero_G,masstoflux,ang_Bomega,rms_mach
- real :: rho_pert_amp,lbox,lbox_x,lbox_y,lbox_z
+ real :: angvel,rms_mach
+ real :: lbox,lbox_x,lbox_y,lbox_z
  real :: BErho_cen,BErad_phys,BErad_norm,BEmass,BEfac
- real :: rho_crit_cgs_setup,r_crit_setup,h_acc_setup,h_soft_sinksink_setup,rhofinal_setup
  real(kind=8)     :: udist,umass
- integer          :: np,iBEparam,icreate_sinks_setup
- logical          :: BEsphere,mu_not_B,cs_in_code,pos_ranh,mc_method
- logical          :: is_sphere
+ integer          :: np,iBEparam
+ logical          :: BEsphere,is_sphere,make_sinks
  character(len=20)            :: dist_unit,mass_unit,lattice
  character(len= 1), parameter :: labelx(3) = (/'x','y','z'/)
 
@@ -70,13 +57,13 @@ contains
 
 !----------------------------------------------------------------
 !+
-!  setup for a sphere
+!  setup for a sphere or ellipsoid
 !+
 !----------------------------------------------------------------
 subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,time,fileprefix)
- use physcon,      only:pi,solarm,hours,years,au,pc,kboltz,mass_proton_cgs
- use dim,          only:maxvxyzu,h2chemistry,gr
- use setup_params, only:rhozero,npart_total,ihavesetupB  !,rmax
+ use physcon,      only:pi,solarm,years,au,pc,kboltz,mass_proton_cgs
+ use dim,          only:maxvxyzu
+ use setup_params, only:rhozero,npart_total
  use io,           only:master,fatal,iprint,iverbose
  use unifdis,      only:set_unifdis
  use spherical,    only:set_sphere,set_ellipse,set_unifdis_sphereN
@@ -85,19 +72,17 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use prompting,    only:prompt
  use units,        only:set_units,select_unit,utime,unit_density,unit_Bfield,unit_velocity,unit_pressure,unit_energ,unit_ergg
  use eos,          only:polyk2,ieos,gmw
- use part,         only:Bxyz,Bextx,Bexty,Bextz,igas,idust,abundance,iHI,set_particle_type
+ use part,         only:igas,abundance,set_particle_type
  use part,         only:nptmass,xyzmh_ptmass,vxyz_ptmass,ihacc,ihsoft
+ use ptmass,       only:icreate_sinks,rho_crit_cgs,r_crit,h_acc,h_soft_sinksink,h_soft_sinkgas
  use timestep,     only:dtmax,tmax,dtwallmax,C_cour,C_force,C_cool,tolv,nout
  use centreofmass, only:reset_centreofmass
  use options,      only:nfulldump,nmaxdumps,icooling,alpha,alphau
  use kernel,       only:hfact_default
  use domain,       only:i_belong
- use ptmass,       only:icreate_sinks,rho_crit,rho_crit_cgs,r_crit,h_acc,h_soft_sinksink
  use cooling,      only:Tfloor,ufloor
- use h2cooling,    only:abundc,abundo,abundsi,abunde,dust_to_gas_ratio,iphoto
  use velfield,     only:set_velfield_from_cubes
  use datafiles,    only:find_phantom_datafile
- use random,       only:ran2
  use options,      only:ipdv_heating,ishock_heating
  use stretchmap,   only:rho_func
  use photoionize_cmi, only:monochrom_source,fix_temp_hii,treat_Rtype_phase
@@ -129,28 +114,29 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real               :: r_sn_cgs,engsn_cgs,pmsncrit_cgs
  real               :: vxyz_avg,vxyz_min,vxyz_max,vxyz_avg_cgs,vxyz_min_cgs,vxyz_max_cgs
  real               :: jeans_mass,jeans_mass_cgs,n_cgs
+ real               :: h_acc_cgs,h_soft_sinksink_cgs,h_soft_sinkgas_cgs,rho_crit_cgs_recomm
  real, allocatable  :: rtab(:),rhotab(:)
- logical            :: iexist,in_iexist
- logical            :: make_sinks
- logical            :: place_sink = .false.
+ logical            :: iexist,in_iexist,random
+ logical            :: place_sink_in_setup = .false.
+ logical            :: gauss_dens_sphere   = .true.
+ logical            :: write_turb_vel      = .false.
  character(len=120) :: filex,filey,filez
  character(len=100) :: filename,infilename,cwd
  character(len=40)  :: fmt
- character(len=10)  :: h_acc_char
- character(len=9)   :: c_shape
+ character(len=9)   :: c_shape,proceed
 
  print "(a)", 'Sphere or Ellipsoid setup for evolving a cloud'
 
  filename = trim(fileprefix)//'.setup'
- inquire(file=filename,exist=iexist)
+ inquire(file = filename,exist=iexist)
  if (iexist) then
     call read_setupfile(filename,ierr)
     np_in = np
     if (ierr /= 0) then
-       if (id==master) call write_setupfile(filename)
+       if (id == master) call write_setupfile(filename)
        stop
     endif
- elseif (id==master) then
+ elseif (id == master) then
     print "(a,/)",trim(filename)//' not found: using interactive setup'
     dist_unit = 'pc'
     mass_unit = 'solarm'
@@ -182,7 +168,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     c_shape = 'sphere' ! 'ellipsoid'
     call prompt('Is the cloud initially a [sphere] or an [ellipsoid]?',c_shape)
 
-    if (c_shape=='sphere') then
+    if (c_shape == 'sphere') then
        is_sphere = .true.
 
        BEsphere = .false.
@@ -204,7 +190,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
           call prompt_BEparameters(iBEparam,BErho_cen,BErad_phys,BErad_norm,BEmass,BEfac,umass,udist,au,solarm)
        endif
 
-    elseif (c_shape=='ellipsoid') then
+    elseif (c_shape == 'ellipsoid') then
        is_sphere = .false.
 
        call prompt('Enter the approximate number of particles in the ellipsoid',np,0,npmax)
@@ -229,47 +215,21 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     angvel = 0.
     call prompt('Enter angular rotation speed in rad/s ',angvel,0.)
 
-    mc_method = .false.
-    call prompt('Do you intend to use Monte Carlo method for assigning particle positions?',mc_method)
-    if (mc_method) then
+    random = .false.
+    call prompt('Do you intend to assign particle positions by random?',random)
+    if (random) then
        lattice = 'random'
     else
        lattice = 'closepacked'
-       pos_ranh = .false.
-       call prompt('Do to intend to slightly randomize particle positions on the lattice?',pos_ranh)
     endif
 
     rms_mach = 5.5
     call prompt('Enter the Mach number of the cloud turbulence',rms_mach,0.)
 
-    !
-    ! sink particle details to go to .in file
-    !
     make_sinks = .true.
     call prompt('Do you wish to dynamically create sink particles? ',make_sinks)
-    if (make_sinks) then
-       h_acc_char  = '0.005pc'
-       call prompt('Enter the accretion radius of the sink (with units; e.g. au,pc,kpc,0.1pc) ',h_acc_char)
-       call select_unit(h_acc_char,h_acc_in,ierr)
-       h_acc_setup = h_acc_in
-       if (ierr == 0) h_acc_setup = h_acc_setup/udist
-       r_crit_setup        = 5.0*h_acc_setup
-       !- sink rho_crit = 10^5 times the initial MC density (Bate et al 1995); default 1E-10
-       if (is_sphere) then
-          print*,'recommended sink rho_crit [g cm^-3]: ',1.d5*totmass_sphere*umass/(4./3.*pi*(r_sphere*udist)**3)
-       else
-          print*,'recommended sink rho_crit [g cm^-3]: ',1.d5*totmass_sphere*umass/(4./3.*pi*r_ellipsoid(1)* &
-                                                         r_ellipsoid(2)*r_ellipsoid(3)*udist**3)
-       endif
-       rho_crit_cgs_setup = 1.d-16
-       call prompt('Enter the critical density of sink formation in g/cm^3',rho_crit_cgs_setup,0.)
-       icreate_sinks_setup = 1
-    else
-       icreate_sinks_setup = 0
-       rhofinal_setup = 0
-       call prompt('Enter final maximum density in g/cm^3 (ignored for <= 0) ',rhofinal_setup)
-    endif
-    if (id==master) call write_setupfile(filename)
+
+    if (id == master) call write_setupfile(filename)
     stop 'please edit .setup file and rerun phantomsetup'
  else
     stop ! MPI, stop on other threads, interactive on master
@@ -302,7 +262,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  ! set gamma
  !
- if (maxvxyzu >=4 ) then
+ if (maxvxyzu >= 4) then
     gamma    = 5./3.
  else
     gamma    = 1.
@@ -352,11 +312,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
                        rhotab=rhotab(1:iBElast),rtab=rtab(1:iBElast),nptot=npart_total,&
                        exactN=.true.,np_requested=np,mask=i_belong)
     else
-       density_func => gauss_density_func
-       call set_sphere(trim(lattice),id,master,0.,r_sphere,psep,hfact,npart,xyzh,nptot=npart_total,&
-                       rhofunc=density_func,exactN=.true.,np_requested=np,mask=i_belong)
-!       call set_sphere(trim(lattice),id,master,0.,r_sphere,psep,hfact,npart,xyzh,nptot=npart_total,&
-!                       exactN=.true.,np_requested=np,mask=i_belong)
+       if (gauss_dens_sphere) then
+          density_func => gauss_density_func
+          call set_sphere(trim(lattice),id,master,0.,r_sphere,psep,hfact,npart,xyzh,nptot=npart_total,&
+                          rhofunc=density_func,exactN=.true.,np_requested=np,mask=i_belong)
+       else
+          call set_sphere(trim(lattice),id,master,0.,r_sphere,psep,hfact,npart,xyzh,nptot=npart_total,&
+                          exactN=.true.,np_requested=np,mask=i_belong)
+       endif
        if (trim(lattice)/='random') print "(a,es10.3)",' Particle separation in sphere = ',psep
     endif
     print "(a)",' Initialised sphere'
@@ -365,17 +328,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
                      nptot=npart_total,exactN=.true.,np_requested=np,mask=i_belong)
     if (trim(lattice)/='random') print "(a,es10.3)",' Particle separation in ellipsoid = ',psep
     print "(a)",' Initialised ellipsoid'
- endif
- !
- ! Slightly randomize particle positions by some factor of smoothing length h
- !
- if (pos_ranh) then
-    iseed = -4385
-    do i = 1,size(xyzh(1,:))
-       xyzh(1,i) = xyzh(1,i) + (-1)**nint(ran2(iseed))*ran2(iseed)*xyzh(4,i)
-       xyzh(2,i) = xyzh(2,i) + (-1)**nint(ran2(iseed))*ran2(iseed)*xyzh(4,i)
-       xyzh(3,i) = xyzh(3,i) + (-1)**nint(ran2(iseed))*ran2(iseed)*xyzh(4,i)
-    enddo
  endif
 
  npartsphere = npart
@@ -405,12 +357,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  if (rms_mach > 0.) then
     call getcwd(cwd)
 
-    ! Kennedy or Dial
     filex  = find_phantom_datafile(filevx,'velfield_sphng_small')
     filey  = find_phantom_datafile(filevy,'velfield_sphng_small')
     filez  = find_phantom_datafile(filevz,'velfield_sphng_small')
-    ! Convert endian for different vfield files:
-    ! setenv GFORTRAN_CONVERT_UNIT big/small_endian
+    !- To convert endian for different vfield files: setenv GFORTRAN_CONVERT_UNIT big/small_endian
 
     turbboxsize = max(abs(xmini(1)),abs(xmaxi(1)),abs(xmini(2)),abs(xmaxi(2)),abs(xmini(3)),abs(xmaxi(3)))
     call set_velfield_from_cubes(xyzh(:,1:npartsphere),vxyzu(:,:npartsphere),npartsphere, &
@@ -436,14 +386,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     vxyz_avg = 0.
     vxyz_min = huge(vxyz_min)
     vxyz_max = epsilon(vxyz_max)
-!    open(2022,file='velfield.txt')
+    if (write_turb_vel) open(2022,file='velfield.txt')
     do i = 1,npart
        vxyz_avg = vxyz_avg + mag(vxyzu(1:3,i))
        if (mag(vxyzu(1:3,i)) < vxyz_min) vxyz_min = mag(vxyzu(1:3,i))
        if (mag(vxyzu(1:3,i)) > vxyz_max) vxyz_max = mag(vxyzu(1:3,i))
-!       write(2022,*) mag(vxyzu(1:3,i))*unit_velocity*1E-5
+       if (write_turb_vel) write(2022,*) mag(vxyzu(1:3,i))*unit_velocity*1E-5
     enddo
-!    close(2022)
+    if (write_turb_vel) close(2022)
     vxyz_avg = vxyz_avg/npart
     vxyz_avg_cgs = vxyz_avg*unit_velocity
     vxyz_min_cgs = vxyz_min*unit_velocity
@@ -455,7 +405,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  ! velocity field corresponding to uniform rotation
  !
- do i=1,npart
+ do i = 1,npart
     r2 = dot_product(xyzh(1:3,i),xyzh(1:3,i))
     if (r2 < rmax**2) then
        vxyzu(1,i) = vxyzu(1,i) - angvel_code*xyzh(2,i)
@@ -473,7 +423,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  ! Manually place a sink as feedback source
  !
- if (place_sink) then
+ if (place_sink_in_setup) then
     nptmass                      = 1
     xyzmh_ptmass(:,:)            = 0.
     xyzmh_ptmass(1:3,nptmass)    = 0.
@@ -488,7 +438,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  infilename=trim(fileprefix)//'.in'
  inquire(file=infilename,exist=in_iexist)
- if (.not. in_iexist) then
+ if (.not.in_iexist) then
     tmax      = 3.15360E14/utime ! 1E1 Myr
     dtmax     = 3.15360E10/utime ! 1E-3 Myr
     nout      = 10
@@ -504,12 +454,38 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ipdv_heating   = 1
     ishock_heating = 1
 
-    icreate_sinks   = icreate_sinks_setup
-    rho_crit_cgs    = rho_crit_cgs_setup
-    rho_crit        = rho_crit_cgs/unit_density
-    r_crit          = r_crit_setup
-    h_acc           = h_acc_setup
-    h_soft_sinksink = h_soft_sinksink_setup
+    !
+    ! Sinks settings
+    !
+    if (make_sinks) then
+       icreate_sinks = 1
+       rho_crit_cgs = 1.d-16           ! density above which sink particles are created
+       h_acc_cgs    = 0.05*pc          ! accretion radius for new sink particles
+       h_soft_sinksink_cgs = 0.025*pc  ! softening length between sink particles
+       h_soft_sinkgas_cgs  = 0.        ! softening length for new sink particles
+
+       !- Check if rho_crit is sensible [10^5 times the initial MC density (Bate et al 1995)]
+       rho_crit_cgs_recomm = 1.d5*totmass_sphere*umass/(vol_sphere*udist**3)
+       if (abs(log10(rho_crit_cgs_recomm)-log10(rho_crit_cgs))/log10(rho_crit_cgs_recomm) > 0.1) then
+          print*,'Recommend setting rho_crit_cgs to ',rho_crit_cgs_recomm,' instead'
+          proceed = 'n'
+          call prompt('Do you wish to continue (y/[n])?',proceed)
+          if (trim(adjustl(proceed)) == 'n') then
+             stop 'Edit rho_crit_cgs and rerun'
+          elseif (trim(adjustl(proceed)) /= 'y') then
+             stop 'Invalid input'
+          endif
+       endif
+
+       !- convert to code units
+       h_acc           = h_acc_cgs/udist
+       r_crit          = 5.*h_acc
+       h_soft_sinksink = h_soft_sinksink_cgs/udist
+       h_soft_sinkgas  = h_soft_sinkgas_cgs/udist
+
+    else
+       icreate_sinks = 0
+    endif
 
     !
     ! Photoionization settings
@@ -525,9 +501,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     photoionize_tree  = .true.
     tree_accuracy_cmi = 0.3
     nHlimit_fac       = 50
-    rcut_opennode_cgs = 1.9E19   ! 6.0 pc
-    rcut_leafpart_cgs = 1.2E19   ! 4.0 pc
-    delta_rcut_cgs    = 3.1E17   ! 0.1 pc
+    rcut_opennode_cgs = 6.0*pc
+    rcut_leafpart_cgs = 4.0*pc
+    delta_rcut_cgs    = 0.1*pc
 
     !
     ! Supernova settings
@@ -672,10 +648,7 @@ subroutine write_setupfile(filename)
 
  write(iunit,"(/,a)") '# intended result'
  call write_inopt(lattice,'lattice','particle lattice',iunit)
- call write_inopt(mc_method,'mc_method','the intent is to place particles with Monte Carlo method',iunit)
- if (.not.mc_method .and. lattice/='random') then
-    call write_inopt(pos_ranh,'pos_ranh','the intent is to slightly randomize particle positions on lattice',iunit)
- endif
+
  if (is_sphere) then
     call write_inopt(temp_sphere,'temp_sphere','temperature of sphere in K',iunit)
  else
@@ -683,15 +656,9 @@ subroutine write_setupfile(filename)
  endif
  call write_inopt(angvel,'angvel','angular velocity in rad/s',iunit)
  call write_inopt(rms_mach,'rms_mach','turbulent rms mach number',iunit)
- write(iunit,"(/,a)") '# Sink properties (values in .in file, if present, will take precedence)'
- call write_inopt(icreate_sinks_setup,'icreate_sinks','1: create sinks.  0: do not create sinks',iunit)
- if (icreate_sinks_setup==1) then
-    call write_inopt(rho_crit_cgs_setup,'rho_crit_cgs','critical density in cgs units',iunit)
-    call write_inopt(h_acc_setup,'h_acc','accretion radius (code units)',iunit)
-    call write_inopt(r_crit_setup,'r_crit','critical radius (code units)',iunit)
- else
-    call write_inopt(rhofinal_setup,'rho_final','final maximum density (<=0 to ignore) (cgs units)',iunit)
- endif
+
+ call write_inopt(make_sinks,'make_sinks','dynamically create sink particles',iunit)
+
  close(iunit)
 
 end subroutine write_setupfile
@@ -719,19 +686,9 @@ subroutine read_setupfile(filename,ierr)
  call read_inopt(dist_unit,'dist_unit',db,ierr)
  call read_inopt(np,'np',db,ierr)
  call read_inopt(lattice,'lattice',db,ierr)
- call read_inopt(mc_method,'mc_method',db,ierr)
- if (.not. mc_method .and. trim(lattice)/='random') then
-    call read_inopt(pos_ranh,'randomize_pos',db,ierr)
- endif
- if ((trim(lattice)=='random' .and. .not.mc_method) .or. &
-     (trim(lattice)/='random' .and. mc_method)) then
-    print*, ' Monte Carlo method will be used if lattice is set to random - Check input consistency'
-    stop
- endif
- if (ierr/=0 .or. .not. is_valid_lattice(trim(lattice))) then
+ if (ierr/=0 .or. .not.is_valid_lattice(trim(lattice))) then
     print*, ' invalid lattice.  Setting to closepacked'
     lattice = 'closepacked'
-    mc_method = .false.
  endif
 
  ! Sphere/Ellipsoid params
@@ -761,15 +718,9 @@ subroutine read_setupfile(filename,ierr)
  call read_inopt(temp_sphere,'temp_sphere',db,ierr)
  call read_inopt(angvel,'angvel',db,ierr)
  call read_inopt(rms_mach,'rms_mach',db,ierr)
- mu_not_B = .true.
- call read_inopt(icreate_sinks_setup,'icreate_sinks',db,ierr)
- if (icreate_sinks_setup==1) then
-    call read_inopt(rho_crit_cgs_setup,'rho_crit_cgs',db,ierr)
-    call read_inopt(h_acc_setup,'h_acc',db,ierr)
-    call read_inopt(r_crit_setup,'r_crit',db,ierr)
- else
-    call read_inopt(rhofinal_setup,'rho_final',db,ierr)
- endif
+
+ call read_inopt(make_sinks,'make_sinks',db,ierr)
+
  call close_db(db)
  !
  ! parse units

@@ -904,7 +904,7 @@ ifeq ($(SETUP), rhdsne)
 endif
 
 ifeq ($(SETUP), rhdsne_hpc)
-#	 Injecting supernova with CMI photoionization
+#	 Injecting supernova with CMI photoionization - HPC ver
     SETUPFILE=velfield_fromcubes.f90 setup_sphere_rhdsne_hpc.f90
     SRCINJECT=inject_sne_sphng.f90
     ANALYSIS=analysis_bindensity.f90

@@ -363,7 +363,7 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
        if (mptmass >= masscrit_ionize) then
           nphotosrc = nphotosrc + 1
           if (nphotosrc > maxphotosrc) call fatal('photoionize_cmi','number of sources &
-                                                 & exceeded maxphotosrc')
+                                                  &exceeded maxphotosrc')
           xyz_photosrc(1:3,nphotosrc) = xyzmh_ptmass(1:3,isink)
           fluxq = get_ionflux_star(mptmass)
           ionflux_photosrc(nphotosrc) = fluxq    ! [nphoton/s]
@@ -377,7 +377,7 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
        if (time > time_startsrc .and. time < time_endsrc) then
           nphotosrc = nphotosrc + 1
           if (nphotosrc > maxphotosrc) call fatal('photoionize_cmi','number of sources &
-                                                 & exceeded maxphotosrc')
+                                                  &exceeded maxphotosrc')
           xyz_photosrc(1:3,nphotosrc) = xyztq_setphotosrc_cgs(1:3,isrc)/udist
           ionflux_photosrc(nphotosrc) = xyztq_setphotosrc_cgs(6,isrc)  ! [nphoton/s]
        endif
