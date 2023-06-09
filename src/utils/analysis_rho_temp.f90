@@ -23,10 +23,10 @@ module analysis
  public :: do_analysis
 
  private
- integer, parameter :: num_rhobin = 100
+ integer, parameter :: num_rhobin = 500
  integer :: binned_temp(num_rhobin)
  real    :: rhobin_min_cgs = 1E-25
- real    :: rhobin_max_cgs = 1E-18
+ real    :: rhobin_max_cgs = 1E-14
  real    :: logrhobin_min,logrhobin_max
 
 contains

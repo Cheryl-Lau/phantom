@@ -60,7 +60,7 @@ module photoionize_cmi
 !                            [Must be specified by the user; Set to .true. if sim is started from a
 !                            dumpfile where the ionizing source(s) are already there]*
 !
-! :Dependencies: infile_utils, physcon, units, io, dim, boundaries, eos, part, kdtree, cooling,
+! :Dependencies: infile_utils, physcon, units, io, dim, boundaries, eos, part, kdtree, linklist,
 !                kdtree_cmi, hnode_cmi, heatcool_cmi
 !
 !
@@ -624,7 +624,6 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
  use part,         only:rhoh,massoftype,igas
  use physcon,      only:kboltz,mass_proton_cgs,years
  use eos,          only:gamma,gmw
- use cooling,      only:ufloor
  use units,        only:unit_ergg,unit_energ,utime
  use io,           only:warning
  integer, intent(in)    :: npart
@@ -664,7 +663,7 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
  npart_heated = 0
  !$omp parallel do default(none) shared(npart,nH_allparts,xyzh,vxyzu) &
  !$omp shared(vxyzu_beforepred,pmass,temp_star,dt,du_cmi) &
- !$omp shared(fix_temp_hii,u_hii,ufloor) &
+ !$omp shared(fix_temp_hii,u_hii) &
  !$omp shared(write_gamma,nH_buc,unit_energ,utime) &
  !$omp shared(catch_noroot_parts,pos_noroot,nH_noroot,temp_noroot) &
  !$omp shared(gmw,gamma,unit_ergg,inoroot) &
@@ -718,18 +717,8 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
              endif
           endif
        endif
-
        !- update vpred
        vxyzu(4,ip) = vxyzu(4,ip) + du
-
-       !- floor thermal energy if required
-       if (ufloor > 0.) then
-          if (vxyzu(4,ip) < ufloor) then
-             du = ufloor - (vxyzu(4,ip) - du)
-             vxyzu(4,ip) = ufloor
-          endif
-       endif
-
        !- store du into global array
        du_cmi(ip) = du
     endif

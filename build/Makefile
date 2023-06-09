@@ -890,7 +890,7 @@ ifeq ($(SETUP), rhdsne)
 #	 Injecting supernova with CMI photoionization
     SETUPFILE=velfield_fromcubes.f90 setup_sphere_rhdsne.f90
     SRCINJECT=inject_sne_sphng.f90
-    ANALYSIS=analysis_bindensity.f90
+    ANALYSIS=analysis_rho_temp.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE=yes

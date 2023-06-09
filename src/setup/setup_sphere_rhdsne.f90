@@ -209,7 +209,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        stop
     endif
 
-    temp_sphere = 32.
+    temp_sphere = 100.
     call prompt('Enter temperature of sphere in K',temp_sphere,0.)
 
     angvel = 0.
@@ -441,7 +441,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  if (.not.in_iexist) then
     tmax      = 3.15360E14/utime ! 1E1 Myr
     dtmax     = 3.15360E10/utime ! 1E-3 Myr
-    nout      = 10
+    nout      = 100
     nfulldump = 1
     nmaxdumps = -1
     dtwallmax = 1800.  ! s
