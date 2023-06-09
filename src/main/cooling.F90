@@ -94,8 +94,8 @@ module cooling
  real    :: KI02_rho_min,KI02_rho_max
  real    :: rhov4_KI02(2,maxt)
 
- real    :: rhominJML_cgs = 1E-23   ! density range of which JML06 cooling curve has equilibium solution(s)
- real    :: rhomaxJML_cgs = 1E-14   !  -Note: rhominJML_cgs is hard limit; rhomaxJML_cgs can be increased by lowering TminJML
+ real    :: rhominJML_cgs = 1E-25   ! density range of which JML06 cooling curve has equilibium solution(s)
+ real    :: rhomaxJML_cgs = 1E-13   !  -Note: rhominJML_cgs is hard limit; rhomaxJML_cgs can be increased by lowering TminJML
  real    :: TminJML = 1E0           ! temperature range of JML06 cooling curve
  real    :: TmaxJML = 1E9
  real    :: rhoueqJML_table(5,maxt)
