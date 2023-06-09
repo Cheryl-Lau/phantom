@@ -94,10 +94,10 @@ module cooling
  real    :: KI02_rho_min,KI02_rho_max
  real    :: rhov4_KI02(2,maxt)
 
- real    :: rhominJML_cgs = 7E-29   ! density range of which JML06 cooling curve has equilibium solution(s)
- real    :: rhomaxJML_cgs = 1E-19   !  -Note: rhominJML_cgs is hard limit; rhomaxJML_cgs can be increased by lowering TminJML
- real    :: TminJML = 1E1           ! temperature range of JML06 cooling curve
- real    :: TmaxJML = 1E8
+ real    :: rhominJML_cgs = 1E-23   ! density range of which JML06 cooling curve has equilibium solution(s)
+ real    :: rhomaxJML_cgs = 1E-14   !  -Note: rhominJML_cgs is hard limit; rhomaxJML_cgs can be increased by lowering TminJML
+ real    :: TminJML = 1E0           ! temperature range of JML06 cooling curve
+ real    :: TmaxJML = 1E9
  real    :: rhoueqJML_table(5,maxt)
 
  integer :: icool_radiation_H0 = 0, icool_relax_Bowen = 0, icool_dust_collision = 0, icool_relax_Stefan = 0
@@ -467,10 +467,10 @@ end function lambdacoolDR
 !
 ! Thermal equilibium: f_T = n*lambda(T) - gamma
 !
-real function equifunc(nrho,temp)
- real, intent(in) :: nrho,temp
+real function equifunc(nrho_cgs,temp)
+ real, intent(in) :: nrho_cgs,temp
 
- equifunc = nrho*lambdacoolJML(temp) - GammaKI_cgs
+ equifunc = nrho_cgs*GammaKI_cgs - nrho_cgs**2*lambdacoolDR(temp)
 
 end function equifunc
 
