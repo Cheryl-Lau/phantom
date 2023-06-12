@@ -209,7 +209,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        stop
     endif
 
-    temp_sphere = 32.
+    temp_sphere = 50.
     call prompt('Enter temperature of sphere in K',temp_sphere,0.)
 
     angvel = 0.
@@ -441,7 +441,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  if (.not.in_iexist) then
     tmax      = 3.15360E14/utime ! 1E1 Myr
     dtmax     = 3.15360E10/utime ! 1E-3 Myr
-    nout      = 10
+    nout      = 100
     nfulldump = 1
     nmaxdumps = -1
     dtwallmax = 1800.  ! s
@@ -459,9 +459,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     if (make_sinks) then
        icreate_sinks = 1
-       rho_crit_cgs = 1.d-16           ! density above which sink particles are created
-       h_acc_cgs    = 0.05*pc          ! accretion radius for new sink particles
-       h_soft_sinksink_cgs = 0.025*pc  ! softening length between sink particles
+       rho_crit_cgs = 1.E-16           ! density above which sink particles are created
+       h_acc_cgs    = 1E-3*pc          ! accretion radius for new sink particles
+       h_soft_sinksink_cgs = 1E-3*pc   ! softening length between sink particles
        h_soft_sinkgas_cgs  = 0.        ! softening length for new sink particles
 
        !- Check if rho_crit is sensible [10^5 times the initial MC density (Bate et al 1995)]
@@ -479,7 +479,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
        !- convert to code units
        h_acc           = h_acc_cgs/udist
-       r_crit          = 5.*h_acc
+       r_crit          = h_acc
        h_soft_sinksink = h_soft_sinksink_cgs/udist
        h_soft_sinkgas  = h_soft_sinkgas_cgs/udist
 
