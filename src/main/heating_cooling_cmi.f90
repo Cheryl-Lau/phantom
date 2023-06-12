@@ -21,9 +21,9 @@ module heatcool_cmi
 !   - rhomin/max_cgs       : *range of densities of which equifunc has at least one solution*
 !   - gammamin/max_cgs     : *range of photoionization heating rate*
 !   - Tmin/max             : *temperature range of cooling curve*
-!   - use_const_recombcoef : *adopt a constant recombination coef, otherwise it varies with temp*
+!   - use_const_alpha      : *adopt a constant recombination coef, otherwise it varies with temp*
 !   - get_ueq_by_interp    : *perform 2D interpolation, otherwise simply grabs closest ueq*
-!   - incl_recomb_cooling  : *include recombination cooling in heating term gamma*
+!   - gamma_background_cgs : *background heating rate*
 !
 ! :Dependencies: io, eos, physcon, units, parts, kdtree, linklist
 !

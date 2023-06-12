@@ -6,7 +6,7 @@
 !--------------------------------------------------------------------------!
 module photoionize_cmi
 !
-! The CMI suite: *photoionize_cmi.f90* kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90
+! The CMI suite: *photoionize_cmi.F90* kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90
 ! This module contains all the subroutines necessary for doing photoionization
 ! using the Monte Carlo Radiative Transfer code CMacIonize
 !
