@@ -393,12 +393,7 @@ subroutine startrun(infile,logfile,evfile,dumpfile)
 #ifdef PHOTO
  call set_photoevap_grid
 #endif
-!
-!-- Init procedures to inject ionizing radiation (calling CMI)
-!
-#ifdef PHOTOION
- call init_ionizing_radiation_cmi(npart,xyzh)
-#endif
+
 !
 !--get timestep for external forces
 !
@@ -595,6 +590,14 @@ subroutine startrun(infile,logfile,evfile,dumpfile)
     write(iprint,*) 'dt initial    = ',dt
  endif
 #endif
+
+!
+!-- Init procedures to inject ionizing radiation (calling CMI)
+!
+#ifdef PHOTOION
+ call init_ionizing_radiation_cmi(time,npart,xyzh,nptmass,dtnew_first)
+#endif
+
 !
 !--Calculate current centre of mass
 !

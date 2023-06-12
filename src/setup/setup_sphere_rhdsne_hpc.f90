@@ -88,7 +88,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use photoionize_cmi, only:monochrom_source,fix_temp_hii,treat_Rtype_phase
  use photoionize_cmi, only:photoionize_tree,tree_accuracy_cmi,nHlimit_fac
  use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
- use photoionize_cmi, only:old_sources_exist,sink_ionsrc,inject_rad
+ use photoionize_cmi, only:sink_ionsrc,inject_rad
  use inject,          only:inject_sn,sink_progenitor
  procedure(rho_func), pointer :: density_func
  integer,           intent(in)    :: id
@@ -460,8 +460,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     if (make_sinks) then
        icreate_sinks = 1
        rho_crit_cgs = 1.E-16           ! density above which sink particles are created
-       h_acc_cgs    = 1E-3*pc          ! accretion radius for new sink particles
-       h_soft_sinksink_cgs = 1E-3*pc   ! softening length between sink particles
+       h_acc_cgs    = 5E-3*pc          ! accretion radius for new sink particles
+       h_soft_sinksink_cgs = 5E-3*pc   ! softening length between sink particles
        h_soft_sinkgas_cgs  = 0.        ! softening length for new sink particles
 
        !- Check if rho_crit is sensible [10^5 times the initial MC density (Bate et al 1995)]
@@ -496,7 +496,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     monochrom_source  = .false.
     fix_temp_hii      = .false.
     treat_Rtype_phase = .true.
-    old_sources_exist = .false.
 
     photoionize_tree  = .true.
     tree_accuracy_cmi = 0.3

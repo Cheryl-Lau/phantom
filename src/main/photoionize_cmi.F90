@@ -56,9 +56,6 @@ module photoionize_cmi
 !   - fix_temp_hii        : *Heats ionized particles to temp_hii, else computes heating and cooling*
 !   - implicit_cmi        : *Update internal energy of particles with implicit method, else explicit*
 !   - treat_Rtype_phase   : *Change heating/cooling rates during R-type phase of HII region*
-!   - old_sources_exist   : *Marks whether the ionizing source(s) already exist before simulation begins
-!                            [Must be specified by the user; Set to .true. if sim is started from a
-!                            dumpfile where the ionizing source(s) are already there]*
 !
 ! :Dependencies: infile_utils, physcon, units, io, dim, boundaries, eos, part, kdtree, linklist,
 !                kdtree_cmi, hnode_cmi, heatcool_cmi
@@ -113,7 +110,6 @@ module photoionize_cmi
  logical, public :: fix_temp_hii = .false.      ! else computes heating and cooling
  logical, public :: implicit_cmi = .true.       ! else updates u explicitly
  logical, public :: treat_Rtype_phase = .false.
- logical, public :: old_sources_exist = .false. ! T if sim is started from a dumpfile with ionizing sources
 
  ! Global storages required for updating u
  real,    public,   allocatable :: vxyzu_beforepred(:,:)  ! u before predictor step
@@ -160,7 +156,7 @@ module photoionize_cmi
  real    :: temp_star,totq,freq_photon,u_hii,udist_si,umass_si
  real    :: time0_wall,time0_cpu,time_now_wall,time_now_cpu
  real    :: time_ellapsed_wall,time_ellapsed_cpu
- logical :: is_Rtype_phase
+ logical :: is_Rtype_phase,old_sources_exist
  logical :: first_call,first_step,warned
 
  ! Switches for plotting/debugging
@@ -177,18 +173,19 @@ contains
 ! Initializations
 !+
 !-----------------------------------------------------------------------------
-subroutine init_ionizing_radiation_cmi(npart,xyzh)
+subroutine init_ionizing_radiation_cmi(time,npart,xyzh,nptmass,dt)
  use physcon,  only:mass_proton_cgs,kboltz,c,planckh,solarl,eV
  use eos,      only:gmw,gamma
  use io,       only:warning,fatal
- use units,    only:udist,umass,unit_ergg
+ use units,    only:udist,umass,utime,unit_ergg
  use dim,      only:maxvxyzu
  use heatcool_cmi, only:init_ueq_table,precompute_uterms
  use omp_lib
- integer, intent(in) :: npart
+ integer, intent(in) :: npart,nptmass
+ real,    intent(in) :: time,dt
  real,    intent(in) :: xyzh(:,:)
- integer :: ip,io_file
- real    :: h_mean,psep,wavelength_cgs,energ_photon_cgs
+ integer :: ip,io_file,isrc
+ real    :: hmean,psep,wavelength_cgs,energ_photon_cgs,time_src0,time_src
  real    :: gmw0,csi_cgs,temp_hii_fromcsi,csi_cgs_req
  logical :: compilecond_ok
 
@@ -203,12 +200,12 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  if (maxvxyzu < 4) call fatal('photoionize_cmi','Not suitable for isothermal simulations')
 
  !- Check that the tol_vsite is sensible by estimating mean particle separation
- h_mean = 0.
+ hmean = 0.
  do ip = 1,npart
-    h_mean = h_mean + xyzh(4,ip)
+    hmean = hmean + xyzh(4,ip)
  enddo
- h_mean = h_mean/npart
- psep = 2.*h_mean / (57.9)**(1./3.)
+ hmean = hmean/npart
+ psep = 2.*hmean / 57.9**(1./3.)
  if (tol_vsite > 0.5*psep) call warning('photoionize_cmi','tol_vsite might be too large')
 
  !- Check pick-nodes settings
@@ -254,7 +251,28 @@ subroutine init_ionizing_radiation_cmi(npart,xyzh)
  !       both can only take one value regardless of the number of ionizing sources.
  !       Here, we will average it over all present sources.
 
- !- Convert cgs units to SI units for CMI
+ !
+ ! Determine whether or not ionizing sources exist in starting dump
+ !- controls the dt > t_recomb check during source injection
+ !
+ if (treat_Rtype_phase) then
+    old_sources_exist = .false.
+    if (sink_ionsrc) then
+       if (nptmass > 0) old_sources_exist = .true.
+    else
+       time_src0 = huge(time_src0)
+       do isrc = 1,nsetphotosrc
+          time_src = xyztq_setphotosrc_cgs(4,isrc)/utime
+          time_src0 = min(time_src0,time_src)
+       enddo
+       if (time > 0. .and. time_src0 < time-dt) old_sources_exist = .true.
+    endif
+    if (old_sources_exist) call warning('photoionize_cmi','existing ionizing sources in starting dumpfile')
+ endif
+
+ !
+ ! Convert cgs units to SI units for CMI
+ !
  udist_si = udist/1E2
  umass_si = umass/1E3
 
@@ -1634,7 +1652,6 @@ subroutine write_options_photoionize(iunit)
  call write_inopt(fix_temp_hii,'fix_temp_hii','Heat ionized particles to specified temp_hii',iunit)
  call write_inopt(implicit_cmi,'implicit_cmi','Use implicit method to update internal energies',iunit)
  call write_inopt(treat_Rtype_phase,'treat_Rtype_phase','Change heating/cooling rate during R-type phase',iunit)
- call write_inopt(old_sources_exist,'old_sources_exist','Source(s) already exist in the starting dumpfile',iunit)
 
 end subroutine write_options_photoionize
 
@@ -1730,13 +1747,10 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
  case('treat_Rtype_phase')
     read(valstring,*,iostat=ierr) treat_Rtype_phase
     ngot = ngot + 1
- case('old_sources_exist')
-    read(valstring,*,iostat=ierr) old_sources_exist
-    ngot = ngot + 1
  case default
     imatch = .false.
  end select
- igotall = ( ngot >= 22 )
+ igotall = ( ngot >= 21 )
 
 end subroutine read_options_photoionize
 
