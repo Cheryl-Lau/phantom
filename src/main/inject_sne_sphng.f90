@@ -591,6 +591,7 @@ subroutine write_options_inject(iunit)
  integer, intent(in) :: iunit
 
  write(iunit,"(/,a)") '# options for injecting supernova'
+ call write_inopt(inject_sn,'inject_sn','inject SNe',iunit)
  call write_inopt(sink_progenitor,'sink_progenitor','init sne with sinks',iunit)
  call write_inopt(engsn_cgs,'engsn_cgs','total energy released from sn',iunit)
  call write_inopt(frackin,'frackin','fraction of kinetic energy',iunit)
@@ -619,6 +620,9 @@ subroutine read_options_inject(name,valstring,imatch,igotall,ierr)
  igotall = .false.
 
  select case(trim(name))
+ case('inject_sn')
+    read(valstring,*,iostat=ierr) inject_sn
+    ngot = ngot + 1
  case('sink_progenitor')
     read(valstring,*,iostat=ierr) sink_progenitor
     ngot = ngot + 1
@@ -650,7 +654,7 @@ subroutine read_options_inject(name,valstring,imatch,igotall,ierr)
     imatch = .false.
  end select
 
- noptions = 7
+ noptions = 8
  igotall  = (ngot >= noptions)
 
 end subroutine read_options_inject

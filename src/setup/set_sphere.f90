@@ -427,7 +427,7 @@ subroutine set_ellipse(lattice,id,master,r_ellipsoid,vol_ellipsoid,delta,hfact,x
     my_mask => mask_true
  endif
 
- rfac = 1.2  ! Slightly beyond ellipsoid
+ rfac = 1.1  ! Slightly beyond ellipsoid
  xmin = -rfac*r_ellipsoid(1)
  xmax = rfac*r_ellipsoid(1)
  ymin = -rfac*r_ellipsoid(2)

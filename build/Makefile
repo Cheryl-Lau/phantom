@@ -920,6 +920,22 @@ ifeq ($(SETUP), rhdsne_hpc)
     NCELLSMAX=4*maxp
 endif
 
+ifeq ($(SETUP), elongcloud_env)
+#	 Injecting supernova and radiation into an elongated cloud with envelope
+    SETUPFILE=velfield_fromcubes.f90 setup_elongated_envelope.f90
+    SRCINJECT=inject_sne_sphng.f90
+    FPPFLAGS= -DPHOTOION
+    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
+    CMACIONIZE=yes
+    PERIODIC=no
+    GRAVITY=yes
+    ISOTHERMAL=no
+    IND_TIMESTEPS=yes
+    KNOWN_SETUP=yes
+    MAXP=1000000
+    NCELLSMAX=3*maxp
+endif
+
 ifeq ($(SETUP), mhdvortex)
 #   Balsara (2004) MHD vortex
     PERIODIC=yes
@@ -1939,7 +1955,7 @@ endif
 
 SOURCES= physcon.f90 ${CONFIG} ${SRCKERNEL} io.F90 units.f90 boundary.f90 \
          mpi_utils.F90 dtype_kdtree.F90 utils_omp.F90 utils_cpuinfo.f90 \
-         utils_allocate.f90 icosahedron.f90 \
+         utils_allocate.f90 icosahedron.f90 prompting.f90 \
          utils_mathfunc.f90 part.F90 ${DOMAIN} utils_timing.f90 mpi_balance.F90 \
          setup_params.f90 timestep.f90 utils_dumpfiles.f90 utils_indtimesteps.F90 utils_infiles.f90 \
          utils_sort.f90 utils_supertimestep.F90 utils_tables.f90 utils_gravwave.f90 \

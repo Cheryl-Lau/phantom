@@ -413,11 +413,11 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  fix_temp_hii      = .true.
  treat_Rtype_phase = .false.
 
- photoionize_tree  = .true.
- tree_accuracy_cmi = 0.25
+ photoionize_tree  = .false.
+ tree_accuracy_cmi = 0.3
  nHlimit_fac       = 100
  rcut_opennode_cgs = 1.2E18  ! 0.4 pc
- rcut_leafpart_cgs = 9.3E17  ! 0.3 pc
+ rcut_leafpart_cgs = 6.1E17  ! 0.2 pc
  delta_rcut_cgs    = 3.1E16  ! 0.01 pc
 
  !- Print summary - for checking

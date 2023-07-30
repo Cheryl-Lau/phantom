@@ -23,8 +23,6 @@ module setup
 !   - iBE_options      : *The set of parameters to define the BE sphere*
 !   - is_sphere        : *set up a sphere; otherwise an ellipsoid*
 !   - lattice          : *either 'random' or 'closepacked'*
-!   - lbox             : *length of a box side in terms of spherical radii*
-!   - lbox_x/y/z       : *dimensions of rectangular box in terms of elliptical semiaxes*
 !   - mass_unit        : *mass unit (e.g. solarm)*
 !   - np               : *requested number of particles in sphere*
 !   - r_crit           : *critical radius (code units)*
@@ -45,7 +43,6 @@ module setup
  real :: xmini(3),xmaxi(3)
  real :: totmass_sphere,r_sphere,r_ellipsoid(3),temp_sphere
  real :: angvel,rms_mach
- real :: lbox,lbox_x,lbox_y,lbox_z
  real :: BErho_cen,BErad_phys,BErad_norm,BEmass,BEfac
  real(kind=8)     :: udist,umass
  integer          :: np,iBEparam
@@ -479,7 +476,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
        !- convert to code units
        h_acc           = h_acc_cgs/udist
-       r_crit          = h_acc
+       r_crit          = 2.*h_acc
        h_soft_sinksink = h_soft_sinksink_cgs/udist
        h_soft_sinkgas  = h_soft_sinkgas_cgs/udist
 
@@ -491,7 +488,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Photoionization settings
     !
     inject_rad = .true.
-    sink_ionsrc = .true.
+    sink_ionsrc = .false.
 
     monochrom_source  = .false.
     fix_temp_hii      = .false.
@@ -507,7 +504,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Supernova settings
     !
-    inject_sn = .true.
+    inject_sn = .false.
     sink_progenitor = .true.
 
  endif

@@ -68,7 +68,7 @@ module heatcool_cmi
 
  ! Switches for plotting/debugging
  logical :: write_ueq = .false.
- logical :: write_Teq = .false.
+ logical :: write_Teq = .true.
 
 contains
 
@@ -522,7 +522,7 @@ subroutine compute_Rtype_time(nphotosrc,xyz_photosrc,xyzh,t_recomb)
 end subroutine compute_Rtype_time
 
 !
-! Recombination coef alphaA as func of temp obtained from fitting table 2.1
+! Case-A recombination coeff alphaA as func of temp obtained from fitting table 2.1
 ! of Osterbrock74 [cm^3 s^-1]
 !
 real function get_alphaA(temp)
@@ -540,7 +540,7 @@ real function get_alphaA(temp)
 end function get_alphaA
 
 !
-! Recombination coef alphaB as func of temp obtained from fitting table 2.1
+! Case-B recombination coeff alphaB as func of temp obtained from fitting table 2.1
 ! of Osterbrock74 [cm^3 s^-1]
 !
 real function get_alphaB(temp)

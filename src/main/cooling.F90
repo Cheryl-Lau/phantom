@@ -422,9 +422,8 @@ real function lambdacoolJML(temp)
 
 end function lambdacoolJML
 
-!
-! Alternative form of the lambdacoolJML cooling curve mimicking curve from DeRijcke2013
-!
+
+
 real function lambdacoolDR(temp)
  real, intent(in) :: temp
  real  :: lambdagamma1,lambdagamma2,lambdagamma
@@ -458,7 +457,7 @@ real function lambdacoolDR(temp)
 
  lambdagamma = lambdagamma / 10**(0.35)
 
- lambdacoolDR = lambdagamma * GammaKI_cgs
+ lambdacoolDR = lambdagamma * 2E-26
 
 end function lambdacoolDR
 
