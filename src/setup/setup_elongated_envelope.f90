@@ -160,7 +160,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     np_envelope = 5E3
     npmax_env = npmax - np_cloud
     call prompt('Enter the approximate number of particles within the envelope boundaries',np_envelope,0,npmax_env)
-    rho_envelope_cgs = 5E-25
+    rho_envelope_cgs = 4E-25
     call prompt('Enter the density of the envelope in g/cm^3',rho_envelope_cgs,0.)
 
     !- Ratio of semi-axes of ellipsoid
@@ -207,7 +207,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  time        = 0.
  hfact       = hfact_default
- gmw         = gmw_in
 
  !
  ! Set up the cloud
@@ -228,8 +227,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  call set_ellipse(trim(lattice),id,master,r_cloud,vol_cloud,psep_cloud,hfact,xyzh,npart,&
                   nptot=npart_total,exactN=.true.,np_requested=npart_cloud,mask=i_belong)
 
- !- Update
+ !- Update parameters with new npart_cloud
  npart_cloud = npart_total
+ totmass_cloud = npart_cloud*massoftype(igas)
+ rho_cloud = totmass_cloud/vol_cloud
 
  !
  ! Temperature and Sound speed of cloud
@@ -306,6 +307,11 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call set_ellipse(trim(lattice),id,master,r_outer,vol_outer,psep_outer,hfact,xyzh_outer,npart_temp,&
                      nptot=npart_total_outer,exactN=.true.,np_requested=npart_outer,mask=i_belong)
 
+    !- Update parameters
+    totmass_outer = npart_total_outer*massoftype(igas)
+    rho_outer = totmass_outer/vol_outer
+    rho_envelope_cgs = rho_outer*unit_density
+
     !- Add to real particles if particle is outside cloud i.e. is envelope
     npart = npart_cloud
     do ip = 1,npart_total_outer
@@ -373,6 +379,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     iverbose  = 1
 
     ieos      = 2    ! adiabatic eos with P = (gamma-1)*rho*u
+    gmw       = gmw_in
     icooling  = 7
     Tfloor    = 3.
     ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
@@ -445,6 +452,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
 
  print*,'-Cloud-'
+ print*,'total mass        ',totmass_cloud,mass_unit
  print*,'Jeans mass        ',jeans_mass,mass_unit
  print*,'free-fall time    ',t_ff*utime/(1E6*365*24*60*60),'Myr'
  print*,'temperature       ',temp_cloud,'K'
