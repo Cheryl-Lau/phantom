@@ -932,7 +932,7 @@ ifeq ($(SETUP), elongcloud_env)
     ISOTHERMAL=no
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
-    MAXP=1000000
+    MAXP=5000000
     NCELLSMAX=3*maxp
 endif
 

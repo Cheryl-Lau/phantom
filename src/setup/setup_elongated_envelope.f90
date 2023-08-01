@@ -100,14 +100,13 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real               :: cs_cloud,cs_cloud_cgs,rho_cloud,rho_outer,temp_cloud,vol_cloud,vol_outer
  real               :: t_ff,jeans_mass,jeans_mass_cgs,totmass_cloud,totmass_outer
  real               :: temp_envelope,cs_envelope_cgs,cs_envelope
- real               :: rmsmach,v2i,turbfac,turbboxsize
+ real               :: rmsmach,v2i,turbfac,turbboxsize,v2_sum,v_rms,v_rms_kms
  real               :: r_sn_cgs,engsn_cgs,pmsncrit_cgs
- real               :: vxyz_avg,vxyz_min,vxyz_max,vxyz_avg_cgs,vxyz_min_cgs,vxyz_max_cgs
  real               :: h_acc_cgs,h_soft_sinksink_cgs,h_soft_sinkgas_cgs,rho_crit_cgs_recomm
  logical            :: iexist,in_iexist
- logical            :: add_envelope        = .true.  ! temporarily remove envelope to see virial
+ logical            :: remove_envelope     = .false.  ! temporarily remove envelope to see virial
  logical            :: place_sink_in_setup = .false.
- logical            :: write_turb_vel      = .false.
+ logical            :: write_turb_vel      = .true.
  character(len=120) :: filex,filey,filez
  character(len=100) :: filename,infilename,cwd
  character(len=40)  :: fmt,lattice
@@ -147,17 +146,17 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     npmax = int(0.9*size(xyzh(1,:))) ! approx max number allowed in sphere given size(xyzh(1,:))
 
     !- Mass of particles
-    mpart_solarm = 1E-3
+    mpart_solarm = 1E-2
     call prompt('Enter the mass of particles in solarm units',mpart_solarm,0.)
 
     !- Settings for the cloud
-    np_cloud = 1E5
+    np_cloud = 1E6
     call prompt('Enter the approximate number of particles in the cloud',np_cloud,0,npmax)
-    rho_cloud_cgs = 1.29E-21 !1E-22
+    rho_cloud_cgs = 1E-20
     call prompt('Enter the density of the cloud in g/cm^3',rho_cloud_cgs,0.)
 
     !- Settings for the envelope
-    np_envelope = 5E3
+    np_envelope = 5E2
     npmax_env = npmax - np_cloud
     call prompt('Enter the approximate number of particles within the envelope boundaries',np_envelope,0,npmax_env)
     rho_envelope_cgs = 4E-25
@@ -172,7 +171,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call prompt('Enter the ratio of semi-axis c of the ellipsoid',r3_ellipsoid,0.)
 
     !- Turbulence (Virial ratio)
-    rms_mach = 5.5
+    rms_mach = 11.6
     call prompt('Enter the Mach number of the cloud turbulence',rms_mach,0.)
 
     !- Mean molecular weight
@@ -276,20 +275,26 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        vxyzu(1:3,ip) = turbfac*vxyzu(1:3,ip)
     enddo
 
-    if (write_turb_vel) then
-       open(2022,file='velfield.txt')
-       do ip = 1,npart_cloud
-          vxyz_avg = vxyz_avg + mag(vxyzu(1:3,i))
-          if (write_turb_vel) write(2022,*) mag(vxyzu(1:3,i))*unit_velocity*1E-5
-       enddo
-       close(2022)
-    endif
+    v2_sum = 0.
+    do ip = 1,npart_cloud
+       v2_sum = v2_sum + mag2(vxyzu(1:3,ip))
+    enddo
+    v_rms = sqrt(1./npart_cloud*v2_sum)
+    v_rms_kms = v_rms*unit_velocity*1E-5
  endif
+
+ !
+ ! Set initial temperature
+ !
+ do ip = 1,npart_cloud
+    vxyzu(4,ip) = kboltz * temp_cloud / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
+ enddo
+
 
  !
  ! Set up the outer ellipsoid then remove the cloud to create the envelope
  !
- if (add_envelope) then
+ if (.not.remove_envelope) then
     npart_outer = np_envelope
     totmass_outer = npart_outer*massoftype(igas)
     rho_outer = rho_envelope_cgs/unit_density
@@ -312,16 +317,26 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     rho_outer = totmass_outer/vol_outer
     rho_envelope_cgs = rho_outer*unit_density
 
-    !- Add to real particles if particle is outside cloud i.e. is envelope
+    !
+    ! Temperature and Sound speed of envelope
+    !
+    temp_envelope   = get_eqtemp_from_rho(rho_envelope_cgs)
+    cs_envelope_cgs = sqrt(temp_envelope*(gamma*kboltz)/(gmw*mass_proton_cgs))
+    cs_envelope     = cs_envelope_cgs/unit_velocity
+
+    !
+    ! Add to real particles if particle is outside cloud i.e. is envelope
+    !
     npart = npart_cloud
     do ip = 1,npart_total_outer
        x = xyzh_outer(1,ip)
        y = xyzh_outer(2,ip)
        z = xyzh_outer(3,ip)
-       if ((x/r_cloud(1))**2 + (y/r_cloud(2))**2 + (z/r_cloud(3))**2 > 1.) then
+       if ((x/r_cloud(1))**2 + (y/r_cloud(2))**2 + (z/r_cloud(3))**2 > 0.99) then
           npart = npart + 1
           h = xyzh_outer(4,ip)
           xyzh(1:4,npart) = (/ x,y,z,h /)
+          vxyzu(4,npart) = kboltz * temp_envelope / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
        endif
     enddo
     deallocate(xyzh_outer)
@@ -332,14 +347,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     else
        stop 'no particles removed!'
     endif
-
-    !
-    ! Temperature and Sound speed of envelope
-    !
-    temp_envelope   = get_eqtemp_from_rho(rho_envelope_cgs)
-    cs_envelope_cgs = sqrt(temp_envelope*(gamma*kboltz)/(gmw*mass_proton_cgs))
-    cs_envelope     = cs_envelope_cgs/unit_velocity
-
  endif
 
  !
@@ -371,7 +378,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  inquire(file=infilename,exist=in_iexist)
  if (.not.in_iexist) then
     tmax      = 3.15360E14/utime ! 1E1 Myr
-    dtmax     = 3.15360E10/utime ! 1E-3 Myr
+    dtmax     = 3.15360E9/utime ! 1E-4 Myr
     nout      = 10
     nfulldump = 1
     nmaxdumps = -1
@@ -392,7 +399,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     if (make_sinks) then
        icreate_sinks = 1
        rho_crit_cgs = 1.E-16           ! density above which sink particles are created
-       h_acc_cgs    = 0.01*pc          ! accretion radius for new sink particles
+       h_acc_cgs    = 0.005*pc         ! accretion radius for new sink particles
        h_soft_sinksink_cgs = 0.005*pc  ! softening length between sink particles
        h_soft_sinkgas_cgs  = 0.        ! softening length for new sink particles
 
@@ -457,29 +464,54 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  print*,'free-fall time    ',t_ff*utime/(1E6*365*24*60*60),'Myr'
  print*,'temperature       ',temp_cloud,'K'
  print*,'sound speed       ',cs_cloud_cgs*1E-5,'km/s'
+ print*,'v_rms             ',v_rms_kms,'km/s'
 
- print*,'-Envelope-'
- print*,'temperature       ',temp_envelope,'K'
- print*,'sound speed       ',cs_envelope_cgs*1E-5,'km/s'
+ if (.not.remove_envelope) then
+    print*,'-Envelope-'
+    print*,'temperature       ',temp_envelope,'K'
+    print*,'sound speed       ',cs_envelope_cgs*1E-5,'km/s'
+ endif
 
  proceed = 'y'
  call prompt('Do you wish to continue?',proceed)
  if (trim(adjustl(proceed)) == 'n') then
-   stop
+    stop
  elseif (trim(adjustl(proceed)) /= 'y') then
-   stop 'Invalid input'
+    stop 'Invalid input'
+ else
+    open(2022,file='cloud_envlp_info.txt')
+    write(2022,*) '-Cloud-'
+    write(2022,*) 'density           ',rho_cloud_cgs,'g/cm^3'
+    write(2022,*) 'total mass        ',totmass_cloud,mass_unit
+    write(2022,*) 'Jeans mass        ',jeans_mass,mass_unit
+    write(2022,*) 'semi-axis a       ',r_cloud(1),dist_unit
+    write(2022,*) 'semi-axis b       ',r_cloud(2),dist_unit
+    write(2022,*) 'semi-axis c       ',r_cloud(3),dist_unit
+    write(2022,*) 'volume            ',vol_cloud*udist**3*3.4E-56,'pc^3'
+    write(2022,*) 'free-fall time    ',t_ff*utime/(1E6*365*24*60*60),'Myr'
+    write(2022,*) 'temperature       ',temp_cloud,'K'
+    write(2022,*) 'sound speed       ',cs_cloud_cgs*1E-5,'km/s'
+    write(2022,*) 'Mach number       ',rms_mach
+    write(2022,*) 'v_rms             ',v_rms_kms,'km/s'
+    if (.not.remove_envelope) then
+       write(2022,*) '-Envelope-'
+       write(2022,*) 'density           ',rho_envelope_cgs,'g/cm^3'
+       write(2022,*) 'temperature       ',temp_envelope,'K'
+       write(2022,*) 'sound speed       ',cs_envelope_cgs*1E-5,'km/s'
+    endif
+    close(2022)
  endif
 
 end subroutine setpart
 
 
 
-real function mag(vec)
+real function mag2(vec)
  real, intent(in) :: vec(3)
 
- mag = sqrt(vec(1)**2 + vec(2)**2 + vec(3)**2)
+ mag2 = vec(1)**2 + vec(2)**2 + vec(3)**2
 
-end function mag
+end function mag2
 
 !
 ! Estimate temperature with given rho from cooling curve
