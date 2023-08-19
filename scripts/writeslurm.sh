@@ -25,7 +25,7 @@ echo '#SBATCH --output='$infile'.qout'
 echo '#SBATCH --error='$infile'.err'
 echo '#SBATCH --mail-type=END,FAIL'
 echo '#SBATCH --mail-user='$USER'@st-andrews.ac.uk'
-echo '#SBATCH --mem=50G'
+echo '#SBATCH --mem=20G'
 
 echo 'export OMP_SCHEDULE="dynamic"'
 echo 'export OMP_NUM_THREADS=32'
