@@ -486,7 +486,7 @@ subroutine compute_Rtype_time(nphotosrc,xyz_photosrc,xyzh,t_recomb)
  real,    intent(in)  :: xyzh(:,:)
  real,    intent(out) :: t_recomb
  integer, parameter   :: neighcachesize = 1E5
- integer :: isrc,nneigh,n,ip,ixyzcachesize
+ integer :: isrc,nneigh,n,ip
  real    :: xyzcache(3,neighcachesize)
  real    :: pos_src(3),rcut,hmean,pmass,rhomean,rhomean_cgs,alphaB
  real    :: t_recomb_src
@@ -501,7 +501,7 @@ subroutine compute_Rtype_time(nphotosrc,xyz_photosrc,xyzh,t_recomb)
     pos_src = xyz_photosrc(3,isrc)
 
     !- Get mean density within a radius of rcut
-    call getneigh(node,pos_src,0.,rcut,3,listneigh,nneigh,xyzh,xyzcache,ixyzcachesize,ifirstincell,.false.)
+    call getneigh(node,pos_src,0.,rcut,3,listneigh,nneigh,xyzh,xyzcache,neighcachesize,ifirstincell,.false.)
     if (nneigh < 100) call fatal('heating_cooling_cmi','not sampling enough particles for estimating t_recomb')
 
     hmean = 0.

@@ -874,7 +874,7 @@ endif
 ifeq ($(SETUP), starbench)
 #	 Benchmark test for the Phantom-CMI RHD scheme
     SETUPFILE=setup_unifdis_cmi.f90
-    ANALYSIS=analysis_get_partinfo.f90
+    ANALYSIS=analysis_partinfo.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE=yes

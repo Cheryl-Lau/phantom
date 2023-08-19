@@ -112,7 +112,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  character(len=40)  :: fmt,lattice
  character(len=9)   :: proceed
 
- print "(a)", 'Ellipsoid setup for an elongated cloud with envalope'
+ print "(a)", 'Ellipsoid setup for an elongated cloud with envelope'
 
  filename = trim(fileprefix)//'.setup'
  inquire(file = filename,exist=iexist)
@@ -152,11 +152,11 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !- Settings for the cloud
     np_cloud = 1E6
     call prompt('Enter the approximate number of particles in the cloud',np_cloud,0,npmax)
-    rho_cloud_cgs = 1E-20
+    rho_cloud_cgs = 1E-21
     call prompt('Enter the density of the cloud in g/cm^3',rho_cloud_cgs,0.)
 
     !- Settings for the envelope
-    np_envelope = 5E2
+    np_envelope = 4E3
     npmax_env = npmax - np_cloud
     call prompt('Enter the approximate number of particles within the envelope boundaries',np_envelope,0,npmax_env)
     rho_envelope_cgs = 4E-25
@@ -377,11 +377,11 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  infilename=trim(fileprefix)//'.in'
  inquire(file=infilename,exist=in_iexist)
  if (.not.in_iexist) then
-    tmax      = 3.15360E14/utime ! 1E1 Myr
-    dtmax     = 3.15360E9/utime ! 1E-4 Myr
-    nout      = 10
+    tmax      = 3.15360E15/utime ! 1E2 Myr
+    dtmax     = 3.15360E9/utime  ! 1E-4 Myr
+    nout      = 100
     nfulldump = 1
-    nmaxdumps = -1
+    nmaxdumps = 1000
     dtwallmax = 1800.  ! s
     iverbose  = 1
 
@@ -446,8 +446,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Supernova settings
     !
-    inject_sn = .false.
-    sink_progenitor = .true.
+    inject_sn = .yes.
+    sink_progenitor = .false.
 
  endif
 
