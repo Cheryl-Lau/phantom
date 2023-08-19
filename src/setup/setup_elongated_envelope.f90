@@ -446,7 +446,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Supernova settings
     !
-    inject_sn = .yes.
+    inject_sn = .true.
     sink_progenitor = .false.
 
  endif
