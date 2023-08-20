@@ -214,7 +214,10 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  ! Inject supernovae from temp-storage
  !
  if (inject_sn .and. nsn >= 1) then
-    write(*,'(1x,a10,i3,a11)') 'Injecting ',nsn,' supernovae'
+    write(*,'(1x,a10,i3,a17)') 'Injecting ',nsn,' supernova(e) at:'
+    do isn = 1,nsn
+       print*, xyz_sn(1:3,isn)
+    enddo
 
     !- Checking
     ekintot = 0.
