@@ -35,8 +35,8 @@ module inject
  logical, public :: inject_sn = .true.  ! switch on/off sn for testing
 
  ! Runtime parameters for supernovae injection to read from input file
- integer, public :: maxsn     = 10
- real,    public :: r_sn_cgs  = 6.17E17     ! 0.2 pc
+ integer, public :: maxsn     = 200
+ real,    public :: r_sn_cgs  = 3.086E17    ! 0.1 pc
  real,    public :: engsn_cgs = 1E51        ! 1E51 erg
  real,    public :: frackin   = 0.5
  real,    public :: fractherm = 0.5
@@ -47,11 +47,11 @@ module inject
 
  ! Set sne properties if not using sinks
  integer, parameter :: maxsn_insert = 1
- real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 2.4037d19, 6.5108d18, 1.6323d19, 2.81d14 /), &
+ real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 1.166d19, 3.271d18, 8.208d18, 9.09d13 /), &
                                                           shape=(/4,maxsn_insert/))
 
  ! Global storage for all sne (also used for switching-off cooling)
- integer, parameter :: maxallsn = 50
+ integer, parameter :: maxallsn = 500
  integer :: nallsn,iprog_allsn(maxallsn),iinsert_allsn(maxallsn)
  real    :: xyzht_allsn(5,maxallsn),vxyz_allsn(3,maxallsn),m_allsn(maxallsn)
 

@@ -949,7 +949,7 @@ ifeq ($(SETUP), elongcloud_env_hpc)
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
     MAXP=5000000
-    NCELLSMAX=3*maxp
+    NCELLSMAX=4*maxp
 endif
 
 ifeq ($(SETUP), mhdvortex)
