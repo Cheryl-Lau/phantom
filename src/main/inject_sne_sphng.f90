@@ -47,7 +47,7 @@ module inject
 
  ! Set sne properties if not using sinks
  integer, parameter :: maxsn_insert = 1
- real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 1.535E+19, 5.947E+19, 6.106E+18, 2.81E14 /), &
+ real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 8.66E+19, -1.116E+18, -2.202E+19, 2.882E14 /), &
                                                           shape=(/4,maxsn_insert/))
 
  ! Global storage for all sne (also used for switching-off cooling)
