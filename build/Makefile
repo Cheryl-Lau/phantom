@@ -761,21 +761,6 @@ ifeq ($(SETUP), balsarakim)
     H2CHEM=yes
 endif
 
-ifeq ($(SETUP), bksne)
-#   Toy model of supernova in elongated turbulent cloud simulation
-    SETUPFILE=velfield_fromcubes.f90 setup_sphereinbox_bksne.f90
-    SRCINJECT=inject_sne.f90
-    PERIODIC=no
-    GRAVITY=yes
-    ISOTHERMAL=no # for gamma = 5/3
-    MHD=no
-    IND_TIMESTEPS=yes
-    DUST=no
-    KNOWN_SETUP=yes
-    H2CHEM=no
-    MAXP=5000000
-endif
-
 ifeq ($(SETUP), sphngsne)
 #   Supernova in elongated turbulent cloud simulation
     SETUPFILE=velfield_fromcubes.f90 setup_sphere_evolvedmc.f90
@@ -791,17 +776,6 @@ ifeq ($(SETUP), sphngsne)
     MAXP=10000000
 endif
 
-ifeq ($(SETUP), evolvedmc)
-#   Turbulent cloud simulation
-    SETUPFILE=velfield_fromcubes.f90 setup_sphere_evolvedmc.f90
-    PERIODIC=no
-    GRAVITY=yes
-    ISOTHERMAL=no
-    IND_TIMESTEPS=yes
-    KNOWN_SETUP=yes
-    MAXP=1000000
-endif
-
 ifeq ($(SETUP), 1dshock)
 #   1-D shock to test cooling
     SETUPFILE=velfield_fromcubes.f90 setup_unifdis_shock.f90
@@ -814,32 +788,15 @@ ifeq ($(SETUP), 1dshock)
     MAXP=1000000
 endif
 
-ifeq ($(SETUP), testhiiregion)
-#   Heating particles within Stromgren sphere
-    SETUPFILE=velfield_fromcubes.f90 setup_sphere_testhiiregion.f90
-    SRCINJECT=inject_test_hiiregion.f90
-    PERIODIC=no
-    GRAVITY=yes
-    ISOTHERMAL=no
-    IND_TIMESTEPS=yes
-    KNOWN_SETUP=yes
-    H2CHEM=no
-    MAXP=5000000
-endif
-
 ifeq ($(SETUP), collshock)
 #   Collision of 1-D shocks
     SETUPFILE=velfield_fromcubes.f90 setup_unifdis_collshock.f90
     SRCINJECT=inject_collshock.f90
-    FPPFLAGS= -DPHOTOION
-    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
-    CMACIONIZE=yes
     PERIODIC=yes
     GRAVITY=no
     ISOTHERMAL=no
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
-    H2CHEM=no
     MAXP=1000000
 endif
 
@@ -854,21 +811,6 @@ ifeq ($(SETUP), extfshock)
     KNOWN_SETUP=yes
     H2CHEM=no
     MAXP=100000
-endif
-
-ifeq ($(SETUP), cmi)
-#	 Coupling Phantom to CMacIonize for adding ionizing radiation
-    SETUPFILE=velfield_fromcubes.f90 setup_sphere_evolvedmc.f90
-    FPPFLAGS= -DPHOTOION
-    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
-    CMACIONIZE=yes
-    PERIODIC=no
-    GRAVITY=yes
-    ISOTHERMAL=no
-    IND_TIMESTEPS=yes
-    KNOWN_SETUP=yes
-    MAXP=1000000
-    NCELLSMAX=2*maxp
 endif
 
 ifeq ($(SETUP), starbench)
@@ -887,7 +829,9 @@ ifeq ($(SETUP), starbench)
 endif
 
 ifeq ($(SETUP), rhdsne)
-#	 Injecting supernova with CMI photoionization
+#	 Turbulent spherical/ellipsoidal cloud
+#	 Injects ionizing radiation upon request by coupling Phantom to CMI
+#	 Injects supernovae upon request
     SETUPFILE=velfield_fromcubes.f90 setup_sphere_rhdsne.f90
     SRCINJECT=inject_sne_sphng.f90
     ANALYSIS=analysis_rho_temp.f90
@@ -904,7 +848,7 @@ ifeq ($(SETUP), rhdsne)
 endif
 
 ifeq ($(SETUP), rhdsne_hpc)
-#	 Injecting supernova with CMI photoionization - HPC ver
+#	 Turbulent spherical/ellipsoidal cloud with radiation and SNe - HPC ver
     SETUPFILE=velfield_fromcubes.f90 setup_sphere_rhdsne_hpc.f90
     SRCINJECT=inject_sne_sphng.f90
     ANALYSIS=analysis_bindensity.f90
