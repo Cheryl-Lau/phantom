@@ -144,8 +144,8 @@ end subroutine init_inject
 !-----------------------------------------------------------------------
 subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
                             npart,npartoftype,dtinject)
- use io,         only:id,master,fatal
- use part,       only:nptmass,massoftype,iphase,igas,kill_particle,hfact,ibin
+ use io,         only:master,fatal
+ use part,       only:nptmass,massoftype,igas,kill_particle,hfact
  use partinject, only:add_or_update_particle
  use physcon,    only:pi
  use units,      only:unit_energ
@@ -156,12 +156,12 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  integer, intent(inout) :: npart
  integer, intent(inout) :: npartoftype(:)
  real,    intent(out)   :: dtinject
- integer  :: i,j,ipart,isn,iadd,ia,ip,ii,icf,in,iallsn
+ integer  :: ipart,isn,iadd,ia,ip,ii,icf,iallsn
  integer  :: npartold,nsn,npartsn,ipartsn,progindex,iprog_sn(maxsn),iinsert_sn(maxsn)
  integer  :: i_rightcand,iEk
  integer  :: indexallsn(maxsn)
  real     :: xyz_sn(3,maxsn),vxyz_sn(3,maxsn),m_sn(maxsn),h_sn(maxsn),mradsn,engkin,engtherm,numden,t_sn
- real     :: xyz_partsn(3),vxyz_partsn(3),xyz_ref(3,6),r_ref,vfact,hnew,unew,radvel,dist,dist_nearby
+ real     :: xyz_partsn(3),vxyz_partsn(3),xyz_ref(3,6),r_ref,hnew,unew,dist!,dist_nearby
  real     :: vrad,a_vrad,r_vrad,aN_scalefactor
  real     :: ekintot,ethermtot,etot_allparts_old,etot_allparts,endiff_cgs
  logical  :: timematch_inject,queueflag_iallsn
@@ -267,6 +267,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        !
        ! Set up velocity profile of sn particles
        !
+       aN_scalefactor = 1. ! to avoid compiler warning
        if (first_sn) then
           call get_vrprofile_candidates(npartsn,massoftype(igas))   ! get candidate entries
           i_rightcand = minloc(abs(Ek_cand(:)-engkin),1)  ! obtain the entry with closest Ek

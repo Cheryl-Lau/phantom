@@ -325,7 +325,10 @@ subroutine read_infile(infile,logfile,evfile,dumpfile)
 #endif
 #ifdef INJECT_PARTICLES
  use inject,          only:read_options_inject
- use dust_formation,  only:read_options_dust_formation,idust_opacity
+ use dust_formation,  only:read_options_dust_formation
+#ifdef wind
+ use dust_formation,  only:idust_opacity
+#endif
 #endif
 #ifdef NONIDEALMHD
  use nicil_sup,       only:read_options_nicil

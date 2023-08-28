@@ -27,9 +27,9 @@ module setup
 !   - gmw_in           : *mean molecular weight*
 !   - make_sinks       : *flag to dynamically create sinks*
 !
-! :Dependencies: boundary, centreofmass, dim, domain, eos, infile_utils,
-!   io, kernel, options, part, physcon, prompting, ptmass,
-!   setup_params, spherical, timestep, unifdis, units
+! :Dependencies: dim, io, physcon, setup_params, spherical, boundary, prompting, units,
+!                eos, part, ptmass, timestep, kernel, options, datafiles
+!                photoionize_cmi, inject
 !
  implicit none
  public :: setpart
@@ -64,7 +64,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use part,         only:nptmass,xyzmh_ptmass,vxyz_ptmass,ihacc,ihsoft
  use ptmass,       only:icreate_sinks,rho_crit_cgs,r_crit,h_acc,h_soft_sinksink,h_soft_sinkgas
  use timestep,     only:dtmax,tmax,dtwallmax,C_cour,C_force,C_cool,tolv,nout
- use centreofmass, only:reset_centreofmass
  use options,      only:nfulldump,nmaxdumps,icooling,alpha,alphau
  use kernel,       only:hfact_default
  use domain,       only:i_belong
@@ -95,7 +94,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  integer            :: npart_cloud,npart_outer,npmax_env,temp_xyzh_size
  integer            :: npart_temp
  integer(kind=8)    :: npart_total_outer
- real               :: xmaxi(3),xmini(3),r_cloud(3),r_outer(3)
+ real               :: r_cloud(3),r_outer(3)
  real               :: psep_cloud,psep_outer,x,y,z,h,rmax,scale_param
  real               :: cs_cloud,cs_cloud_cgs,rho_cloud,rho_outer,temp_cloud,vol_cloud,vol_outer
  real               :: t_ff,jeans_mass,jeans_mass_cgs,totmass_cloud,totmass_outer
@@ -106,13 +105,12 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  logical            :: iexist,in_iexist
  logical            :: remove_envelope     = .false.  ! temporarily remove envelope to see virial
  logical            :: place_sink_in_setup = .false.
- logical            :: write_turb_vel      = .true.
  character(len=120) :: filex,filey,filez
  character(len=100) :: filename,infilename,cwd
  character(len=40)  :: fmt,lattice
  character(len=9)   :: proceed
 
- print "(a)", 'Ellipsoid setup for an elongated cloud with envelope'
+ print "(a)", 'Setup for an elongated cloud (ellipsoid) with an envelope'
 
  filename = trim(fileprefix)//'.setup'
  inquire(file = filename,exist=iexist)
@@ -196,9 +194,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  ! set gamma
  !
  if (maxvxyzu >= 4) then
-    gamma    = 5./3.
+    gamma = 5./3.
  else
-    gamma    = 1.
+    gamma = 1.
  endif
 
  !
@@ -250,12 +248,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     filez  = find_phantom_datafile(filevz,'velfield_sphng_small')
 
     rmax = max(r_cloud(1),r_cloud(2),r_cloud(3))
-    do i = 1,3
-       xmini(i) = 1.1*rmax
-       xmaxi(i) = -xmini(i)
-    enddo
-    turbboxsize = max(abs(xmini(1)),abs(xmaxi(1)),abs(xmini(2)),abs(xmaxi(2)),abs(xmini(3)),abs(xmaxi(3)))
-
+    turbboxsize = 1.1*rmax
     call set_velfield_from_cubes(xyzh(:,1:npart_cloud),vxyzu(:,:npart_cloud),npart_cloud, &
                                  filex,filey,filez,1.,turbboxsize,.false.,ierr)
     if (ierr /= 0) call fatal('setup','error setting up velocity field on clouds')
@@ -275,6 +268,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        vxyzu(1:3,ip) = turbfac*vxyzu(1:3,ip)
     enddo
 
+    !- Calculate rms-velocity
     v2_sum = 0.
     do ip = 1,npart_cloud
        v2_sum = v2_sum + mag2(vxyzu(1:3,ip))
@@ -452,7 +446,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  endif
 
  !
- ! Calculate the approx number of stars it will form
+ ! Calculate the approx number of stars that will form
  !
  jeans_mass_cgs = (5.*Rg*temp_cloud/(2.*gg*gmw))**(3./2.) * (4./3.*pi*rho_cloud_cgs)**(-1./2.)
  jeans_mass = jeans_mass_cgs/umass
