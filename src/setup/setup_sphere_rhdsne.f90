@@ -141,7 +141,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     if (c_shape == 'sphere') then
        is_sphere = .true.
 
-       npart_sphere = 1E5
+       npart_sphere = 1E6
        call prompt('Enter the approximate number of particles in the sphere',npart_sphere,0,npart_max)
 
        r_sphere = 0.5
@@ -156,7 +156,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     elseif (c_shape == 'ellipsoid') then
        is_sphere = .false.
 
-       npart_sphere = 1E5
+       npart_sphere = 1E6
        call prompt('Enter the approximate number of particles in the ellipsoid',npart_sphere,0,npart_max)
 
        r_ellipsoid(1) = 5.
@@ -180,14 +180,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     apply_cooling = .false.
     call prompt('Do you wish to apply cooling to the gas particles? ',apply_cooling)
 
-    temp_sphere = 20.
+    temp_sphere = 10.
     if (apply_cooling) then
        print*, 'Initital temperature set to ',temp_sphere,' K; will drift to thermal equilibrium.'
     else
        call prompt('Enter temperature of sphere in K',temp_sphere,0.)
     endif
 
-    rms_mach = 5.5
+    rms_mach = 9.5
     call prompt('Enter the Mach number of the cloud turbulence',rms_mach,0.)
 
     make_sinks = .true.
@@ -269,16 +269,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  ! Temperature and sound speed
  !
- if (apply_cooling) then
-    !- Estiamte temp_sphere based on mean density
-    temp_sphere = get_eqtemp_from_rho(dens_sphere_cgs)
- else
-    !- Set gas internal energy with input temp_sphere
-    u_sphere = kboltz * temp_sphere / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
-    do ip = 1,npart
-       vxyzu(4,ip) = u_sphere
-    enddo
- endif
+ if (apply_cooling) temp_sphere = get_eqtemp_from_rho(dens_sphere_cgs)
  cs_sphere_cgs = sqrt(temp_sphere*(gamma*kboltz)/(gmw*mass_proton_cgs))
  cs_sphere     = cs_sphere_cgs/unit_velocity
 
@@ -304,7 +295,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !- To convert endian for different vfield files: setenv GFORTRAN_CONVERT_UNIT big/small_endian
 
     turbboxsize = 1.1*rmax
-    call set_velfield_from_cubes(xyzh(:,1:npart),vxyzu(:,:npart),npart, &
+    call set_velfield_from_cubes(xyzh(:,1:npart),vxyzu(:,1:npart),npart, &
                                  filex,filey,filez,1.,turbboxsize,.false.,ierr)
     if (ierr /= 0) call fatal('setup','error setting up velocity field on clouds')
 
@@ -335,6 +326,16 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  endif
 
  !
+ ! Set gas internal energy [overwrite u=0 after setting turb]
+ !
+ if (.not.apply_cooling) then
+    u_sphere = kboltz * temp_sphere / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
+    do ip = 1,npart
+       vxyzu(4,ip) = u_sphere
+    enddo
+ endif
+
+ !
  ! Manually place a sink as feedback source
  !
  if (place_sink_in_setup) then
@@ -347,177 +348,177 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     vxyz_ptmass                  = 0.
  endif
 
-  !
-  ! Set default runtime parameters if .in file does not exist
-  !
-  infilename=trim(fileprefix)//'.in'
-  inquire(file=infilename,exist=in_iexist)
-  if (.not.in_iexist) then
-     tmax      = 3.15360E15/utime ! 1E2 Myr
-     dtmax     = 3.15360E9/utime  ! 1E-4 Myr
-     nout      = 100
-     nfulldump = 1
-     nmaxdumps = 1000
-     dtwallmax = 1800.  ! s
-     iverbose  = 1
+ !
+ ! Set default runtime parameters if .in file does not exist
+ !
+ infilename=trim(fileprefix)//'.in'
+ inquire(file=infilename,exist=in_iexist)
+ if (.not.in_iexist) then
+    tmax      = 1.1*t_ff
+    dtmax     = 0.01*t_ff
+    nout      = 10
+    nfulldump = 1
+    nmaxdumps = 1000
+    dtwallmax = 1800.  ! s
+    iverbose  = 1
 
-     ieos      = 2    ! adiabatic eos with P = (gamma-1)*rho*u
-     gmw       = 1.29
-     if (apply_cooling) then
-        icooling = 7
-        Tfloor   = 3.
-        ufloor   = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
-     else
-        icooling = 0
-     endif
-     ipdv_heating   = 1
-     ishock_heating = 1
+    ieos      = 2    ! adiabatic eos with P = (gamma-1)*rho*u
+    gmw       = 1.29
+    if (apply_cooling) then
+       icooling = 7
+       Tfloor   = 3.
+       ufloor   = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
+    else
+       icooling = 0
+    endif
+    ipdv_heating   = 1
+    ishock_heating = 1
 
-     !
-     ! Sinks settings
-     !
-     if (make_sinks) then
-        icreate_sinks = 1
-        rho_crit_cgs  = 1.E-16          ! density above which sink particles are created
-        h_acc_cgs     = 0.005*pc        ! accretion radius for new sink particles
-        h_soft_sinksink_cgs = 0.005*pc  ! softening length between sink particles
-        h_soft_sinkgas_cgs  = 0.        ! softening length for new sink particles
+    !
+    ! Sinks settings
+    !
+    if (make_sinks) then
+       icreate_sinks = 1
+       rho_crit_cgs  = 1.E-16          ! density above which sink particles are created
+       h_acc_cgs     = 0.005*pc        ! accretion radius for new sink particles
+       h_soft_sinksink_cgs = 0.005*pc  ! softening length between sink particles
+       h_soft_sinkgas_cgs  = 0.        ! softening length for new sink particles
 
-        !- Check if rho_crit is sensible [10^5 times the initial MC density (Bate et al 1995)]
-        rho_crit_cgs_recomm = 1.d5*dens_sphere_cgs
-        if (abs(log10(rho_crit_cgs_recomm)-log10(rho_crit_cgs))/log10(rho_crit_cgs_recomm) > 0.1) then
-           print*,'Recommend setting rho_crit_cgs to ',rho_crit_cgs_recomm,' instead'
-           proceed = 'n'
-           call prompt('Do you wish to continue?',proceed)
-           if (trim(adjustl(proceed)) == 'n') then
-              stop 'Edit rho_crit_cgs and rerun'
-           elseif (trim(adjustl(proceed)) /= 'y') then
-              stop 'Invalid input'
-           endif
-        endif
+       !- Check if rho_crit is sensible [10^5 times the initial MC density (Bate et al 1995)]
+       rho_crit_cgs_recomm = 1.d5*dens_sphere_cgs
+       if (abs(log10(rho_crit_cgs_recomm)-log10(rho_crit_cgs))/log10(rho_crit_cgs_recomm) > 0.1) then
+          print*,'Recommend setting rho_crit_cgs to ',rho_crit_cgs_recomm,' instead'
+          proceed = 'n'
+          call prompt('Do you wish to continue?',proceed)
+          if (trim(adjustl(proceed)) == 'n') then
+             stop 'Edit rho_crit_cgs and rerun'
+          elseif (trim(adjustl(proceed)) /= 'y') then
+             stop 'Invalid input'
+          endif
+       endif
 
-        !- convert to code units
-        h_acc           = h_acc_cgs/udist
-        r_crit          = 2.*h_acc
-        h_soft_sinksink = h_soft_sinksink_cgs/udist
-        h_soft_sinkgas  = h_soft_sinkgas_cgs/udist
+       !- convert to code units
+       h_acc           = h_acc_cgs/udist
+       r_crit          = 2.*h_acc
+       h_soft_sinksink = h_soft_sinksink_cgs/udist
+       h_soft_sinkgas  = h_soft_sinkgas_cgs/udist
 
-     else
-        icreate_sinks = 0
-     endif
+    else
+       icreate_sinks = 0
+    endif
 
-     !
-     ! Photoionization settings
-     !
-     inject_rad  = .false.
-     sink_ionsrc = .false.
+    !
+    ! Photoionization settings
+    !
+    inject_rad  = .false.
+    sink_ionsrc = .false.
 
-     monochrom_source  = .false.
-     fix_temp_hii      = .false.
-     treat_Rtype_phase = .true.
+    monochrom_source  = .false.
+    fix_temp_hii      = .false.
+    treat_Rtype_phase = .true.
 
-     photoionize_tree  = .true.
-     tree_accuracy_cmi = 0.3
-     nHlimit_fac       = 50
-     rcut_opennode_cgs = 6.0*pc
-     rcut_leafpart_cgs = 4.0*pc
-     delta_rcut_cgs    = 0.1*pc
+    photoionize_tree  = .true.
+    tree_accuracy_cmi = 0.3
+    nHlimit_fac       = 50
+    rcut_opennode_cgs = 6.0*pc
+    rcut_leafpart_cgs = 4.0*pc
+    delta_rcut_cgs    = 0.1*pc
 
-     !
-     ! Supernova settings
-     !
-     inject_sn = .false.
-     sink_progenitor = .false.
+    !
+    ! Supernova settings
+    !
+    inject_sn = .false.
+    sink_progenitor = .false.
 
-  endif
+ endif
 
-  !
-  ! Calculate the approx number of stars that will form
-  !
-  jeans_mass_cgs = (5.*Rg*temp_sphere/(2.*gg*gmw))**(3./2.) * (4./3.*pi*dens_sphere_cgs)**(-1./2.)
-  jeans_mass = jeans_mass_cgs/umass
+ !
+ ! Calculate the approx number of stars that will form
+ !
+ jeans_mass_cgs = (5.*Rg*temp_sphere/(2.*gg*gmw))**(3./2.) * (4./3.*pi*dens_sphere_cgs)**(-1./2.)
+ jeans_mass = jeans_mass_cgs/umass
 
-  !
-  ! Write summary
-  !
-  print*,'-Cloud-'
-  print*,'total mass        ',totmass_sphere,mass_unit
-  print*,'Jeans mass        ',jeans_mass,mass_unit
-  if (is_sphere) then
-     print*,'radius            ',r_sphere,dist_unit
-  else
-     print*,'semi-axis a       ',r_ellipsoid(1),dist_unit
-     print*,'semi-axis b       ',r_ellipsoid(2),dist_unit
-     print*,'semi-axis c       ',r_ellipsoid(3),dist_unit
-  endif
-  print*,'volume            ',vol_sphere*udist**3*3.4E-56,'pc^3'
-  if (gauss_density) then
-     print*,'mean density      ',dens_sphere_cgs,'g/cm^3'
-     print*,'est. free-fall time ',t_ff*utime/(1E6*365*24*60*60),'Myr'
-  else
-     print*,'density           ',dens_sphere_cgs,'g/cm^3'
-     print*,'free-fall time    ',t_ff*utime/(1E6*365*24*60*60),'Myr'
-  endif
-  if (apply_cooling) then
-     print*,'est. temperature  ',temp_sphere,'K'
-  else
-     print*,'temperature       ',temp_sphere,'K'
-     print*,'internal energy   ',u_sphere*unit_ergg,'erg/g'
-  endif
-  print*,'sound speed       ',cs_sphere_cgs*1E-5,'km/s'
-  print*,'v_rms             ',v_rms_kms,'km/s'
-  print*,''
-  print*,'-Particles-'
-  print*,'total number      ',npart
-  print*,'particle mass     ',massoftype(igas),mass_unit
+ !
+ ! Write summary
+ !
+ print*,'-Cloud-'
+ print*,'total mass        ',totmass_sphere,mass_unit
+ print*,'Jeans mass        ',jeans_mass,mass_unit
+ if (is_sphere) then
+    print*,'radius            ',r_sphere,dist_unit
+ else
+    print*,'semi-axis a       ',r_ellipsoid(1),dist_unit
+    print*,'semi-axis b       ',r_ellipsoid(2),dist_unit
+    print*,'semi-axis c       ',r_ellipsoid(3),dist_unit
+ endif
+ print*,'volume            ',vol_sphere*udist**3*3.4E-56,'pc^3'
+ if (gauss_density) then
+    print*,'mean density      ',dens_sphere_cgs,'g/cm^3'
+    print*,'est. free-fall time ',t_ff*utime/(1E6*years),'Myr'
+ else
+    print*,'density           ',dens_sphere_cgs,'g/cm^3'
+    print*,'free-fall time    ',t_ff*utime/(1E6*years),'Myr'
+ endif
+ if (apply_cooling) then
+    print*,'est. temperature  ',temp_sphere,'K'
+ else
+    print*,'temperature       ',temp_sphere,'K'
+    print*,'internal energy   ',u_sphere*unit_ergg,'erg/g'
+ endif
+ print*,'sound speed       ',cs_sphere_cgs*1E-5,'km/s'
+ print*,'v_rms             ',v_rms_kms,'km/s'
+ print*,''
+ print*,'-Particles-'
+ print*,'total number      ',npart
+ print*,'particle mass     ',massoftype(igas),mass_unit
 
-  proceed = 'y'
-  call prompt('Do you wish to continue?',proceed)
-  if (trim(adjustl(proceed)) == 'n') then
-     stop
-  elseif (trim(adjustl(proceed)) /= 'y') then
-     stop 'Invalid input'
-  else
-     open(2022,file='cloud_particles_info.txt')
-     write(2022,*) '-Cloud-'
-     write(2022,*) 'total mass        ',totmass_sphere,mass_unit
-     if (gauss_density) then
-        write(2022,*) 'est. Jeans mass   ',jeans_mass,mass_unit
-     else
-        write(2022,*) 'Jeans mass        ',jeans_mass,mass_unit
-     endif
-     if (is_sphere) then
-        write(2022,*) 'radius            ',r_sphere,dist_unit
-     else
-        write(2022,*) 'semi-axis a       ',r_ellipsoid(1),dist_unit
-        write(2022,*) 'semi-axis b       ',r_ellipsoid(2),dist_unit
-        write(2022,*) 'semi-axis c       ',r_ellipsoid(3),dist_unit
-     endif
-     write(2022,*) 'volume            ',vol_sphere*udist**3*3.4E-56,'pc^3'
-     if (gauss_density) then
-        write(2022,*) 'mean density      ',dens_sphere_cgs,'g/cm^3'
-        write(2022,*) 'est. free-fall time ',t_ff*utime/(1E6*365*24*60*60),'Myr'
-     else
-        write(2022,*) 'density           ',dens_sphere_cgs,'g/cm^3'
-        write(2022,*) 'free-fall time    ',t_ff*utime/(1E6*365*24*60*60),'Myr'
-     endif
-     if (apply_cooling) then
-        write(2022,*) 'est. temperature  ',temp_sphere,'K'
-        write(2022,*) 'est. sound speed  ',cs_sphere_cgs*1E-5,'km/s'
-     else
-        write(2022,*) 'temperature       ',temp_sphere,'K'
-        write(2022,*) 'sound speed       ',cs_sphere_cgs*1E-5,'km/s'
-     endif
+ proceed = 'y'
+ call prompt('Do you wish to continue?',proceed)
+ if (trim(adjustl(proceed)) == 'n') then
+    stop
+ elseif (trim(adjustl(proceed)) /= 'y') then
+    stop 'Invalid input'
+ else
+    open(2022,file='cloud_particles_info.txt')
+    write(2022,*) '-Cloud-'
+    write(2022,*) 'total mass        ',totmass_sphere,mass_unit
+    if (gauss_density) then
+       write(2022,*) 'est. Jeans mass   ',jeans_mass,mass_unit
+    else
+       write(2022,*) 'Jeans mass        ',jeans_mass,mass_unit
+    endif
+    if (is_sphere) then
+       write(2022,*) 'radius            ',r_sphere,dist_unit
+    else
+       write(2022,*) 'semi-axis a       ',r_ellipsoid(1),dist_unit
+       write(2022,*) 'semi-axis b       ',r_ellipsoid(2),dist_unit
+       write(2022,*) 'semi-axis c       ',r_ellipsoid(3),dist_unit
+    endif
+    write(2022,*) 'volume            ',vol_sphere*udist**3*3.4E-56,'pc^3'
+    if (gauss_density) then
+       write(2022,*) 'mean density      ',dens_sphere_cgs,'g/cm^3'
+       write(2022,*) 'est. free-fall time ',t_ff*utime/(1E6*years),'Myr'
+    else
+       write(2022,*) 'density           ',dens_sphere_cgs,'g/cm^3'
+       write(2022,*) 'free-fall time    ',t_ff*utime/(1E6*years),'Myr'
+    endif
+    if (apply_cooling) then
+       write(2022,*) 'est. temperature  ',temp_sphere,'K'
+       write(2022,*) 'est. sound speed  ',cs_sphere_cgs*1E-5,'km/s'
+    else
+       write(2022,*) 'temperature       ',temp_sphere,'K'
+       write(2022,*) 'sound speed       ',cs_sphere_cgs*1E-5,'km/s'
+    endif
 
-     write(2022,*) 'Mach number       ',rms_mach
-     write(2022,*) 'v_rms             ',v_rms_kms,'km/s'
-     write(2022,*) ''
-     write(2022,*) '-Particles-'
-     write(2022,*) 'total number      ',npart
-     write(2022,*) 'particle mass     ',massoftype(igas),mass_unit
+    write(2022,*) 'Mach number       ',rms_mach
+    write(2022,*) 'v_rms             ',v_rms_kms,'km/s'
+    write(2022,*) ''
+    write(2022,*) '-Particles-'
+    write(2022,*) 'total number      ',npart
+    write(2022,*) 'particle mass     ',massoftype(igas),mass_unit
 
-     close(2022)
-  endif
+    close(2022)
+ endif
 
 end subroutine setpart
 
@@ -590,7 +591,7 @@ subroutine write_setupfile(filename)
     call write_inopt(npart_sphere,'npart_sphere','requested number of particles in sphere',iunit)
     call write_inopt(r_sphere,'r_sphere','radius of sphere in code units',iunit)
     call write_inopt(totmass_sphere,'totmass_sphere','mass of sphere in code units',iunit)
-    call write_inopt(gauss_density,'gauss_density','the intent is to centrally condense the sphere',iunit)
+    call write_inopt(gauss_density,'gauss_density','centrally condense the sphere',iunit)
  else
     write(iunit,"(/,a)") '# options for ellipsoid'
     call write_inopt(npart_sphere,'npart_sphere','requested number of particles in ellipsoid',iunit)
@@ -600,7 +601,7 @@ subroutine write_setupfile(filename)
     call write_inopt(totmass_sphere,'totmass_sphere','mass of ellipsoid in code units',iunit)
  endif
 
- call write_inopt(apply_cooling,'apply_cooling','the intent is to apply cooling',iunit)
+ call write_inopt(apply_cooling,'apply_cooling','switch on gas cooling',iunit)
  call write_inopt(temp_sphere,'temp_sphere','temperature of cloud in K',iunit)
 
  call write_inopt(rms_mach,'rms_mach','turbulent rms mach number',iunit)
