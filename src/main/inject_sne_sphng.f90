@@ -45,10 +45,12 @@ module inject
 
  private
 
- ! Set sne properties if not using sinks
- integer, parameter :: maxsn_insert = 1
- real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 8.66E+19, -1.116E+18, -2.202E+19, 2.882E14 /), &
-                                                          shape=(/4,maxsn_insert/))
+ ! Set sne properties if not using sinks as progenitors
+ integer, parameter :: maxsn_insert = 2
+ real    :: mstar_cgs = 3.98E34  ! 20 solarm
+ real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 1.543E20, 1.234E20, 2.315E20, 2.85E14, &
+                                                            -1.234E20, 0., -1.852E20, 2.85E14 /), &
+                                                           shape=(/4,maxsn_insert/))
 
  ! Global storage for all sne (also used for switching-off cooling)
  integer, parameter :: maxallsn = 500
@@ -67,7 +69,7 @@ module inject
  logical :: first_sn
 
  integer :: iseed = -12345
- real    :: r_sn,engsn,pmsncrit
+ real    :: r_sn,engsn,pmsncrit,mstar
  real    :: xyzt_sn_insert(4,maxsn_insert)
 
 contains
@@ -79,6 +81,8 @@ contains
 subroutine init_inject(ierr)
  use datafiles,  only:find_phantom_datafile
  use units,      only:umass,udist,utime,unit_energ
+ use physcon,    only:solarm
+ use io,         only:warning
  integer, intent(out) :: ierr
  integer  :: i,ip,isn,ientry
  !
@@ -96,6 +100,13 @@ subroutine init_inject(ierr)
     do isn = 1,maxsn_insert
        snflag_time(isn) = .false.
     enddo
+ endif
+ !
+ ! Calculate mass of progenitor
+ !
+ if (.not.sink_progenitor) then
+    if (mstar_cgs < pmsncrit_cgs) call warning('inject_sne_sphng','recommend setting a larger mstar_cgs')
+    mstar = mstar_cgs/umass
  endif
  !
  ! Import tabulated velocity profile (Precomputed solutions to
@@ -144,7 +155,7 @@ end subroutine init_inject
 !-----------------------------------------------------------------------
 subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
                             npart,npartoftype,dtinject)
- use io,         only:master,fatal
+ use io,         only:master,fatal,warning
  use part,       only:nptmass,massoftype,igas,kill_particle,hfact
  use partinject, only:add_or_update_particle
  use physcon,    only:pi
@@ -157,7 +168,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  integer, intent(inout) :: npartoftype(:)
  real,    intent(out)   :: dtinject
  integer  :: ipart,isn,iadd,ia,ip,ii,icf,iallsn
- integer  :: npartold,nsn,npartsn,ipartsn,progindex,iprog_sn(maxsn),iinsert_sn(maxsn)
+ integer  :: npartold,nsn,nkilled,npartsn,ipartsn,progindex,iprog_sn(maxsn),iinsert_sn(maxsn)
  integer  :: i_rightcand,iEk
  integer  :: indexallsn(maxsn)
  real     :: xyz_sn(3,maxsn),vxyz_sn(3,maxsn),m_sn(maxsn),h_sn(maxsn),mradsn,engkin,engtherm,numden,t_sn
@@ -169,7 +180,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  !
  ! Init/Reset variables of sne properties injected at current timestep (temp-storage)
  !
- nsn = 0                    ! number of sne going off now
+ nsn = 0              ! number of sne going off now
  if (sink_progenitor) then
     iprog_sn = 0      ! sink index of progenitors
     m_sn  = 0.        ! mass of progenitors
@@ -210,6 +221,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        endif
     enddo
  endif
+
  !
  ! Inject supernovae from temp-storage
  !
@@ -232,15 +244,23 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        !
        ! Kill all particles within blast radius
        !
-       mradsn = 0.
+       mradsn  = 0.
+       nkilled = 0
        do ipart = 1,npart
           dist = mag(xyzh(1:3,ipart) - xyz_sn(1:3,isn))
           if (dist < r_sn) then
              call kill_particle(ipart,npartoftype)
-             mradsn = mradsn + massoftype(igas)
+             nkilled = nkilled + 1
+             mradsn  = mradsn + massoftype(igas)
           endif
        enddo
-       if (mradsn == 0) call fatal('inject_sne_sphng','no particles found within blast radius')
+       if (nkilled == 0) then
+          if (sink_progenitor) then
+             call fatal('inject_sne_sphng','no particles found within blast radius')
+          else
+             call warning('inject_sne_sphng','no particles found within blast radius')
+          endif
+       endif
        !
        ! Adding in 1/4 mass of progenitor into supernova
        !
@@ -248,6 +268,8 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
           mradsn = mradsn + 0.25*m_sn(isn)
           progindex = iprog_sn(isn)
           xyzmh_ptmass(4,progindex) = 0.75*xyzmh_ptmass(4,progindex)
+       else
+          mradsn = mradsn + 0.25*mstar
        endif
        !
        ! Energies of supernova
@@ -259,6 +281,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        !
        npartsn = nint(mradsn/massoftype(igas))
        print*,'Number of SN particles: ',npartsn
+       if (npartsn > nkilled) print*,'adding ',npartsn-nkilled,' extra particles'
        if (npartsn < 6) call fatal('inject_sne_sphng','too few supernova particles')
        !
        ! Internal energy of sn particles

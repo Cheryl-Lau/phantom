@@ -169,7 +169,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call prompt('Enter the ratio of semi-axis c of the ellipsoid',r3_ellipsoid,0.)
 
     !- Turbulence (Virial ratio)
-    rms_mach = 11.6
+    rms_mach = 7.4
     call prompt('Enter the Mach number of the cloud turbulence',rms_mach,0.)
 
     !- Mean molecular weight
@@ -371,13 +371,13 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  infilename=trim(fileprefix)//'.in'
  inquire(file=infilename,exist=in_iexist)
  if (.not.in_iexist) then
-    tmax      = 3.15360E15/utime ! 1E2 Myr
-    dtmax     = 3.15360E9/utime  ! 1E-4 Myr
-    nout      = 100
+    tmax      = 1.5*t_ff
+    dtmax     = 0.001*t_ff
+    nout      = 10
     nfulldump = 1
     nmaxdumps = 1000
     dtwallmax = 1800.  ! s
-    iverbose  = 1
+    iverbose  = 0
 
     ieos      = 2    ! adiabatic eos with P = (gamma-1)*rho*u
     gmw       = gmw_in
@@ -455,7 +455,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  print*,'-Cloud-'
  print*,'total mass        ',totmass_cloud,mass_unit
  print*,'Jeans mass        ',jeans_mass,mass_unit
- print*,'free-fall time    ',t_ff*utime/(1E6*365*24*60*60),'Myr'
+ print*,'free-fall time    ',t_ff*utime/(1E6*years),'Myr'
  print*,'temperature       ',temp_cloud,'K'
  print*,'sound speed       ',cs_cloud_cgs*1E-5,'km/s'
  print*,'v_rms             ',v_rms_kms,'km/s'
@@ -474,6 +474,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     stop 'Invalid input'
  else
     open(2022,file='cloud_envlp_info.txt')
+    write(2022,*) '-Simulation-'
+    write(2022,*) 'tmax              ',tmax*utime/(1E6*years),'Myr / ',tmax*utime,'s'
+    write(2022,*) 'dtmax             ',dtmax*utime/(1E6*years),'Myr / ',dtmax*utime,'s'
     write(2022,*) '-Cloud-'
     write(2022,*) 'density           ',rho_cloud_cgs,'g/cm^3'
     write(2022,*) 'total mass        ',totmass_cloud,mass_unit
@@ -481,8 +484,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     write(2022,*) 'semi-axis a       ',r_cloud(1),dist_unit
     write(2022,*) 'semi-axis b       ',r_cloud(2),dist_unit
     write(2022,*) 'semi-axis c       ',r_cloud(3),dist_unit
-    write(2022,*) 'volume            ',vol_cloud*udist**3*3.4E-56,'pc^3'
-    write(2022,*) 'free-fall time    ',t_ff*utime/(1E6*365*24*60*60),'Myr'
+    write(2022,*) 'volume            ',vol_cloud*udist**3/pc**3,'pc^3'
+    write(2022,*) 'free-fall time    ',t_ff,'/ ',t_ff*utime/(1E6*years),'Myr / ',t_ff*utime,'s'
     write(2022,*) 'temperature       ',temp_cloud,'K'
     write(2022,*) 'sound speed       ',cs_cloud_cgs*1E-5,'km/s'
     write(2022,*) 'Mach number       ',rms_mach

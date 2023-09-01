@@ -360,7 +360,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     nfulldump = 1
     nmaxdumps = 1000
     dtwallmax = 1800.  ! s
-    iverbose  = 1
+    iverbose  = 0
 
     ieos      = 2    ! adiabatic eos with P = (gamma-1)*rho*u
     gmw       = 1.29
@@ -480,6 +480,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     stop 'Invalid input'
  else
     open(2022,file='cloud_particles_info.txt')
+    write(2022,*) '-Simulation-'
+    write(2022,*) 'tmax              ',tmax*utime/(1E6*years),'Myr / ',tmax*utime,'s'
+    write(2022,*) 'dtmax             ',dtmax*utime/(1E6*years),'Myr / ',dtmax*utime,'s'
     write(2022,*) '-Cloud-'
     write(2022,*) 'total mass        ',totmass_sphere,mass_unit
     if (gauss_density) then
@@ -494,13 +497,13 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        write(2022,*) 'semi-axis b       ',r_ellipsoid(2),dist_unit
        write(2022,*) 'semi-axis c       ',r_ellipsoid(3),dist_unit
     endif
-    write(2022,*) 'volume            ',vol_sphere*udist**3*3.4E-56,'pc^3'
+    write(2022,*) 'volume            ',vol_sphere*udist**3/pc**3,'pc^3'
     if (gauss_density) then
        write(2022,*) 'mean density      ',dens_sphere_cgs,'g/cm^3'
-       write(2022,*) 'est. free-fall time ',t_ff*utime/(1E6*years),'Myr'
+       write(2022,*) 'est. free-fall time ',t_ff,'/ ',t_ff*utime/(1E6*years),'Myr / ',t_ff*utime,'s'
     else
        write(2022,*) 'density           ',dens_sphere_cgs,'g/cm^3'
-       write(2022,*) 'free-fall time    ',t_ff*utime/(1E6*years),'Myr'
+       write(2022,*) 'free-fall time    ',t_ff,'/ ',t_ff*utime/(1E6*years),'Myr / ',t_ff*utime,'s'
     endif
     if (apply_cooling) then
        write(2022,*) 'est. temperature  ',temp_sphere,'K'

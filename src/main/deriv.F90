@@ -39,7 +39,7 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
                   Bevol,dBevol,rad,drad,radprop,dustprop,ddustprop,&
                   dustevol,ddustevol,dustfrac,eos_vars,time,dt,dtnew,pxyzu,dens,metrics)
  use dim,            only:maxvxyzu,mhd,fast_divcurlB
- use io,             only:iprint,fatal
+ use io,             only:iprint,fatal,iverbose
  use linklist,       only:set_linklist
  use densityforce,   only:densityiterate
  use ptmass,         only:ipart_rhomax
@@ -168,17 +168,19 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
  endif
 
 #ifdef PHOTOION
- !- Checking
- if (implicit_cmi) then
-    u_mean = 0.
-    !$omp parallel do default(none) shared(npart,vxyzu) &
-    !$omp private(ip) &
-    !$omp reduction(+:u_mean)
-    do ip = 1,npart
-       u_mean = u_mean + vxyzu(4,ip)
-    enddo
-    !$omp end parallel do
-    u_mean = u_mean/npart
+ if (iverbose > 0) then
+    !- Checking
+    if (implicit_cmi) then
+       u_mean = 0.
+       !$omp parallel do default(none) shared(npart,vxyzu) &
+       !$omp private(ip) &
+       !$omp reduction(+:u_mean)
+       do ip = 1,npart
+          u_mean = u_mean + vxyzu(4,ip)
+       enddo
+       !$omp end parallel do
+       u_mean = u_mean/npart
+    endif
  endif
 
  if (icall == 1 .or. icall == 0) then
@@ -190,21 +192,23 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
  ! Compute dudt_cmi if explicit (done in both icall=1 and icall=2)
  if (.not.implicit_cmi) call energ_explicit_cmi(npart,xyzh,vxyzu,dt)
 
- !- Checking
- u_mean_new = 0.
- !$omp parallel do default(none) shared(npart,vxyzu) &
- !$omp private(ip) &
- !$omp reduction(+:u_mean_new)
- do ip = 1,npart
-    u_mean_new = u_mean_new + vxyzu(4,ip)
- enddo
- !$omp end parallel do
- u_mean_new = u_mean_new/npart
+ if (iverbose > 0) then
+    !- Checking
+    u_mean_new = 0.
+    !$omp parallel do default(none) shared(npart,vxyzu) &
+    !$omp private(ip) &
+    !$omp reduction(+:u_mean_new)
+    do ip = 1,npart
+       u_mean_new = u_mean_new + vxyzu(4,ip)
+    enddo
+    !$omp end parallel do
+    u_mean_new = u_mean_new/npart
 
- if (implicit_cmi) then
-    print*,'change in u: ',u_mean,u_mean_new
- else
-    print*,'updated u',u_mean_new
+    if (implicit_cmi) then
+       print*,'change in u: ',u_mean,u_mean_new
+    else
+       print*,'updated u',u_mean_new
+    endif
  endif
 #endif
 
