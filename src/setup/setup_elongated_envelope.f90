@@ -106,7 +106,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  logical            :: remove_envelope     = .false.  ! temporarily remove envelope to see virial
  logical            :: place_sink_in_setup = .false.
  character(len=120) :: filex,filey,filez
- character(len=100) :: filename,infilename,cwd
+ character(len=100) :: filename,infilename
  character(len=40)  :: fmt,lattice
  character(len=9)   :: proceed
 
@@ -241,8 +241,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  vxyzu = 0.
  if (rms_mach > 0.) then
-    call getcwd(cwd)
-
     filex  = find_phantom_datafile(filevx,'velfield_sphng_small')
     filey  = find_phantom_datafile(filevy,'velfield_sphng_small')
     filez  = find_phantom_datafile(filevz,'velfield_sphng_small')
@@ -522,6 +520,7 @@ real function get_eqtemp_from_rho(rho_cgs)
  real    :: rhoteq(maxcol,maxrow)
 
  open(3000,file=find_phantom_datafile('rhoteq_table.txt','coolcurve_rho_temp'))
+ rewind(3000)
  do irow = 1,maxrow
     read(3000,*) (rhoteq(icol,irow), icol=1,maxcol)
  enddo

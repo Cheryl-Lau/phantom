@@ -94,7 +94,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real               :: h_acc_cgs,h_soft_sinksink_cgs,h_soft_sinkgas_cgs,rho_crit_cgs_recomm
  logical            :: iexist,in_iexist
  logical            :: place_sink_in_setup = .false.
- character(len=120) :: filex,filey,filez,filename,infilename,cwd,lattice
+ character(len=120) :: filex,filey,filez,filename,infilename,lattice
  character(len=10)  :: c_shape,proceed
 
  print "(a)", 'Setup for Sphere or Ellipsoid in which radiation and/or supernovae can be injected'
@@ -177,7 +177,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        stop
     endif
 
-    apply_cooling = .false.
+    apply_cooling = .true.
     call prompt('Do you wish to apply cooling to the gas particles? ',apply_cooling)
 
     temp_sphere = 10.
@@ -287,8 +287,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  vxyzu = 0.
  if (rms_mach > 0.) then
-    call getcwd(cwd)
-
     filex  = find_phantom_datafile(filevx,'velfield_sphng_small')
     filey  = find_phantom_datafile(filevy,'velfield_sphng_small')
     filez  = find_phantom_datafile(filevz,'velfield_sphng_small')
@@ -550,7 +548,7 @@ end function mag2
 ! Estimate temperature with given rho from cooling curve
 !
 real function get_eqtemp_from_rho(rho_cgs)
- use datafiles, only:find_phantom_datafile
+ use datafiles,  only:find_phantom_datafile
  real,   intent(in) :: rho_cgs
  integer, parameter :: maxrow = 1000
  integer, parameter :: maxcol = 4
@@ -558,6 +556,7 @@ real function get_eqtemp_from_rho(rho_cgs)
  real    :: rhoteq(maxcol,maxrow)
 
  open(3000,file=find_phantom_datafile('rhoteq_table.txt','coolcurve_rho_temp'))
+ rewind(3000)
  do irow = 1,maxrow
     read(3000,*) (rhoteq(icol,irow), icol=1,maxcol)
  enddo
