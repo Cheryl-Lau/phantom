@@ -106,6 +106,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  integer            :: npart_tmp_cloud1,npart_tmp_cloud2,npart_tmp_outer,npart_diff,npart_hii
  integer(kind=8)    :: npart_total_cloud1,npart_total_cloud2,npart_total_outer
  real,  allocatable :: xyzh_tmp_cloud1(:,:),xyzh_tmp_cloud2(:,:),xyzh_tmp_outer(:,:)
+ real,  allocatable :: vxyzu_turb(:,:)
  real(kind=8)       :: h_acc_in
  real               :: r_cloud1,cen_cloud1(3),psep_cloud1,cs_cloud1,cs_cloud1_cgs,rho_cloud1
  real               :: temp_cloud1,vol_cloud1,t_ff_cloud1,totmass_cloud1,u_cloud1
@@ -422,6 +423,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     cs_cloud2     = cs_cloud2_cgs/unit_velocity
 
     !- Apply turbulence
+    allocate(vxyzu_turb(4,npart_cloud2))
     do ip = npart_cloud1+1,npart
       vxyzu(1:3,ip) = 0.  ! init
     enddo
@@ -430,13 +432,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        filex  = find_phantom_datafile(filevx,'velfield_sphng_small')
        filey  = find_phantom_datafile(filevy,'velfield_sphng_small')
        filez  = find_phantom_datafile(filevz,'velfield_sphng_small')
-       call set_velfield_from_cubes(xyzh(:,npart_cloud1+1:npart),vxyzu(:,npart_cloud1+1:npart),npart_cloud2, &
-                                    filex,filey,filez,1.,turbboxsize,.false.,ierr)
+
+       call set_velfield_from_cubes(xyzh_tmp_cloud2(:,:),vxyzu_turb(:,:),npart_cloud2, &
+            filex,filey,filez,1.,turbboxsize,.false.,ierr)
        if (ierr /= 0) call fatal('setup','error setting up velocity field on clouds')
 
        rmsmach = 0.
-       do ip = npart_cloud1+1,npart
-          v2i     = dot_product(vxyzu(1:3,ip),vxyzu(1:3,ip))
+       do ip = 1,npart_cloud2
+          v2i     = dot_product(vxyzu_turb(1:3,ip),vxyzu_turb(1:3,ip))
           rmsmach = rmsmach + v2i/cs_cloud2**2
        enddo
        rmsmach = sqrt(rmsmach/npart_cloud2)
@@ -445,8 +448,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        else
           turbfac = 0.
        endif
-       do ip = npart_cloud1+1,npart
-          vxyzu(1:3,ip) = turbfac*vxyzu(1:3,ip)
+       do ip = 1,npart_cloud2
+          vxyzu(1:3,npart_cloud1+ip) = turbfac*vxyzu_turb(1:3,ip)
        enddo
 
        !- Calculate rms-velocity
@@ -457,6 +460,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        v_rms_cloud2 = sqrt(1./npart_cloud2*v2_sum)
        v_rms_kms_cloud2 = v_rms_cloud2*unit_velocity*1E-5
     endif
+    deallocate(vxyzu_turb)
 
     !- Set initial temperature
     u_cloud2 = kboltz * temp_cloud2 / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
