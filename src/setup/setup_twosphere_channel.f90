@@ -51,6 +51,7 @@ module setup
  real         :: mpart_solarm,rho_cloud1_cgs,rho_cloud2_cgs,rho_envelope_cgs,gmw_in
  real         :: rms_mach_cloud1,rms_mach_cloud2,r1_envelope,r2_envelope,r3_envelope
  real         :: cloud_sep_pc,omega_channel,pfrac_channel
+ real         :: temp_hii = 1E5
  logical      :: make_sinks,create_hiiregion,create_channel
  character(len=20) :: dist_unit,mass_unit
 
@@ -102,21 +103,21 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  character(len=20), parameter     :: filevz = 'cube_v3.dat'
  integer            :: ip,npmax,ierr,i
  integer            :: npart_cloud1,npart_cloud2,np_outer,npart_outer,npmax_env,xyzh_size_tmp
- integer            :: npart_tmp_cloud1,npart_tmp_cloud2,npart_tmp_outer,npart_diff
+ integer            :: npart_tmp_cloud1,npart_tmp_cloud2,npart_tmp_outer,npart_diff,npart_hii
  integer(kind=8)    :: npart_total_cloud1,npart_total_cloud2,npart_total_outer
  real,  allocatable :: xyzh_tmp_cloud1(:,:),xyzh_tmp_cloud2(:,:),xyzh_tmp_outer(:,:)
  real(kind=8)       :: h_acc_in
  real               :: r_cloud1,cen_cloud1(3),psep_cloud1,cs_cloud1,cs_cloud1_cgs,rho_cloud1
- real               :: temp_cloud1,vol_cloud1,t_ff_cloud1,totmass_cloud1
+ real               :: temp_cloud1,vol_cloud1,t_ff_cloud1,totmass_cloud1,u_cloud1
  real               :: rmsmach,v2i,turbfac,turbboxsize,v2_sum,v_rms_cloud1,v_rms_kms_cloud1
  real               :: r_cloud2,cen_cloud2(3),psep_cloud2,cs_cloud2,cs_cloud2_cgs,rho_cloud2
- real               :: temp_cloud2,vol_cloud2,t_ff_cloud2,totmass_cloud2
+ real               :: temp_cloud2,vol_cloud2,t_ff_cloud2,totmass_cloud2,u_cloud2
  real               :: v_rms_cloud2,v_rms_kms_cloud2
  real               :: mjeans_cloud2,mjeans_cgs_cloud2
  real               :: cloud_sep,minx_clouds,minyz_clouds
- real               :: omega,area,radius,rad_circ,x,y,z,rad_strom,rad_strom_cgs,temp_hii
+ real               :: omega,area,radius,rad_circ,x,y,z,rad_strom,rad_strom_cgs,u_hii
  real               :: r_outer(3),psep_outer,scale_param,rho_outer,vol_outer,totmass_outer
- real               :: temp_envelope,cs_envelope_cgs,cs_envelope
+ real               :: temp_envelope,cs_envelope_cgs,cs_envelope,u_envelope
  real               :: r_sn_cgs,engsn_cgs,pmsncrit_cgs
  real               :: h_acc_cgs,h_soft_sinksink_cgs,h_soft_sinkgas_cgs,rho_crit_cgs_recomm
  logical            :: iexist,in_iexist,add_particle
@@ -169,9 +170,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !- Settings for the cloud to inject feedback (cloud1)
     np_cloud1 = 1E6
     call prompt('Enter the approximate number of particles in cloud1 (with feedback injected)',np_cloud1,0,npmax)
-    rho_cloud1_cgs = 1E-20
+    rho_cloud1_cgs = 1E-21
     call prompt('Enter the density of cloud1 in g/cm^3',rho_cloud1_cgs,0.)
-    rms_mach_cloud1 = 15.
+    rms_mach_cloud1 = 20.
     call prompt('Enter the Mach number of the cloud1 turbulence',rms_mach_cloud1,0.)
 
     !- Settings for the neighbouring cloud (cloud2)
@@ -179,11 +180,11 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call prompt('Enter the approximate number of particles in cloud2',np_cloud2,0,npmax)
     rho_cloud2_cgs = 1E-21
     call prompt('Enter the density of cloud2 in g/cm^3',rho_cloud2_cgs,0.)
-    rms_mach_cloud2 = 10.
+    rms_mach_cloud2 = 20.
     call prompt('Enter the Mach number of the cloud2 turbulence',rms_mach_cloud2,0.)
 
     !- Settings for cloud locations
-    cloud_sep_pc = 14.
+    cloud_sep_pc = 15.
     call prompt('Enter the separation between the centre of clouds in pc',cloud_sep_pc,0.)
 
     !- Settings for the envelope
@@ -217,7 +218,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     if (create_channel) then
        omega_channel = 0.2 * 4.*pi
        call prompt('Enter the solid angle of the channel in steradian ',omega_channel,0.,4.*pi)
-       pfrac_channel = 0.5
+       pfrac_channel = 0.8
        call prompt('Enter the fraction of particles to remove in the channel ',pfrac_channel,0.,1.)
     endif
 
@@ -269,13 +270,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     xyzh_size_tmp = int(np_cloud1*1.5)
     allocate(xyzh_tmp_cloud1(4,xyzh_size_tmp))
 
-    print*,'r_cloud1,psep_cloud1',r_cloud1,psep_cloud1,xyzh_size_tmp
-
     call set_sphere(trim(lattice_cloud1),id,master,0.,r_cloud1,psep_cloud1,hfact,npart_tmp_cloud1,xyzh_tmp_cloud1,&
                     nptot=npart_total_cloud1,exactN=.true.,np_requested=np_cloud1,mask=i_belong)
-    print*,'npart_tmp_cloud1, npart_total_tmp, xyzh_tmp',npart_tmp_cloud1,npart_total_cloud1,xyzh_tmp_cloud1(1,1)  !- testing
 
-    print*,'npart,npart_tmp_cloud1',npart,npart_tmp_cloud1
+    print*,'Number of particles in cloud1: ',npart_tmp_cloud1
 
     !- Manually clear away some particles in a channel that points towards the neighbouring cloud
     if (create_channel) then
@@ -301,14 +299,15 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
           endif
        enddo check_particles
 
+       print*,'Number of particles in cloud1 after carving channel: ',npart
+       if (npart == npart_tmp_cloud1) call fatal('setup_twosphere_channel','no particles removed from channel')
+
        deallocate(xyzh_tmp_cloud1)
     else
        npart = npart_tmp_cloud1
        xyzh  = xyzh_tmp_cloud1
        npart_cloud1 = npart  !- bookkeeping
     endif
-
-    print*,'npart after clearing channel',npart
 
     !- Temperature and sound speed
     temp_cloud1   = get_eqtemp_from_rho(rho_cloud1_cgs)
@@ -352,25 +351,30 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     endif
 
     !- Set initial temperature
+    u_cloud1 = kboltz * temp_cloud1 / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
     do ip = 1,npart
-      vxyzu(4,ip) = kboltz * temp_cloud1 / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
+      vxyzu(4,ip) = u_cloud1
     enddo
+
+    !- Estimate Stromgren radius
+    rad_strom_cgs = (3.*1E49*mass_proton_cgs**2/(4.*pi*2.7E-13*rho_cloud1_cgs**2))**(1./3.)
+    rad_strom = rad_strom_cgs/udist
+    if (rad_strom > r_cloud1) call fatal('setup_twosphere_channel','Stromgren radius is beyond the sphere boundaries')
+    if (rad_strom < 0.1*r_cloud1) call warning('setup_twosphere_channel','Stromgren radius could be too small')
 
     !- Manually heat the HII region upon request
     if (create_hiiregion) then
-       temp_hii = 1E4
-       ! estimate Stromgren radius
-       rad_strom_cgs = (3.*1E49*mass_proton_cgs**2/(4.*pi*2.7E-13*rho_cloud1_cgs))**(1./3.)
-       rad_strom = rad_strom_cgs/udist
-       if (rad_strom > r_cloud1) call fatal('setup_twocloud_wchannel','Stromgren radius is beyond sphere')
-       ! set internal energy
+       npart_hii = 0
+       u_hii = kboltz * temp_hii / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
        do ip = 1,npart
           if (mag2(xyzh(1:3,ip)-cen_cloud1) < rad_strom**2) then
-             vxyzu(4,ip) = kboltz * temp_hii / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
+             vxyzu(4,ip) = u_hii
+             if (ip == 610300) print*,'!!!CHECK!!! u of particle 610300',vxyzu(4,ip)  ! testing
+             npart_hii = npart_hii + 1
           endif
        enddo
+       print*,'Number of particles within Stromgren radius: ',npart_hii
     endif
-
  endif
 
  !
@@ -385,7 +389,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  cloud_sep = cloud_sep_pc*pc/udist
  cen_cloud2     = (/ cloud_sep,0.,0. /)
 
- if (cloud_sep < r_cloud1+r_cloud2) call warning('setup_twocloud_wchannel','spheres could overlap')
+ if (cloud_sep < r_cloud1+r_cloud2) call warning('setup_twosphere_channel','spheres could overlap')
 
  if (.not.remove_cloud2) then
 
@@ -393,7 +397,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     npart_cloud2 = 0
     npart_tmp_cloud2 = 0
     npart_total_cloud2 = 0
-    print*,'npart before 2nd sphere',npart
 
     xyzh_size_tmp = int(np_cloud2*1.5)
     allocate(xyzh_tmp_cloud2(4,xyzh_size_tmp))
@@ -410,7 +413,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        xyzh(1,npart) = xyzh(1,npart) + cloud_sep
     enddo
 
-    print*,'npart after 2nd sphere',npart
+    print*,'Number of particles in cloud2: ',npart_cloud2
+    print*,'Total number of particles in both clouds: ',npart
 
     !- Temperature and sound speed
     temp_cloud2   = get_eqtemp_from_rho(rho_cloud2_cgs)
@@ -418,9 +422,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     cs_cloud2     = cs_cloud2_cgs/unit_velocity
 
     !- Apply turbulence
-    vxyzu = 0.
+    do ip = npart_cloud1+1,npart
+      vxyzu(1:3,ip) = 0.  ! init
+    enddo
     if (rms_mach_cloud2 > 0.) then
-
        turbboxsize = 1.1*r_cloud2
        filex  = find_phantom_datafile(filevx,'velfield_sphng_small')
        filey  = find_phantom_datafile(filevy,'velfield_sphng_small')
@@ -429,7 +434,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
                                     filex,filey,filez,1.,turbboxsize,.false.,ierr)
        if (ierr /= 0) call fatal('setup','error setting up velocity field on clouds')
 
-       rmsmach = 0.0
+       rmsmach = 0.
        do ip = npart_cloud1+1,npart
           v2i     = dot_product(vxyzu(1:3,ip),vxyzu(1:3,ip))
           rmsmach = rmsmach + v2i/cs_cloud2**2
@@ -454,8 +459,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     endif
 
     !- Set initial temperature
+    u_cloud2 = kboltz * temp_cloud2 / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
     do ip = npart_cloud1+1,npart
-      vxyzu(4,ip) = kboltz * temp_cloud2 / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
+      vxyzu(4,ip) = u_cloud2
     enddo
  endif
 
@@ -477,7 +483,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     minx_clouds  = r_cloud1 + cloud_sep + r_cloud2
     minyz_clouds = 2.*max(r_cloud1,r_cloud2)
     if (2.*r_outer(1) < 2.*minx_clouds .or. 2.*max(r_outer(2),r_outer(3)) < 2.*minyz_clouds) then
-       call fatal('setup_twocloud_wchannel','require more particles in envelope')
+       call fatal('setup_twosphere_channel','require more particles in envelope')
     endif
 
     xyzh_size_tmp = int(np_outer*1.5)
@@ -511,16 +517,17 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     cs_envelope     = cs_envelope_cgs/unit_velocity
 
     !- Set initial temp
+    u_envelope = kboltz * temp_envelope / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
     do ip = npart_cloud1+npart_cloud2+1,npart
-       vxyzu(4,ip) = kboltz * temp_envelope / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
+       vxyzu(4,ip) = u_envelope
     enddo
 
     npart_diff = npart_cloud1 + npart_cloud2 + npart_tmp_outer - npart
     if (npart_diff > 0) then
-       print*,npart_diff,'particles removed'
-       print*,'actual number of particles in the envelope ',npart_outer
+       print*,'Removed ',npart_diff,' particles from envelope that overlap the spheres'
+       print*,'Number of particles in the envelope: ',npart_outer
     else
-       stop 'no particles removed!'
+       call fatal('setup_twosphere_channel','no particles removed in evelope')
     endif
  endif
 
@@ -553,7 +560,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  infilename=trim(fileprefix)//'.in'
  inquire(file=infilename,exist=in_iexist)
  if (.not.in_iexist) then
-    tmax      = 1.5*min(t_ff_cloud1,t_ff_cloud2)
+    tmax      = 1.1*min(t_ff_cloud1,t_ff_cloud2)
     dtmax     = 0.001*min(t_ff_cloud1,t_ff_cloud2)
     nout      = 10
     nfulldump = 1
@@ -619,7 +626,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     rcut_leafpart_cgs = 4.0*pc
     delta_rcut_cgs    = 0.1*pc
 
-    if (create_hiiregion .and. inject_rad) call fatal('setup_twocloud_wchannel','why inject radiation twice...?')
+    if (create_hiiregion .and. inject_rad) call fatal('setup_twosphere_channel','why inject radiation twice...?')
 
     !
     ! Supernova settings
@@ -638,14 +645,17 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
  print*,'-Cloud 1-'
  print*,'total mass        ',totmass_cloud1,mass_unit
+ print*,'radius            ',r_cloud1,dist_unit
  print*,'free-fall time    ',t_ff_cloud1*utime/(1E6*years),'Myr'
  print*,'temperature       ',temp_cloud1,'K'
  print*,'sound speed       ',cs_cloud1_cgs*1E-5,'km/s'
  print*,'v_rms             ',v_rms_kms_cloud1,'km/s'
+ print*,'expected R_St     ',rad_strom,dist_unit
 
  print*,'-Cloud 2-'
  print*,'total mass        ',totmass_cloud2,mass_unit
  print*,'Jeans mass        ',mjeans_cloud2,mass_unit
+ print*,'radius            ',r_cloud2,dist_unit
  print*,'free-fall time    ',t_ff_cloud2*utime/(1E6*years),'Myr'
  print*,'temperature       ',temp_cloud2,'K'
  print*,'sound speed       ',cs_cloud2_cgs*1E-5,'km/s'
@@ -680,6 +690,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     write(2022,*) 'sound speed       ',cs_cloud1_cgs*1E-5,'km/s'
     write(2022,*) 'Mach number       ',rms_mach_cloud1
     write(2022,*) 'v_rms             ',v_rms_kms_cloud1,'km/s'
+    write(2022,*) 'Stromgren radius  ',rad_strom,dist_unit
 
     write(2022,*) '-Cloud 2-'
     write(2022,*) 'density           ',rho_cloud2_cgs,'g/cm^3'
@@ -832,16 +843,16 @@ subroutine read_setupfile(filename,ierr)
  !
  call select_unit(mass_unit,umass,nerr)
  if (nerr /= 0) then
-    call error('setup_twocloud_wchannel','mass unit not recognised')
+    call error('setup_twosphere_channel','mass unit not recognised')
     ierr = ierr + 1
  endif
  call select_unit(dist_unit,udist,nerr)
  if (nerr /= 0) then
-    call error('setup_twocloud_wchannel','length unit not recognised')
+    call error('setup_twosphere_channel','length unit not recognised')
     ierr = ierr + 1
  endif
  if (ierr > 0) then
-    print "(1x,a,i2,a)",'setup_twocloud_wchannel: ',nerr,' error(s) during read of setup file.  Re-writing.'
+    print "(1x,a,i2,a)",'setup_twosphere_channel: ',nerr,' error(s) during read of setup file.  Re-writing.'
  endif
 
 end subroutine read_setupfile
