@@ -107,7 +107,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  integer(kind=8)    :: npart_total_cloud1,npart_total_cloud2,npart_total_outer
  real,  allocatable :: xyzh_tmp_cloud1(:,:),xyzh_tmp_cloud2(:,:),xyzh_tmp_outer(:,:)
  real,  allocatable :: vxyzu_turb(:,:)
- real(kind=8)       :: h_acc_in
+ real(kind=8)       :: h_accs_in
  real               :: r_cloud1,cen_cloud1(3),psep_cloud1,cs_cloud1,cs_cloud1_cgs,rho_cloud1
  real               :: temp_cloud1,vol_cloud1,t_ff_cloud1,totmass_cloud1,u_cloud1
  real               :: rmsmach,v2i,turbfac,turbboxsize,v2_sum,v_rms_cloud1,v_rms_kms_cloud1
@@ -116,7 +116,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real               :: v_rms_cloud2,v_rms_kms_cloud2
  real               :: mjeans_cloud2,mjeans_cgs_cloud2
  real               :: cloud_sep,minx_clouds,minyz_clouds
- real               :: omega,area,radius,rad_circ,x,y,z,rad_strom,rad_stag,rad_strom_cgs,u_hii,c_0,c_i
+ real               :: omega,area,radius,rad_circ,x,y,z,rad_strom,rad_stag,rad_strom_cgs,u_hii,cs_0,cs_i
  real               :: r_outer(3),psep_outer,scale_param,rho_outer,vol_outer,totmass_outer
  real               :: temp_envelope,cs_envelope_cgs,cs_envelope,u_envelope
  real               :: r_sn_cgs,engsn_cgs,pmsncrit_cgs
@@ -362,11 +362,11 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     rad_strom = rad_strom_cgs/udist
 
     !- Stagnation radius of HII region
-    c_i =   ! 1E4 K
-    c_0 =   ! 1E1 K
-    rad_stag = (8./3.)**(2./3.) * (c_i/c_0)**(4./3.) * rad_strom
+    cs_i = sqrt(1E4*(gamma*kboltz)/(gmw*mass_proton_cgs)) / unit_velocity  ! cs of ionized medium
+    cs_0 = cs_cloud1                                                       ! cs of neutral medium
+    rad_stag = (8./3.)**(2./3.) * (cs_i/cs_0)**(4./3.) * rad_strom
     if (rad_stag < 0.2*r_cloud1) call warning('setup_twosphere_channel','HII region could be too small')
- 
+
     !- Manually heat the evolved HII region upon request
     if (create_hiiregion) then
        if (rad_stag > r_cloud1) call fatal('setup_twosphere_channel','HII region is beyond the sphere boundaries')
