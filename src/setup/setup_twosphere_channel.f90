@@ -366,7 +366,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     c_0 =   ! 1E1 K
     rad_stag = (8./3.)**(2./3.) * (c_i/c_0)**(4./3.) * rad_strom
     if (rad_stag < 0.2*r_cloud1) call warning('setup_twosphere_channel','HII region could be too small')
-
+ 
     !- Manually heat the evolved HII region upon request
     if (create_hiiregion) then
        if (rad_stag > r_cloud1) call fatal('setup_twosphere_channel','HII region is beyond the sphere boundaries')
