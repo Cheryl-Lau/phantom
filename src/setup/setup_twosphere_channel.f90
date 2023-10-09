@@ -116,7 +116,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real               :: v_rms_cloud2,v_rms_kms_cloud2
  real               :: mjeans_cloud2,mjeans_cgs_cloud2
  real               :: cloud_sep,minx_clouds,minyz_clouds
- real               :: omega,area,radius,rad_circ,x,y,z,rad_strom,rad_strom_cgs,u_hii
+ real               :: omega,area,radius,rad_circ,x,y,z,rad_strom,rad_stag,rad_strom_cgs,u_hii,c_0,c_i
  real               :: r_outer(3),psep_outer,scale_param,rho_outer,vol_outer,totmass_outer
  real               :: temp_envelope,cs_envelope_cgs,cs_envelope,u_envelope
  real               :: r_sn_cgs,engsn_cgs,pmsncrit_cgs
@@ -360,17 +360,21 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !- Estimate Stromgren radius
     rad_strom_cgs = (3.*1E49*mass_proton_cgs**2/(4.*pi*2.7E-13*rho_cloud1_cgs**2))**(1./3.)
     rad_strom = rad_strom_cgs/udist
-    if (rad_strom > r_cloud1) call fatal('setup_twosphere_channel','Stromgren radius is beyond the sphere boundaries')
-    if (rad_strom < 0.1*r_cloud1) call warning('setup_twosphere_channel','Stromgren radius could be too small')
 
-    !- Manually heat the HII region upon request
+    !- Stagnation radius of HII region
+    c_i =   ! 1E4 K
+    c_0 =   ! 1E1 K
+    rad_stag = (8./3.)**(2./3.) * (c_i/c_0)**(4./3.) * rad_strom
+    if (rad_stag < 0.2*r_cloud1) call warning('setup_twosphere_channel','HII region could be too small')
+
+    !- Manually heat the evolved HII region upon request
     if (create_hiiregion) then
+       if (rad_stag > r_cloud1) call fatal('setup_twosphere_channel','HII region is beyond the sphere boundaries')
        npart_hii = 0
        u_hii = kboltz * temp_hii / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
        do ip = 1,npart
-          if (mag2(xyzh(1:3,ip)-cen_cloud1) < rad_strom**2) then
+          if (mag2(xyzh(1:3,ip)-cen_cloud1) < rad_stag**2) then
              vxyzu(4,ip) = u_hii
-             if (ip == 610300) print*,'!!!CHECK!!! u of particle 610300',vxyzu(4,ip)  ! testing
              npart_hii = npart_hii + 1
           endif
        enddo
@@ -654,7 +658,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  print*,'temperature       ',temp_cloud1,'K'
  print*,'sound speed       ',cs_cloud1_cgs*1E-5,'km/s'
  print*,'v_rms             ',v_rms_kms_cloud1,'km/s'
- print*,'expected R_St     ',rad_strom,dist_unit
+ print*,'expected R_stag   ',rad_stag,dist_unit
 
  print*,'-Cloud 2-'
  print*,'total mass        ',totmass_cloud2,mass_unit
@@ -694,7 +698,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     write(2022,*) 'sound speed       ',cs_cloud1_cgs*1E-5,'km/s'
     write(2022,*) 'Mach number       ',rms_mach_cloud1
     write(2022,*) 'v_rms             ',v_rms_kms_cloud1,'km/s'
-    write(2022,*) 'Stromgren radius  ',rad_strom,dist_unit
+    write(2022,*) 'Stagnation radius ',rad_stag,dist_unit
 
     write(2022,*) '-Cloud 2-'
     write(2022,*) 'density           ',rho_cloud2_cgs,'g/cm^3'
