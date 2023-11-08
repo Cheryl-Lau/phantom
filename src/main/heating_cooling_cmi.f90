@@ -49,13 +49,13 @@ module heatcool_cmi
 
  private
 
- ! Pre-computed table of equilibiurms ueq(rho,gamma)
- integer, parameter :: maxrho   = 1000
+ ! Pre-computed table of equilibrium ueq(rho,gamma)
+ integer, parameter :: maxrho   = 10000
  integer, parameter :: maxgamma = 1000
  real   :: rho_gamma_ueq_table(maxrho,maxgamma,6)  ! stores: rho,gamma,numroots,ueq1,ueq2,ueq3
 
- real   :: rhomin_cgs   = 1E-23
- real   :: rhomax_cgs   = 1E-17
+ real   :: rhomin_cgs   = 1E-26
+ real   :: rhomax_cgs   = 1E-13
  real   :: gammamin_cgs = 1E-27
  real   :: gammamax_cgs = 1E-11
  real   :: Tmin  = 1E0
