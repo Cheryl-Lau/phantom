@@ -43,12 +43,18 @@ module inject
  real,    public :: pmsncrit_cgs = 1.59E34  ! 8 solarm
  logical, public :: sink_progenitor = .false.
 
+ ! Runtime parameters for manually heating an HII region 
+ logical, public :: heat_hii   = .false.
+ real,    public :: rad_hii    = 3.             ! code units
+ real,    public :: cen_hii(3) = (/ 0.,0.,0. /) ! code units; Note: this is not written to .in file
+ real,    public :: temp_hii   = 1E4            ! K
+
  private
 
  ! Set sne properties if not using sinks as progenitors
  integer, parameter :: maxsn_insert = 1
  real    :: mstar_cgs = 3.98E34  ! 20 solarm
- real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 0., 0., 0., 3.3E13 /), &
+ real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 0., 0., 0., 1.2E10 /), &
                                                            shape=(/4,maxsn_insert/))
 
  ! Global storage for all sne (also used for switching-off cooling)
@@ -175,6 +181,11 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  real     :: vrad,a_vrad,r_vrad,aN_scalefactor
  real     :: ekintot,ethermtot,etot_allparts_old,etot_allparts,endiff_cgs
  logical  :: timematch_inject,queueflag_iallsn
+
+ !
+ ! Manually create a HII region before SNe injection upon request
+ !
+ if (heat_hii) call create_hiiregion(npart,xyzh,vxyzu)
 
  !
  ! Init/Reset variables of sne properties injected at current timestep (temp-storage)
@@ -526,25 +537,6 @@ subroutine gen_refpoints(xyz_ref,r_ref)
  xyz_ref(:,6) = -1*c_vec(:)
 
 end subroutine gen_refpoints
-!
-! Vector math functions
-!
-real function mag(vec)
- real, intent(in) :: vec(3)
-
- mag = sqrt(dot_product(vec,vec))
-
-end function mag
-
-function cross_product(vec1,vec2)
- real, intent(in)   :: vec1(3),vec2(3)
- real, dimension(3) :: cross_product
-
- cross_product(1) = vec1(2)*vec2(3) - vec1(3)*vec2(2)
- cross_product(2) = vec1(3)*vec2(1) - vec1(1)*vec2(3)
- cross_product(3) = vec1(1)*vec2(2) - vec1(2)*vec2(1)
-
-end function cross_product
 
 ! ----------------------------------------------------------------------------------
 !
@@ -606,6 +598,53 @@ subroutine get_vrprofile_candidates(npartsn,mi)
 
 end subroutine get_vrprofile_candidates
 
+! ----------------------------------------------------------------------------------
+!
+! Subroutine for manually heating a HII region before injecting SN
+!
+! ----------------------------------------------------------------------------------
+subroutine create_hiiregion(npart,xyzh,vxyzu)
+ use physcon, only:kboltz,mass_proton_cgs
+ use eos,     only:gmw,gamma
+ use units,   only:unit_ergg
+ integer, intent(in)    :: npart
+ real,    intent(in)    :: xyzh(:,:)
+ real,    intent(inout) :: vxyzu(:,:)
+ integer :: ip
+ real    :: u_hii
+
+ u_hii = kboltz * temp_hii / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
+
+ do ip = 1,npart
+    if (mag(xyzh(1:3,ip)-cen_hii) < rad_hii) then
+       if (vxyzu(4,ip) < u_hii) vxyzu(4,ip) = u_hii
+    endif
+ enddo
+
+end subroutine create_hiiregion
+
+! ----------------------------------------------------------------------------------
+!
+! Vector math functions
+!
+! ----------------------------------------------------------------------------------
+real function mag(vec)
+ real, intent(in) :: vec(3)
+
+ mag = sqrt(dot_product(vec,vec))
+
+end function mag
+
+function cross_product(vec1,vec2)
+ real, intent(in)   :: vec1(3),vec2(3)
+ real, dimension(3) :: cross_product
+
+ cross_product(1) = vec1(2)*vec2(3) - vec1(3)*vec2(2)
+ cross_product(2) = vec1(3)*vec2(1) - vec1(1)*vec2(3)
+ cross_product(3) = vec1(1)*vec2(2) - vec1(2)*vec2(1)
+
+end function cross_product
+
 !-----------------------------------------------------------------------
 !+
 !  Writes input options to the input file
@@ -625,6 +664,9 @@ subroutine write_options_inject(iunit)
  call write_inopt(r_sn_cgs,'r_sn_cgs','blast radius of supernova',iunit)
  call write_inopt(maxsn,'maxsn','maximum number of supernovae at a time',iunit)
  call write_inopt(pmsncrit_cgs,'pmsncrit_cgs','critical mass of sinks',iunit)
+ call write_inopt(heat_hii,'heat_hii','manually heat HII region',iunit)
+ call write_inopt(rad_hii,'rad_hii','radius of the HII region',iunit)
+ call write_inopt(temp_hii,'temp_hii','temperature of the HII region',iunit)
 
 end subroutine write_options_inject
 
@@ -676,11 +718,22 @@ subroutine read_options_inject(name,valstring,imatch,igotall,ierr)
     read(valstring,*,iostat=ierr) pmsncrit_cgs
     ngot = ngot + 1
     if (pmsncrit_cgs < 0.) call fatal(label,'invalid setting for pmsncrit_cgs (<0)')
+ case('heat_hii')
+    read(valstring,*,iostat=ierr) heat_hii
+    ngot = ngot + 1
+ case('rad_hii')
+    read(valstring,*,iostat=ierr) rad_hii
+    ngot = ngot + 1
+    if (rad_hii < 0.) call fatal(label,'invalid setting for rad_hii (<0)')
+ case('temp_hii')
+    read(valstring,*,iostat=ierr) temp_hii
+    ngot = ngot + 1
+    if (temp_hii < 0.) call fatal(label,'invalid setting for temp_hii (<0)')
  case default
     imatch = .false.
  end select
 
- noptions = 8
+ noptions = 10
  igotall  = (ngot >= noptions)
 
 end subroutine read_options_inject
