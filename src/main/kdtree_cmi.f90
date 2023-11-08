@@ -71,11 +71,11 @@ subroutine extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
  write(*,'(3x,a22,f10.2)') 'radius of leaf nodes: ',rcut_opennode
  write(*,'(3x,a26,f6.2)')  'radius of ind. particles: ',rcut_leafpart
 
- if (maxlevel > maxlevel_indexed) then
-    call fatal('kdtree_cmi','This module only works if maxlevel is within maxlevel_indexed. &
-              &Recompile with larger MAXP/NCELLSMAX or use individual particles instead by &
-              &setting the variable photoionize_tree (in module photoionize_cmi) to false.')
- endif
+! if (maxlevel > maxlevel_indexed) then
+!    call fatal('kdtree_cmi','This module only works if maxlevel is within maxlevel_indexed. &
+!              &Recompile with larger MAXP/NCELLSMAX or use individual particles instead by &
+!              &setting the variable photoionize_tree (in module photoionize_cmi) to false.')
+! endif
 
  rcut_opennode2 = rcut_opennode**2.
  rcut_leafpart2 = rcut_leafpart**2.
@@ -94,6 +94,7 @@ subroutine extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
  nstack(istack) = irootnode
  over_stack: do while (istack /= 0)
     n = nstack(istack)
+    if (n /= n .or. n <= 0 .or. n > huge(n)) call fatal('kdtree_cmi','invalid node index')
     istack = istack - 1
     pos_node   = node(n)%xcen(1:3)
     size_node  = node(n)%size
