@@ -908,8 +908,8 @@ ifeq ($(SETUP), sncavity)
     ISOTHERMAL=no
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
-    MAXP=7000000
-    NCELLSMAX=3*maxp
+    MAXP=10000000
+    NCELLSMAX=4*maxp
 endif
 
 ifeq ($(SETUP), mhdvortex)

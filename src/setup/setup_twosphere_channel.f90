@@ -51,7 +51,7 @@ module setup
  real         :: mpart_solarm,rho_cloud1_cgs,rho_cloud2_cgs,rho_envelope_cgs,gmw_in
  real         :: rms_mach_cloud1,rms_mach_cloud2,r1_envelope,r2_envelope,r3_envelope
  real         :: cloud_sep_pc,omega_channel,pfrac_channel
- real         :: temp_hii = 1E5
+ real         :: temp_hiiregion = 1E4
  logical      :: make_sinks,create_hiiregion,create_channel
  character(len=20) :: dist_unit,mass_unit
 
@@ -89,6 +89,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
  use photoionize_cmi, only:sink_ionsrc,inject_rad
  use inject,          only:inject_sn,sink_progenitor
+ use inject,          only:heat_hii,rad_hii,temp_hii
  integer,           intent(in)    :: id
  integer,           intent(inout) :: npart
  integer,           intent(out)   :: npartoftype(:)
@@ -123,7 +124,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real               :: h_acc_cgs,h_soft_sinksink_cgs,h_soft_sinkgas_cgs,rho_crit_cgs_recomm
  logical            :: iexist,in_iexist,add_particle
  logical            :: remove_cloud1       = .false. ! temporarily removing objects to check virial ratio
- logical            :: remove_cloud2       = .false.
+ logical            :: remove_cloud2       = .true.
  logical            :: remove_envelope     = .false.
  logical            :: place_sink_in_setup = .false.
  character(len=120) :: filex,filey,filez
@@ -165,27 +166,27 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     npmax = int(0.4*size(xyzh(1,:))) ! approx max number allowed in sphere given size(xyzh(1,:))
 
     !- Mass of particles
-    mpart_solarm = 1E-2
+    mpart_solarm = 1E-1
     call prompt('Enter the mass of particles in solarm units',mpart_solarm,0.)
 
     !- Settings for the cloud to inject feedback (cloud1)
-    np_cloud1 = 1E6
+    np_cloud1 = 9E6
     call prompt('Enter the approximate number of particles in cloud1 (with feedback injected)',np_cloud1,0,npmax)
     rho_cloud1_cgs = 1E-21
     call prompt('Enter the density of cloud1 in g/cm^3',rho_cloud1_cgs,0.)
-    rms_mach_cloud1 = 20.
+    rms_mach_cloud1 = 0.
     call prompt('Enter the Mach number of the cloud1 turbulence',rms_mach_cloud1,0.)
 
     !- Settings for the neighbouring cloud (cloud2)
-    np_cloud2 = 1E6
+    np_cloud2 = 8E5
     call prompt('Enter the approximate number of particles in cloud2',np_cloud2,0,npmax)
     rho_cloud2_cgs = 1E-21
     call prompt('Enter the density of cloud2 in g/cm^3',rho_cloud2_cgs,0.)
-    rms_mach_cloud2 = 20.
+    rms_mach_cloud2 = 6.
     call prompt('Enter the Mach number of the cloud2 turbulence',rms_mach_cloud2,0.)
 
     !- Settings for cloud locations
-    cloud_sep_pc = 15.
+    cloud_sep_pc = 30.
     call prompt('Enter the separation between the centre of clouds in pc',cloud_sep_pc,0.)
 
     !- Settings for the envelope
@@ -210,14 +211,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     make_sinks = .true.
     call prompt('Do you wish to dynamically create sink particles? ',make_sinks)
 
-    create_hiiregion = .true.
+    create_hiiregion = .false.
     call prompt('Do you wish to manually create an HII region? ',create_hiiregion)
 
     create_channel = .true.
     call prompt('Do you wish to manually carve a channel? ',create_channel)
 
     if (create_channel) then
-       omega_channel = 0.2 * 4.*pi
+       omega_channel = 0.1 * 4.*pi
        call prompt('Enter the solid angle of the channel in steradian ',omega_channel,0.,4.*pi)
        pfrac_channel = 0.8
        call prompt('Enter the fraction of particles to remove in the channel ',pfrac_channel,0.,1.)
@@ -302,13 +303,15 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
        print*,'Number of particles in cloud1 after carving channel: ',npart
        if (npart == npart_tmp_cloud1) call fatal('setup_twosphere_channel','no particles removed from channel')
-
-       deallocate(xyzh_tmp_cloud1)
     else
        npart = npart_tmp_cloud1
-       xyzh  = xyzh_tmp_cloud1
+       do ip = 1,npart
+          xyzh(:,ip) = xyzh_tmp_cloud1(:,ip)
+       enddo
        npart_cloud1 = npart  !- bookkeeping
     endif
+
+    deallocate(xyzh_tmp_cloud1)
 
     !- Temperature and sound speed
     temp_cloud1   = get_eqtemp_from_rho(rho_cloud1_cgs)
@@ -364,14 +367,20 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !- Stagnation radius of HII region
     cs_i = sqrt(1E4*(gamma*kboltz)/(gmw*mass_proton_cgs)) / unit_velocity  ! cs of ionized medium
     cs_0 = cs_cloud1                                                       ! cs of neutral medium
+!    cs_0 = sqrt(1E2*(gamma*kboltz)/(gmw*mass_proton_cgs)) / unit_velocity  ! testing
+
     rad_stag = (8./3.)**(2./3.) * (cs_i/cs_0)**(4./3.) * rad_strom
     if (rad_stag < 0.2*r_cloud1) call warning('setup_twosphere_channel','HII region could be too small')
 
     !- Manually heat the evolved HII region upon request
     if (create_hiiregion) then
-       if (rad_stag > r_cloud1) call fatal('setup_twosphere_channel','HII region is beyond the sphere boundaries')
+       if (rad_stag > r_cloud1) then
+          print*,'Stagnation radius is ',rad_stag/r_cloud1,'times bigger than sphere radius'
+          call fatal('setup_twosphere_channel','HII region is beyond the sphere boundaries')
+       endif
+       !- In setup
        npart_hii = 0
-       u_hii = kboltz * temp_hii / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
+       u_hii = kboltz * temp_hiiregion / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
        do ip = 1,npart
           if (mag2(xyzh(1:3,ip)-cen_cloud1) < rad_stag**2) then
              vxyzu(4,ip) = u_hii
@@ -379,6 +388,12 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
           endif
        enddo
        print*,'Number of particles within HII region: ',npart_hii
+       !- In runtime (SN injection mod)
+       heat_hii = .true.
+       rad_hii  = rad_stag
+       temp_hii = temp_hiiregion
+    else
+       if (rad_stag > r_cloud1) call warning('setup_twosphere_channel','HII region could be beyond the sphere boundaries')
     endif
  endif
 
@@ -471,6 +486,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     do ip = npart_cloud1+1,npart
       vxyzu(4,ip) = u_cloud2
     enddo
+
+    deallocate(xyzh_tmp_cloud2)
  endif
 
  !
@@ -509,10 +526,22 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
     !- Store particle only if it is outside both clouds
     do ip = 1,npart_tmp_outer
-       if (mag2(xyzh_tmp_outer(1:3,ip)-cen_cloud1) > (1.01*r_cloud1)**2 .and. &
-           mag2(xyzh_tmp_outer(1:3,ip)-cen_cloud2) > (1.01*r_cloud2)**2) then
-          npart = npart + 1
-          xyzh(:,npart) = xyzh_tmp_outer(:,ip)
+       if (.not.remove_cloud1 .and. .not.remove_cloud2) then
+          if (mag2(xyzh_tmp_outer(1:3,ip)-cen_cloud1) > (1.01*r_cloud1)**2 .and. &
+              mag2(xyzh_tmp_outer(1:3,ip)-cen_cloud2) > (1.01*r_cloud2)**2) then
+             npart = npart + 1
+             xyzh(:,npart) = xyzh_tmp_outer(:,ip)
+          endif
+       elseif (.not.remove_cloud1) then
+          if (mag2(xyzh_tmp_outer(1:3,ip)-cen_cloud1) > (1.01*r_cloud1)**2) then
+             npart = npart + 1
+             xyzh(:,npart) = xyzh_tmp_outer(:,ip)
+          endif
+       elseif (.not.remove_cloud2) then
+          if (mag2(xyzh_tmp_outer(1:3,ip)-cen_cloud2) > (1.01*r_cloud2)**2) then
+             npart = npart + 1
+             xyzh(:,npart) = xyzh_tmp_outer(:,ip)
+          endif
        endif
     enddo
     deallocate(xyzh_tmp_outer)
@@ -568,8 +597,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  infilename=trim(fileprefix)//'.in'
  inquire(file=infilename,exist=in_iexist)
  if (.not.in_iexist) then
-    tmax      = 1.1*min(t_ff_cloud1,t_ff_cloud2)
-    dtmax     = 0.001*min(t_ff_cloud1,t_ff_cloud2)
+    tmax      = 2.0*min(t_ff_cloud1,t_ff_cloud2)
+    dtmax     = 0.01*min(t_ff_cloud1,t_ff_cloud2)
     nout      = 10
     nfulldump = 1
     nmaxdumps = 1000
@@ -620,7 +649,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Photoionization settings
     !
-    inject_rad = .false.
+    inject_rad  = .true.
     sink_ionsrc = .false.
 
     monochrom_source  = .false.
@@ -629,9 +658,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
     photoionize_tree  = .true.
     tree_accuracy_cmi = 0.3
-    nHlimit_fac       = 50
-    rcut_opennode_cgs = 6.0*pc
-    rcut_leafpart_cgs = 4.0*pc
+    nHlimit_fac       = 100
+    rcut_opennode_cgs = 0.5*pc
+    rcut_leafpart_cgs = 0.2*pc
     delta_rcut_cgs    = 0.1*pc
 
     if (create_hiiregion .and. inject_rad) call fatal('setup_twosphere_channel','why inject radiation twice...?')
@@ -639,7 +668,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Supernova settings
     !
-    inject_sn = .true.
+    inject_sn = .false.
     sink_progenitor = .false.
 
  endif
@@ -723,7 +752,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  endif
 
 end subroutine setpart
-
 
 
 real function mag2(vec)

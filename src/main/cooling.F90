@@ -992,7 +992,7 @@ subroutine energ_cooling(xi,yi,zi,ui,dudt,rho,dt,Trad,mu_in,K2,kappa,Tgas)
     endif
  end select
  !
- ! Temporarily reduce cooling for particles near sne
+ ! Temporarily reduce cooling for particles near SNe
  !
  if (snecoolingoff .and. ncoolingoff >= 1) then
 !    if (xyzh_coolingoff(1,1)>0.) print*, 'xyzh_coolingoff in cooling' , xyzh_coolingoff
@@ -1010,6 +1010,7 @@ subroutine energ_cooling(xi,yi,zi,ui,dudt,rho,dt,Trad,mu_in,K2,kappa,Tgas)
  endif
 
 end subroutine energ_cooling
+
 
 !
 ! Compute the fraction of dudtcool to reduce around supernova
