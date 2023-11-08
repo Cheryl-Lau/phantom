@@ -82,7 +82,7 @@ module photoionize_cmi
  !- or
  ! Manually set location, starting/ending time and ionizing photon flux [cgs units] of sources
  integer, public, parameter :: nsetphotosrc = 1
- real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 0.,0.,0.,0.,1E50,1E49 /),&
+ real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 1.477E19,3.468E19,-9.69E+16,9.085E13,1E50,1E49 /),&
                                                                     shape=(/6,nsetphotosrc/))
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
@@ -146,7 +146,7 @@ module photoionize_cmi
 
  integer, parameter :: maxoutfile_ult = 99999
  integer :: maxoutfile = 5000         ! max number of (ni)xyzhmnH output files
- integer :: ncall_writefile = 1      ! interval to write (ni)xyzhmnH output file
+ integer :: ncall_writefile = 100     ! interval to write (ni)xyzhmnH output file
  integer :: icall,iunit,ifile,iruncmi
  integer :: ncall_checktreewalk = 50  ! interval to check for unnecessarily-opened nodes
  integer :: nphotosrc_old
@@ -160,10 +160,10 @@ module photoionize_cmi
  logical :: first_call,first_step,warned
 
  ! Switches for plotting/debugging
- logical :: write_gamma = .true.          ! write heating rates vs nH (from both phantom and CMI)
+ logical :: write_gamma = .false.          ! write heating rates vs nH (from both phantom and CMI)
  logical :: print_cmi   = .false.          ! show CMI shell outputs
- logical :: write_nH_u_distri  = .true.   ! write u of particles vs nH
- logical :: write_node_prop    = .true.    ! write properties of the current set of cmi-nodes
+ logical :: write_nH_u_distri  = .false.   ! write u of particles vs nH
+ logical :: write_node_prop    = .false.   ! write properties of the current set of cmi-nodes
  logical :: catch_noroot_parts = .false.   ! write particles with no therm-equil roots
 
 contains
