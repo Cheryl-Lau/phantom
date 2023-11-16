@@ -54,10 +54,10 @@ module heatcool_cmi
  integer, parameter :: maxgamma = 1000
  real   :: rho_gamma_ueq_table(maxrho,maxgamma,6)  ! stores: rho,gamma,numroots,ueq1,ueq2,ueq3
 
- real   :: rhomin_cgs   = 1E-26
+ real   :: rhomin_cgs   = 1E-27
  real   :: rhomax_cgs   = 1E-13
  real   :: gammamin_cgs = 1E-27
- real   :: gammamax_cgs = 1E-11
+ real   :: gammamax_cgs = 1E-10
  real   :: Tmin  = 1E0
  real   :: Tmax  = 1E9
 
@@ -267,7 +267,7 @@ subroutine heating_term(nH,rho,u,temp_star,gammaheat)
  use physcon, only:mass_proton_cgs,kboltz
  use units,   only:unit_density,unit_ergg
  use eos,     only:gamma,gmw
- use io,      only:fatal
+ use io,      only:fatal,warning
  real, intent(in)  :: nH,rho,u,temp_star
  real, intent(out) :: gammaheat
  real :: rho_cgs,nrho_cgs,temp,alphaA,Ne,Np
@@ -277,9 +277,12 @@ subroutine heating_term(nH,rho,u,temp_star,gammaheat)
 
     !- number density of H atoms
     rho_cgs = rho*unit_density
+    !- if beyond range, simply approximate with the closest value
+    if (rho_cgs < rhomin_cgs) rho_cgs = rhomin_cgs
+    if (rho_cgs > rhomax_cgs) rho_cgs = rhomax_cgs
     if (rho_cgs < rhomin_cgs .or. rho_cgs > rhomax_cgs) then
        print*,'rho_cgs',rho_cgs
-       call fatal('heating_cooling_cmi','rho_cgs exceeded range')
+       call warning('heating_cooling_cmi','rho_cgs exceeded range')
     endif
     nrho_cgs = rho_cgs*one_over_mH_cgs
 
