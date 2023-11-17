@@ -82,7 +82,7 @@ module photoionize_cmi
  !- or
  ! Manually set location, starting/ending time and ionizing photon flux [cgs units] of sources
  integer, public, parameter :: nsetphotosrc = 1
- real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 1.477E19,3.468E19,-9.69E+16,9.085E13,1E50,1E49 /),&
+ real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 0.,0.,0.,0.,1E50,1E49 /),&
                                                                     shape=(/6,nsetphotosrc/))
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
@@ -747,6 +747,7 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
     if (npart_heated == 0) then
        call warning('photoionize_cmi','no ionized particles')
     else
+       print*,'Number of particles heated:   ',npart_heated
        ueq_mean = ueq_mean/npart_heated
        temp_ueq = ueq_mean/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
        print*,'Drifting HII region to temp [K]:   ',temp_ueq
