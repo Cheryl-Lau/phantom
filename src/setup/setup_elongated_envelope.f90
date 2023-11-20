@@ -157,7 +157,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     np_envelope = 4E3
     npmax_env = npmax - np_cloud
     call prompt('Enter the approximate number of particles within the envelope boundaries',np_envelope,0,npmax_env)
-    rho_envelope_cgs = 4E-25
+    rho_envelope_cgs = 5E-25
     call prompt('Enter the density of the envelope in g/cm^3',rho_envelope_cgs,0.)
 
     !- Ratio of semi-axes of ellipsoid
@@ -371,7 +371,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  if (.not.in_iexist) then
     tmax      = 1.5*t_ff
     dtmax     = 0.001*t_ff
-    nout      = 10
+    nout      = 1
     nfulldump = 1
     nmaxdumps = 1000
     dtwallmax = 1800.  ! s
@@ -421,7 +421,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Photoionization settings
     !
-    inject_rad = .false.
+    inject_rad = .true.
     sink_ionsrc = .false.
 
     monochrom_source  = .false.
@@ -433,12 +433,12 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     nHlimit_fac       = 50
     rcut_opennode_cgs = 6.0*pc
     rcut_leafpart_cgs = 4.0*pc
-    delta_rcut_cgs    = 0.1*pc
+    delta_rcut_cgs    = 0.5*pc
 
     !
     ! Supernova settings
     !
-    inject_sn = .true.
+    inject_sn = .false.
     sink_progenitor = .false.
 
  endif
