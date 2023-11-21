@@ -120,7 +120,7 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
     call hnode_newton_raphson(node,icminode,pos_node,size_node,ncminode,nnodeneigh,listnodeneigh,&
                               xyzcache_nodeneigh,avgneigh,h_solvertocmi,ierr)
     if (ierr /= 0) then
-       write(*,'(3x,a30,i7,a25)') 'Newton-Raphson failed for node',na,', trying bisection method'
+       !write(*,'(3x,a30,i7,a25)') 'Newton-Raphson failed for node',na,', trying bisection method'
        call hnode_bisection(node,icminode,pos_node,size_node,ncminode,nnodeneigh,listnodeneigh,&
                             xyzcache_nodeneigh,avgneigh,h_solvertocmi,ierr)
     endif
@@ -134,7 +134,7 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
        node_failed = .true.
        !$omp end critical
        h_solvertocmi(icminode) = hfact_node*2.*size_node
-       write(*,'(3x,a30,i7,a31)') 'Bisection also failed for node',na,', using node size to estimate h'
+       !write(*,'(3x,a30,i7,a31)') 'Bisection also failed for node',na,', using node size to estimate h'
     endif
 
     time2_iterate = omp_get_wtime()
