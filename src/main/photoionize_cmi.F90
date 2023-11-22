@@ -82,13 +82,13 @@ module photoionize_cmi
  !- or
  ! Manually set location, starting/ending time and ionizing photon flux [cgs units] of sources
  integer, public, parameter :: nsetphotosrc = 1
- real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 4.016935e+18, 5.85044e+18, 1.3751939e+18, 0.,1E40,1E50 /),&
+ real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 0., 0., 0., 0.,1E60,1E50 /),&
                                                                     shape=(/6,nsetphotosrc/))
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
  integer, public :: niter_mcrt = 10
  real,    public :: photon_eV  = 13.6   ! used only if sink_ionsrc=F and monochrom_source=T
- real,    public :: tol_vsite  = 1E-1
+ real,    public :: tol_vsite  = 1E-4
  logical, public :: lloyd      = .true.
  logical, public :: monochrom_source = .false.   ! else blackbody spec
 
@@ -96,12 +96,12 @@ module photoionize_cmi
  logical, public :: photoionize_tree = .true.
 
  ! Options for extracting cmi-nodes from kdtree
- real,    public :: tree_accuracy_cmi = 0.2
+ real,    public :: tree_accuracy_cmi = 0.3
  real,    public :: rcut_opennode_cgs = 1.2E18   ! 0.4 pc
  real,    public :: rcut_leafpart_cgs = 9.3E17   ! 0.3 pc
  real,    public :: delta_rcut_cgs    = 3.1E16   ! 0.01 pc
  real,    public :: nHlimit_fac       = 100      ! ionization front resolution; recommend 60-100
- real,    public :: min_nodesize_toflag = 0.005  ! min node size as a fraction of root node
+ real,    public :: min_nodesize_toflag = 1E-5   ! min node size as a fraction of root node
  logical, public :: auto_opennode = .true.
  logical, public :: auto_tree_acc = .false.
 
@@ -1298,8 +1298,8 @@ subroutine write_cmi_infiles(nsite,x,y,z,h,m)
  !
  redo_grid = .false.
  check_poschange: do i = 1,maxcminode
-    if (abs(x_old(i)-x(i))/x_old(i) > tol_vsite .or. abs(y_old(i)-y(i))/y_old(i) > tol_vsite .or. &
-        abs(z_old(i)-z(i))/z_old(i) > tol_vsite) then
+    if (abs(x_old(i)-x(i))/(xmax-xmin) > tol_vsite .or. abs(y_old(i)-y(i))/(ymax-ymin) > tol_vsite .or. &
+        abs(z_old(i)-z(i))/(zmax-zmin) > tol_vsite) then
        redo_grid = .true.
        exit check_poschange
     endif
