@@ -1295,13 +1295,16 @@ subroutine write_cmi_infiles(nsite,x,y,z,h,m)
  !
  ! Rewrite the Voronoi grid generating-sites only if their locations have shifted
  ! beyond the tolerance
+ ! (But cmi-node labelling could change across timesteps even if it was the same particle....)
  !
  redo_grid = .false.
  check_poschange: do i = 1,maxcminode
-    if (abs(x_old(i)-x(i))/(xmax-xmin) > tol_vsite .or. abs(y_old(i)-y(i))/(ymax-ymin) > tol_vsite .or. &
-        abs(z_old(i)-z(i))/(zmax-zmin) > tol_vsite) then
-       redo_grid = .true.
-       exit check_poschange
+    if (x_old(i) /= 0. .and. x(i) /= 0. .and. y_old(i) /= 0. .and. y(i) /= 0. .and. z_old(i) /= 0. .and. z(i) /= 0.) then
+       if (abs(x_old(i)-x(i))/(xmax-xmin) > tol_vsite .or. abs(y_old(i)-y(i))/(ymax-ymin) > tol_vsite .or. &
+           abs(z_old(i)-z(i))/(zmax-zmin) > tol_vsite) then
+          redo_grid = .true.
+          exit check_poschange
+       endif
     endif
  enddo check_poschange
 
