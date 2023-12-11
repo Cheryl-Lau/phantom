@@ -82,7 +82,7 @@ module photoionize_cmi
  !- or
  ! Manually set location, starting/ending time and ionizing photon flux [cgs units] of sources
  integer, public, parameter :: nsetphotosrc = 1
- real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 4.0169e+18, 5.8504e+18, 1.3752e+18, 0.,1E60,1E50 /),&
+ real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 0., 0., 0., 0.,1E60,1E50 /),&
                                                                     shape=(/6,nsetphotosrc/))
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
@@ -104,6 +104,10 @@ module photoionize_cmi
  real,    public :: min_nodesize_toflag = 1E-5   ! min node size as a fraction of root node
  logical, public :: auto_opennode = .true.
  logical, public :: auto_tree_acc = .false.
+
+ ! Options for cropping simulation domain being passed to CMI (to avoid segfault; use with caution)
+ logical, public :: crop_domain  = .true.
+ real,    public :: crop_fac     = 3.0          ! bounds = crop_fac*rcut_opennode (>1)
 
  ! Options for heating/cooling
  real,    public :: temp_hii     = 1E4          ! K
@@ -153,6 +157,7 @@ module photoionize_cmi
  real    :: xyz_photosrc_si(3,maxphotosrc),ionflux_photosrc(maxphotosrc),mass_photosrc(maxphotosrc),masscrit_ionize
  real    :: tree_accuracy_cmi_old
  real    :: rcut_opennode,rcut_leafpart,delta_rcut
+ real    :: cen_crop(3),r_crop2,rcrop_min
  real    :: temp_star,totq,freq_photon,u_hii,udist_si,umass_si
  real    :: time0_wall,time0_cpu,time_now_wall,time_now_cpu
  real    :: time_ellapsed_wall,time_ellapsed_cpu
@@ -164,6 +169,7 @@ module photoionize_cmi
  logical :: print_cmi   = .false.          ! show CMI shell outputs
  logical :: write_nH_u_distri  = .false.   ! write u of particles vs nH
  logical :: write_node_prop    = .false.   ! write properties of the current set of cmi-nodes
+ logical :: plot_cropped_sites = .false.   ! write properties of the current cropped set of cmi-nodes
  logical :: catch_noroot_parts = .false.   ! write particles with no therm-equil roots
 
 contains
@@ -225,6 +231,12 @@ subroutine init_ionizing_radiation_cmi(time,npart,xyzh,nptmass,dt)
 #endif
     if (.not.compilecond_ok) call fatal('photoionize_cmi','current version does not support PERIODIC or MPI')
  endif
+
+ !- Check settings for cropping simulation 
+ if (crop_domain) then 
+    if (crop_fac < 1.5) call fatal('photoionize_cmi','we need larger nodes on the side to detect the ionization front!')
+    if (crop_fac < 3.0) call warning('photoionize_cmi','recommend setting a larger crop_fac')
+ endif 
 
  !- Check options for ionizing source
  if (monochrom_source) then
@@ -365,6 +377,8 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
  real,    intent(in) :: xyzmh_ptmass(:,:)
  integer :: isrc,ix,isink
  real    :: time_startsrc,time_endsrc,mptmass,fluxq
+ real    :: xmin_allsrc,xmax_allsrc,ymin_allsrc,ymax_allsrc,zmin_allsrc,zmax_allsrc
+ real    :: disttomin2,disttomax2
 
  !- Init/Reset
  nphotosrc = 0
@@ -401,6 +415,36 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
        endif
     enddo
  endif
+ !
+ ! Locate the boundary that encapsulates all sources (to be used for cropping)
+ ! 
+ if (crop_domain) then 
+    xmax_allsrc = -huge(xmax_allsrc)
+    ymax_allsrc = -huge(ymax_allsrc)
+    zmax_allsrc = -huge(zmax_allsrc)
+    xmin_allsrc = huge(xmin_allsrc)
+    ymin_allsrc = huge(ymin_allsrc)
+    zmin_allsrc = huge(zmin_allsrc)
+    do isrc = 1,nphotosrc
+       xmin_allsrc = min(xmin_allsrc,xyz_photosrc(1,isrc))
+       ymin_allsrc = min(ymin_allsrc,xyz_photosrc(2,isrc))
+       zmin_allsrc = min(zmin_allsrc,xyz_photosrc(3,isrc))
+       xmax_allsrc = max(xmax_allsrc,xyz_photosrc(1,isrc))
+       ymax_allsrc = max(ymax_allsrc,xyz_photosrc(2,isrc))
+       zmax_allsrc = max(zmax_allsrc,xyz_photosrc(3,isrc))
+    enddo 
+    !- centre of all sources 
+    cen_crop = (/ (xmin_allsrc + xmax_allsrc) /2., &
+                  (ymin_allsrc + ymax_allsrc) /2., &
+                  (zmin_allsrc + zmax_allsrc) /2.  /)
+    !- estimate minimum range to crop out 
+    disttomin2 = mag2((/xmin_allsrc,ymin_allsrc,zmin_allsrc/) - cen_crop)
+    disttomax2 = mag2((/xmax_allsrc,ymax_allsrc,zmax_allsrc/) - cen_crop)
+    rcrop_min  = max(disttomin2,disttomax2)
+    print*,'-Cropping simulation domain-'
+    print*,' centre: ',cen_crop
+    print*,' radius that encapsulates all sources: ',rcrop_min
+ endif 
 
  !- Convert to SI units for CMI param file
  if (nphotosrc >= 1) then
@@ -885,8 +929,9 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
  integer :: ncloseleaf   !- number of leaves to be replaced
  integer :: nleafparts   !- total number of particles in leaf nodes to be replaced
  integer :: niter,inode,isite,n,inextopen,n_nextopen
+ integer :: ncminode_in,ncminode_out  !- local var that controls the actual number of sites passed to CMI
  real    :: size_node,size_root,nH_node,nH_part,nH_limit,mintheta
- logical :: node_checks_passed
+ logical :: node_checks_passed,must_iter
 
  !- Init
  node_checks_passed = .false.
@@ -933,19 +978,64 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
        cycle resolve_ionfront
     endif
     !
-    ! Run CMI
+    ! Pack final set of CMI input - fill x,y,z,h,m
     !
     call allocate_cmi_inoutputs(x,y,z,h,m,nH)
-    x(1:ncminode) = nixyzhmf_cminode(3,1:ncminode)
-    y(1:ncminode) = nixyzhmf_cminode(4,1:ncminode)
-    z(1:ncminode) = nixyzhmf_cminode(5,1:ncminode)
-    h(1:ncminode) = nixyzhmf_cminode(6,1:ncminode)
-    m(1:ncminode) = nixyzhmf_cminode(7,1:ncminode)
-    call run_cmacionize(ncminode,x,y,z,h,m,nH)
+    if (crop_domain) then
+       ncminode_in = 0
+       r_crop2 = (rcrop_min + rcut_opennode*crop_fac)**2
+       do inode = 1,ncminode
+          if (mag2(nixyzhmf_cminode(3:5,inode)-cen_crop) < r_crop2) then
+             ncminode_in = ncminode_in + 1 
+             x(ncminode_in) = nixyzhmf_cminode(3,inode)
+             y(ncminode_in) = nixyzhmf_cminode(4,inode)
+             z(ncminode_in) = nixyzhmf_cminode(5,inode)
+             h(ncminode_in) = nixyzhmf_cminode(6,inode)
+             m(ncminode_in) = nixyzhmf_cminode(7,inode)
+          endif 
+       enddo 
+       write(*,'(2x,a42,i8)') 'Number of pseudo-particles after cropping:',ncminode_in
+    else 
+       x(1:ncminode) = nixyzhmf_cminode(3,1:ncminode)
+       y(1:ncminode) = nixyzhmf_cminode(4,1:ncminode)
+       z(1:ncminode) = nixyzhmf_cminode(5,1:ncminode)
+       h(1:ncminode) = nixyzhmf_cminode(6,1:ncminode)
+       m(1:ncminode) = nixyzhmf_cminode(7,1:ncminode)
+       ncminode_in = ncminode
+    endif 
     !
-    ! Store CMI output
+    ! Run CMI
     !
-    nixyzhmf_cminode(8,1:ncminode) = nH(1:ncminode) !- fill nixyzhmf_cminode(8,inode)
+    call run_cmacionize(ncminode_in,x,y,z,h,m,nH)
+    !
+    ! Store CMI output - fill nH
+    !
+    if (crop_domain) then
+       !- Check that the whole ionized region is within the cropped domain 
+       call check_cropped_space_ionization(ncminode_in,x,y,z,nH,must_iter)
+       if (must_iter) then 
+          call warning('photoionize_cmi','boundary of cropped region is ionized too!')
+          call deallocate_cmi_inoutputs(x,y,z,h,m,nH)
+          print*,' ** Adjusting rcut_opennode and rcut_leafpart **'
+          rcut_opennode = rcut_opennode + delta_rcut
+          rcut_leafpart = rcut_leafpart + delta_rcut
+          niter = niter + 1
+          cycle resolve_ionfront
+       endif 
+       !- If okay, store nH outputs, assuming that all nodes beyond cropped bounds are neutral
+       ncminode_out = 0
+       do inode = 1,ncminode
+          if (mag2(nixyzhmf_cminode(3:5,inode)-cen_crop) < r_crop2) then
+             ncminode_out = ncminode_out + 1 
+             nixyzhmf_cminode(8,inode) = nH(ncminode_out) ! assume same order as input
+          else 
+             nixyzhmf_cminode(8,inode) = 1.  
+          endif 
+       enddo 
+       if (ncminode_out /= ncminode_in) call fatal('photoionize_cmi','number of nodes coming in and out do not match!')
+    else
+       nixyzhmf_cminode(8,1:ncminode) = nH(1:ncminode)      !- fill nixyzhmf_cminode(8,inode)
+    endif 
     call deallocate_cmi_inoutputs(x,y,z,h,m,nH)
 
     !- For plotting current ionization structure of nodes
@@ -1196,7 +1286,133 @@ subroutine remove_unnecessary_opennode(ncminode)
 
 end subroutine remove_unnecessary_opennode
 
+!-----------------------------------------------------------------------------
+!+
+! If only passing a cropped spherical region of the whole simulation domain to CMI,
+! check that the boundary is beyond ionization front i.e. not ionized.
+! Note: Could happen during the initial iterations of resolve-ionfront iter, so 
+!       kill the simulation only if the warning persisted across timesteps
+!+
+!-----------------------------------------------------------------------------
+subroutine check_cropped_space_ionization(nsite,x,y,z,nH,must_iter)
+ integer, intent(in)  :: nsite 
+ real,    intent(in)  :: x(nsite),y(nsite),z(nsite),nH(nsite)
+ logical, intent(out) :: must_iter   !- flag to immediately jump to next resolve_ionfront iteration
+ integer :: isite,inbound,outbound,ifurthest
+ integer :: isite_all(nsite)         !- array of site indices to be sorted 
+ real    :: dist2site_all(nsite)     !- array of sites' distances to centre to be sorted 
+ real    :: boundary_frac = 0.1
+ real    :: disttocen2,nH_site
 
+ if (plot_cropped_sites) then 
+    open(2039,file='xyzf_cminode_cropping.txt')
+    write(2039,'(a25,a25,a25,a25)') 'x','y','z','nH'
+    do isite = 1,nsite
+       write(2039,*) x(isite), y(isite), z(isite), nH(isite) 
+    enddo
+    close(2039)
+ endif 
+
+ must_iter = .false. 
+
+ !- Compute distances between each node and centre of sources and store in array 
+ !$omp parallel do default(none) shared(nsite,cen_crop,x,y,z,isite_all,dist2site_all) &
+ !$omp private(isite,disttocen2) &
+ !$omp schedule(runtime)
+ do isite = 1,nsite
+    disttocen2 = mag2((/ x(isite),y(isite),z(isite) /) - cen_crop)
+    isite_all(isite) = isite
+    dist2site_all(isite) = disttocen2
+ enddo 
+ !$omp end parallel do
+
+ !- Sort dist2_site_all array in ascending order along with isite_all 
+ call quick_sort(nsite,dist2site_all,isite_all,1,nsite)
+
+ !- Get the furthest ~10% of sites
+ inbound  = int((1.-boundary_frac)*nsite)
+ outbound = nsite
+
+ !- Check nH of these sites 
+ check_nH: do ifurthest = 1,outbound-inbound+1 
+    isite = isite_all(inbound+ifurthest-1) 
+    nH_site = nH(isite)
+    if (nH_site < 1.) then 
+       must_iter = .true. 
+       exit check_nH
+    endif 
+ enddo check_nH
+
+end subroutine check_cropped_space_ionization
+
+!
+! Sorts input array along with iarray (carrying indices)
+!
+recursive subroutine quick_sort(n,array,iarray,first,last)
+ integer, intent(in)    :: n
+ integer, intent(in)    :: first,last
+ integer, intent(inout) :: iarray(n)
+ real,    intent(inout) :: array(n)
+ integer :: partition,nleft,nright
+
+ if (first < last .and. n > 0) then
+     !- Set pivot
+    call partition_pos(n,array,iarray,first,last,partition)
+
+    nleft = partition - first
+    call quick_sort(nleft,array,iarray,first,partition-1)
+
+    nright = last - partition
+    call quick_sort(nright,array,iarray,partition+1,last)
+ endif
+
+end subroutine quick_sort
+
+!
+! Function for finding a pivot such that those smaller than pivot
+! would be on the left and vice versa
+!
+subroutine partition_pos(n,array,iarray,first,last,partition)
+ integer, intent(in)    :: n
+ integer, intent(in)    :: first,last
+ integer, intent(inout) :: iarray(n)
+ real,    intent(inout) :: array(n)
+ integer, intent(out)   :: partition
+ integer :: i,j
+ real    :: temp,itemp,pivot
+
+ pivot = array(last)
+ i = first - 1        !- pointer for greater element
+
+ do j = first,last
+    if (array(j) < pivot) then
+       i = i + 1
+       temp = array(i)
+       array(i) = array(j)
+       array(j) = temp
+
+       itemp = iarray(i)
+       iarray(i) = iarray(j)
+       iarray(j) = itemp
+    endif
+ enddo
+ temp = array(i+1)
+ array(i+1) = array(last)
+ array(last) = temp
+
+ itemp = iarray(i+1)
+ iarray(i+1) = iarray(last)
+ iarray(last) = itemp
+
+ partition = i + 1
+
+end subroutine partition_pos
+
+!-----------------------------------------------------------------------------
+!+
+! Math tools 
+!+
+!-----------------------------------------------------------------------------
 real function mag2(vec)
  real, intent(in) :: vec(3)
 
