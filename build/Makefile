@@ -901,6 +901,8 @@ ifeq ($(SETUP), sncavity)
 #	 Injecting SN into cloud with cavity and channels to hit on neighbouring cloud
     SETUPFILE=velfield_fromcubes.f90 setup_twosphere_channel.f90
     SRCINJECT=inject_sne_sphng.f90
+    ANALYSIS=analysis_cell_near_sn.f90
+    MODFILE=moddump_clear_channel.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE=yes
@@ -1319,9 +1321,9 @@ ifeq ($(MCFOST), yes)
 endif
 
 ifeq ($(CMACIONIZE), yes)
-    LDFLAGS+= -L/$(CMI_DIR)/build/lib -lCMIFortranLibrary -lCMILibrary -lLegacyEngine -lSharedEngine $(HDF5ROOT)/lib/libhdf5.so \
-    /usr/lib/x86_64-linux-gnu/libz.so /usr/lib/x86_64-linux-gnu/libdl.so /usr/lib/x86_64-linux-gnu/libm.so \
-    /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi_cxx.so /usr/lib/x86_64-linux-gnu/openmpi/lib/libmpi.so -lstdc++ -lc
+    LDFLAGS+= -L/$(CMI_DIR)/build/lib -lCMIFortranLibrary -lCMILibrary -lLegacyEngine -lSharedEngine \
+$(HDF5ROOT)/lib/libhdf5.so /usr/lib/x86_64-linux-gnu/libz.so /usr/lib/x86_64-linux-gnu/libdl.a \
+/usr/lib/x86_64-linux-gnu/libm.so  -lstdc++ -lc
 endif
 
 ifeq ($(CMACIONIZE_KENNEDY),yes)
