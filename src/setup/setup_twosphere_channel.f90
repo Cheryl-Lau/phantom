@@ -7,7 +7,7 @@
 module setup
 !
 ! This module sets up an ellipsoidal envalope that contains two spherical clouds
-! with the option to manually create/mimic an HII region and a radiation-carved channel
+! with the option to manually create/mimic a radiation-carved channel
 !
 ! :References: None
 !
@@ -33,7 +33,6 @@ module setup
 !   - pfrac_channel    : *fraction of particles to remove in the channel*
 !   - gmw_in           : *mean molecular weight*
 !   - make_sinks       : *flag to dynamically create sinks*
-!   - create_hiiregion : *flag to manually heat the Stromgren region*
 !   - create_channel   : *flag to manually open a channel*
 !
 ! :Dependencies: dim, io, physcon, setup_params, spherical, boundary, prompting, units,
@@ -51,8 +50,7 @@ module setup
  real         :: mpart_solarm,rho_cloud1_cgs,rho_cloud2_cgs,rho_envelope_cgs,gmw_in
  real         :: rms_mach_cloud1,rms_mach_cloud2,r1_envelope,r2_envelope,r3_envelope
  real         :: cloud_sep_pc,omega_channel,pfrac_channel
- real         :: temp_hiiregion = 1E4
- logical      :: make_sinks,create_hiiregion,create_channel
+ logical      :: make_sinks,create_channel
  character(len=20) :: dist_unit,mass_unit
 
 contains
@@ -70,7 +68,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use spherical,    only:set_sphere,set_ellipse
  use boundary,     only:set_boundary,xmin,xmax,ymin,ymax,zmin,zmax,dxbound,dybound,dzbound
  use prompting,    only:prompt
- use units,        only:set_units,select_unit,utime,unit_density,unit_velocity,unit_energ,unit_ergg
+ use units,        only:set_units,select_unit,utime,unit_density,unit_velocity,unit_energ,unit_ergg,unit_pressure
  use eos,          only:polyk2,ieos,gmw
  use part,         only:igas,abundance,set_particle_type
  use part,         only:nptmass,xyzmh_ptmass,vxyz_ptmass,ihacc,ihsoft
@@ -89,7 +87,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
  use photoionize_cmi, only:sink_ionsrc,inject_rad
  use inject,          only:inject_sn,sink_progenitor
- use inject,          only:heat_hii,rad_hii,temp_hii
  integer,           intent(in)    :: id
  integer,           intent(inout) :: npart
  integer,           intent(out)   :: npartoftype(:)
@@ -104,12 +101,12 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  character(len=20), parameter     :: filevz = 'cube_v3.dat'
  integer            :: ip,npmax,ierr,i
  integer            :: npart_cloud1,npart_cloud2,np_outer,npart_outer,npmax_env,xyzh_size_tmp
- integer            :: npart_tmp_cloud1,npart_tmp_cloud2,npart_tmp_outer,npart_diff,npart_hii
+ integer            :: npart_tmp_cloud1,npart_tmp_cloud2,npart_tmp_outer,npart_diff
  integer(kind=8)    :: npart_total_cloud1,npart_total_cloud2,npart_total_outer
  real,  allocatable :: xyzh_tmp_cloud1(:,:),xyzh_tmp_cloud2(:,:),xyzh_tmp_outer(:,:)
  real,  allocatable :: vxyzu_turb(:,:)
  real(kind=8)       :: h_accs_in
- real               :: r_cloud1,cen_cloud1(3),psep_cloud1,cs_cloud1,cs_cloud1_cgs,rho_cloud1
+ real               :: r_cloud1,cen_cloud1(3),psep_cloud1,cs_cloud1,cs_cloud1_cgs,rho_cloud1,p_cloud1,p_cloud1_cgs
  real               :: temp_cloud1,vol_cloud1,t_ff_cloud1,totmass_cloud1,u_cloud1
  real               :: rmsmach,v2i,turbfac,turbboxsize,v2_sum,v_rms_cloud1,v_rms_kms_cloud1
  real               :: r_cloud2,cen_cloud2(3),psep_cloud2,cs_cloud2,cs_cloud2_cgs,rho_cloud2
@@ -190,16 +187,16 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call prompt('Enter the separation between the centre of clouds in pc',cloud_sep_pc,0.)
 
     !- Settings for the envelope
-    np_envelope = 1E5
+    np_envelope = 9E5
     npmax_env = npmax - np_cloud1 - np_cloud2
     call prompt('Enter the approximate number of particles within the envelope boundaries',np_envelope,0,npmax_env)
-    rho_envelope_cgs = 4E-25
+    rho_envelope_cgs = 3E-24  ! for 100K  ! 4E-25 for 1000K
     call prompt('Enter the density of the envelope in g/cm^3',rho_envelope_cgs,0.)
 
     !- Ratio of semi-axes of ellipsoidal envelope
-    r1_envelope = 5.
-    r2_envelope = 2.
-    r3_envelope = 2.
+    r1_envelope = 1.
+    r2_envelope = 1.
+    r3_envelope = 1.
     call prompt('Enter the ratio of semi-axis a of the ellipsoidal envelope ',r1_envelope,0.)
     call prompt('Enter the ratio of semi-axis b of the ellipsoidal envelope ',r2_envelope,0.)
     call prompt('Enter the ratio of semi-axis c of the ellipsoidal envelope ',r3_envelope,0.)
@@ -208,13 +205,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     gmw_in = 1.29
     call prompt('Enter the mean molecular weight',gmw_in,0.)
 
-    make_sinks = .true.
+    make_sinks = .false.
     call prompt('Do you wish to dynamically create sink particles? ',make_sinks)
 
-    create_hiiregion = .false.
-    call prompt('Do you wish to manually create an HII region? ',create_hiiregion)
-
-    create_channel = .true.
+    create_channel = .false.
     call prompt('Do you wish to manually carve a channel? ',create_channel)
 
     if (create_channel) then
@@ -259,7 +253,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  vol_cloud1     = totmass_cloud1/rho_cloud1
  r_cloud1       = (3./4.*vol_cloud1/pi)**(1./3.)
  t_ff_cloud1    = sqrt(3.*pi/(32.*rho_cloud1))
- lattice_cloud1 = 'closepacked'
+ lattice_cloud1 = 'random'
  cen_cloud1 = (/ 0.,0.,0. /)
 
  if (.not.remove_cloud1) then
@@ -318,6 +312,11 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     cs_cloud1_cgs = sqrt(temp_cloud1*(gamma*kboltz)/(gmw*mass_proton_cgs))
     cs_cloud1     = cs_cloud1_cgs/unit_velocity
 
+    !- Pressure
+    p_cloud1     = cs_cloud1**2*rho_cloud1/gamma
+    p_cloud1_cgs = p_cloud1*unit_pressure
+    print*,'pressure cloud1 g/cm/s^2 ',p_cloud1_cgs
+
     !- Apply turbulence
     vxyzu = 0.
     if (rms_mach_cloud1 > 0.) then
@@ -367,34 +366,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !- Stagnation radius of HII region
     cs_i = sqrt(1E4*(gamma*kboltz)/(gmw*mass_proton_cgs)) / unit_velocity  ! cs of ionized medium
     cs_0 = cs_cloud1                                                       ! cs of neutral medium
-!    cs_0 = sqrt(1E2*(gamma*kboltz)/(gmw*mass_proton_cgs)) / unit_velocity  ! testing
 
     rad_stag = (8./3.)**(2./3.) * (cs_i/cs_0)**(4./3.) * rad_strom
     if (rad_stag < 0.2*r_cloud1) call warning('setup_twosphere_channel','HII region could be too small')
-
-    !- Manually heat the evolved HII region upon request
-    if (create_hiiregion) then
-       if (rad_stag > r_cloud1) then
-          print*,'Stagnation radius is ',rad_stag/r_cloud1,'times bigger than sphere radius'
-          call fatal('setup_twosphere_channel','HII region is beyond the sphere boundaries')
-       endif
-       !- In setup
-       npart_hii = 0
-       u_hii = kboltz * temp_hiiregion / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg
-       do ip = 1,npart
-          if (mag2(xyzh(1:3,ip)-cen_cloud1) < rad_stag**2) then
-             vxyzu(4,ip) = u_hii
-             npart_hii = npart_hii + 1
-          endif
-       enddo
-       print*,'Number of particles within HII region: ',npart_hii
-       !- In runtime (SN injection mod)
-       heat_hii = .true.
-       rad_hii  = rad_stag
-       temp_hii = temp_hiiregion
-    else
-       if (rad_stag > r_cloud1) call warning('setup_twosphere_channel','HII region could be beyond the sphere boundaries')
-    endif
+    if (rad_stag > r_cloud1) call warning('setup_twosphere_channel','HII region could be beyond the sphere boundaries')
  endif
 
  !
@@ -505,9 +480,11 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     lattice_envelope = 'closepacked'
 
     !- Check that the size of envelope can cover the two clouds
-    minx_clouds  = r_cloud1 + cloud_sep + r_cloud2
-    minyz_clouds = 2.*max(r_cloud1,r_cloud2)
-    if (2.*r_outer(1) < 2.*minx_clouds .or. 2.*max(r_outer(2),r_outer(3)) < 2.*minyz_clouds) then
+    minx_clouds = r_cloud1
+    if (.not.remove_cloud2) minx_clouds = minx_clouds + cloud_sep + r_cloud2
+    minyz_clouds = r_cloud1
+    if (.not.remove_cloud2) minyz_clouds = 2.*max(r_cloud1,r_cloud2)
+    if (2.*r_outer(1) < 1.5*minx_clouds .or. 2.*max(r_outer(2),r_outer(3)) < 1.5*minyz_clouds) then
        call fatal('setup_twosphere_channel','require more particles in envelope')
     endif
 
@@ -542,6 +519,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
              npart = npart + 1
              xyzh(:,npart) = xyzh_tmp_outer(:,ip)
           endif
+       else
+          npart = npart + 1
+          xyzh(:,npart) = xyzh_tmp_outer(:,ip)
        endif
     enddo
     deallocate(xyzh_tmp_outer)
@@ -564,7 +544,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        print*,'Removed ',npart_diff,' particles from envelope that overlap the spheres'
        print*,'Number of particles in the envelope: ',npart_outer
     else
-       call fatal('setup_twosphere_channel','no particles removed in evelope')
+       if (.not.remove_cloud1 .and. .not.remove_cloud2) then
+          call fatal('setup_twosphere_channel','no particles removed in evelope')
+       endif
     endif
  endif
 
@@ -598,8 +580,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  inquire(file=infilename,exist=in_iexist)
  if (.not.in_iexist) then
     tmax      = 2.0*min(t_ff_cloud1,t_ff_cloud2)
-    dtmax     = 0.01*min(t_ff_cloud1,t_ff_cloud2)
-    nout      = 10
+    dtmax     = 0.001*min(t_ff_cloud1,t_ff_cloud2)
+    nout      = 1
     nfulldump = 1
     nmaxdumps = 1000
     dtwallmax = 1800.  ! s
@@ -607,11 +589,12 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
     ieos      = 2    ! adiabatic eos with P = (gamma-1)*rho*u
     gmw       = gmw_in
-    icooling  = 7
+    icooling  = 0
     Tfloor    = 3.
     ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
     ipdv_heating   = 1
     ishock_heating = 1
+    alphau = 1.
 
     !
     ! Sinks settings
@@ -654,16 +637,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
     monochrom_source  = .false.
     fix_temp_hii      = .false.
-    treat_Rtype_phase = .true.
+    treat_Rtype_phase = .false.
 
     photoionize_tree  = .true.
     tree_accuracy_cmi = 0.3
-    nHlimit_fac       = 100
-    rcut_opennode_cgs = 0.5*pc
-    rcut_leafpart_cgs = 0.2*pc
-    delta_rcut_cgs    = 0.1*pc
-
-    if (create_hiiregion .and. inject_rad) call fatal('setup_twosphere_channel','why inject radiation twice...?')
+    nHlimit_fac       = 100.
+    rcut_opennode_cgs = 3*pc
+    rcut_leafpart_cgs = 2*pc
+    delta_rcut_cgs    = 0.5*pc
 
     !
     ! Supernova settings
@@ -679,24 +660,27 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  mjeans_cgs_cloud2 = (5.*Rg*temp_cloud2/(2.*gg*gmw))**(3./2.) * (4./3.*pi*rho_cloud2_cgs)**(-1./2.)
  mjeans_cloud2 = mjeans_cgs_cloud2/umass
 
+ if (.not.remove_cloud1) then
+    print*,'-Cloud 1-'
+    print*,'total mass        ',totmass_cloud1,mass_unit
+    print*,'radius            ',r_cloud1,dist_unit
+    print*,'free-fall time    ',t_ff_cloud1*utime/(1E6*years),'Myr'
+    print*,'temperature       ',temp_cloud1,'K'
+    print*,'sound speed       ',cs_cloud1_cgs*1E-5,'km/s'
+    print*,'v_rms             ',v_rms_kms_cloud1,'km/s'
+    print*,'expected R_stag   ',rad_stag,dist_unit
+ endif
 
- print*,'-Cloud 1-'
- print*,'total mass        ',totmass_cloud1,mass_unit
- print*,'radius            ',r_cloud1,dist_unit
- print*,'free-fall time    ',t_ff_cloud1*utime/(1E6*years),'Myr'
- print*,'temperature       ',temp_cloud1,'K'
- print*,'sound speed       ',cs_cloud1_cgs*1E-5,'km/s'
- print*,'v_rms             ',v_rms_kms_cloud1,'km/s'
- print*,'expected R_stag   ',rad_stag,dist_unit
-
- print*,'-Cloud 2-'
- print*,'total mass        ',totmass_cloud2,mass_unit
- print*,'Jeans mass        ',mjeans_cloud2,mass_unit
- print*,'radius            ',r_cloud2,dist_unit
- print*,'free-fall time    ',t_ff_cloud2*utime/(1E6*years),'Myr'
- print*,'temperature       ',temp_cloud2,'K'
- print*,'sound speed       ',cs_cloud2_cgs*1E-5,'km/s'
- print*,'v_rms             ',v_rms_kms_cloud2,'km/s'
+ if (.not.remove_cloud2) then
+    print*,'-Cloud 2-'
+    print*,'total mass        ',totmass_cloud2,mass_unit
+    print*,'Jeans mass        ',mjeans_cloud2,mass_unit
+    print*,'radius            ',r_cloud2,dist_unit
+    print*,'free-fall time    ',t_ff_cloud2*utime/(1E6*years),'Myr'
+    print*,'temperature       ',temp_cloud2,'K'
+    print*,'sound speed       ',cs_cloud2_cgs*1E-5,'km/s'
+    print*,'v_rms             ',v_rms_kms_cloud2,'km/s'
+ endif
 
  if (.not.remove_envelope) then
     print*,'-Envelope-'
@@ -717,29 +701,33 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     write(2022,*) 'tmax              ',tmax*utime/(1E6*years),'Myr / ',tmax*utime,'s'
     write(2022,*) 'dtmax             ',dtmax*utime/(1E6*years),'Myr / ',dtmax*utime,'s'
 
-    write(2022,*) '-Cloud 1-'
-    write(2022,*) 'density           ',rho_cloud1_cgs,'g/cm^3'
-    write(2022,*) 'total mass        ',totmass_cloud1,mass_unit
-    write(2022,*) 'radius            ',r_cloud1,dist_unit
-    write(2022,*) 'volume            ',vol_cloud1*udist**3/pc**3,'pc^3'
-    write(2022,*) 'free-fall time    ',t_ff_cloud1,'/ ',t_ff_cloud1*utime/(1E6*years),'Myr / ',t_ff_cloud1*utime,'s'
-    write(2022,*) 'temperature       ',temp_cloud1,'K'
-    write(2022,*) 'sound speed       ',cs_cloud1_cgs*1E-5,'km/s'
-    write(2022,*) 'Mach number       ',rms_mach_cloud1
-    write(2022,*) 'v_rms             ',v_rms_kms_cloud1,'km/s'
-    write(2022,*) 'Stagnation radius ',rad_stag,dist_unit
+    if (.not.remove_cloud1) then
+       write(2022,*) '-Cloud 1-'
+       write(2022,*) 'density           ',rho_cloud1_cgs,'g/cm^3'
+       write(2022,*) 'total mass        ',totmass_cloud1,mass_unit
+       write(2022,*) 'radius            ',r_cloud1,dist_unit
+       write(2022,*) 'volume            ',vol_cloud1*udist**3/pc**3,'pc^3'
+       write(2022,*) 'free-fall time    ',t_ff_cloud1,'/ ',t_ff_cloud1*utime/(1E6*years),'Myr / ',t_ff_cloud1*utime,'s'
+       write(2022,*) 'temperature       ',temp_cloud1,'K'
+       write(2022,*) 'sound speed       ',cs_cloud1_cgs*1E-5,'km/s'
+       write(2022,*) 'Mach number       ',rms_mach_cloud1
+       write(2022,*) 'v_rms             ',v_rms_kms_cloud1,'km/s'
+       write(2022,*) 'Stagnation radius ',rad_stag,dist_unit
+    endif
 
-    write(2022,*) '-Cloud 2-'
-    write(2022,*) 'density           ',rho_cloud2_cgs,'g/cm^3'
-    write(2022,*) 'total mass        ',totmass_cloud2,mass_unit
-    write(2022,*) 'Jeans mass        ',mjeans_cloud2,mass_unit
-    write(2022,*) 'radius            ',r_cloud2,dist_unit
-    write(2022,*) 'volume            ',vol_cloud2*udist**3/pc**3,'pc^3'
-    write(2022,*) 'free-fall time    ',t_ff_cloud2,'/ ',t_ff_cloud2*utime/(1E6*years),'Myr / ',t_ff_cloud2*utime,'s'
-    write(2022,*) 'temperature       ',temp_cloud2,'K'
-    write(2022,*) 'sound speed       ',cs_cloud2_cgs*1E-5,'km/s'
-    write(2022,*) 'Mach number       ',rms_mach_cloud2
-    write(2022,*) 'v_rms             ',v_rms_kms_cloud2,'km/s'
+    if (.not.remove_cloud2) then
+       write(2022,*) '-Cloud 2-'
+       write(2022,*) 'density           ',rho_cloud2_cgs,'g/cm^3'
+       write(2022,*) 'total mass        ',totmass_cloud2,mass_unit
+       write(2022,*) 'Jeans mass        ',mjeans_cloud2,mass_unit
+       write(2022,*) 'radius            ',r_cloud2,dist_unit
+       write(2022,*) 'volume            ',vol_cloud2*udist**3/pc**3,'pc^3'
+       write(2022,*) 'free-fall time    ',t_ff_cloud2,'/ ',t_ff_cloud2*utime/(1E6*years),'Myr / ',t_ff_cloud2*utime,'s'
+       write(2022,*) 'temperature       ',temp_cloud2,'K'
+       write(2022,*) 'sound speed       ',cs_cloud2_cgs*1E-5,'km/s'
+       write(2022,*) 'Mach number       ',rms_mach_cloud2
+       write(2022,*) 'v_rms             ',v_rms_kms_cloud2,'km/s'
+    endif
 
     if (.not.remove_envelope) then
        write(2022,*) '-Envelope-'
@@ -806,7 +794,6 @@ subroutine write_setupfile(filename)
  call write_inopt(mpart_solarm,'mpart_solarm','mass of particles in solarm units',iunit)
  call write_inopt(gmw_in,'gmw_in','mean molecular weight',iunit)
  call write_inopt(make_sinks,'make_sinks','dynamically create sink particles',iunit)
- call write_inopt(create_hiiregion,'create_hiiregion','manually heat the Stromgren region',iunit)
  call write_inopt(create_channel,'create_channel','manually open a channel',iunit)
 
  write(iunit,"(/,a)") '# cloud1 settings'
@@ -870,7 +857,6 @@ subroutine read_setupfile(filename,ierr)
  call read_inopt(pfrac_channel,'pfrac_channel',db,ierr)
  call read_inopt(gmw_in,'gmw_in',db,ierr)
  call read_inopt(make_sinks,'make_sinks',db,ierr)
- call read_inopt(create_hiiregion,'create_hiiregion',db,ierr)
  call read_inopt(create_channel,'create_channel',db,ierr)
 
  call close_db(db)
