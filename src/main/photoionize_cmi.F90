@@ -82,7 +82,7 @@ module photoionize_cmi
  !- or
  ! Manually set location, starting/ending time and ionizing photon flux [cgs units] of sources
  integer, public, parameter :: nsetphotosrc = 1
- real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 0.,0.,0., 0.,1E60,1E50 /),&
+ real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 4.0169e+18, 5.8504e+18, 1.3752e+18, 0.,1E60,1E50 /),&
                                                                     shape=(/6,nsetphotosrc/))
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
@@ -106,7 +106,7 @@ module photoionize_cmi
  logical, public :: auto_tree_acc = .false.
 
  ! Options for cropping simulation domain being passed to CMI (to avoid segfault; use with caution)
- real,    public :: crop_fac     = 2.5          ! bounds = crop_fac*rcut_opennode (>1)
+ real,    public :: crop_fac     = 1.2          ! bounds = crop_fac*rcut_opennode (>1)
  logical, public :: crop_domain  = .true.
 
  ! Options for heating/cooling
@@ -234,8 +234,8 @@ subroutine init_ionizing_radiation_cmi(time,npart,xyzh,nptmass,dt)
 
  !- Check settings for cropping simulation 
  if (crop_domain) then 
-    if (crop_fac < 1.5) call fatal('photoionize_cmi','we need larger nodes on the side to detect the ionization front!')
-    if (crop_fac < 3.0) call warning('photoionize_cmi','recommend setting a larger crop_fac')
+    if (crop_fac < 1.0) call fatal('photoionize_cmi','we need larger nodes on the side to detect the ionization front!')
+    if (crop_fac < 2.0) call warning('photoionize_cmi','recommend setting a larger crop_fac')
  endif 
 
  !- Check options for ionizing source
@@ -1014,7 +1014,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
        !- Check that the whole ionized region is within the cropped domain 
        call check_cropped_space_ionization(ncminode_in,x,y,z,nH,must_iter)
        if (must_iter) then 
-          call warning('photoionize_cmi','boundary of cropped region is ionized too!')
+          print*,' Boundary of cropped region is ionized too!'
           call deallocate_cmi_inoutputs(x,y,z,h,m,nH)
           print*,' ** Adjusting rcut_opennode and rcut_leafpart **'
           rcut_opennode = rcut_opennode + delta_rcut
@@ -1301,8 +1301,9 @@ subroutine check_cropped_space_ionization(nsite,x,y,z,nH,must_iter)
  integer :: isite,inbound,outbound,ifurthest
  integer :: isite_all(nsite)         !- array of site indices to be sorted 
  real    :: dist2site_all(nsite)     !- array of sites' distances to centre to be sorted 
- real    :: boundary_frac = 0.1
+ real    :: boundary_frac = 0.05
  real    :: disttocen2,nH_site
+ logical :: bounds_ok
 
  if (plot_cropped_sites) then 
     open(2039,file='xyzf_cminode_cropping.txt')
@@ -1329,9 +1330,17 @@ subroutine check_cropped_space_ionization(nsite,x,y,z,nH,must_iter)
  !- Sort dist2_site_all array in ascending order along with isite_all 
  call quick_sort(nsite,dist2site_all,isite_all,1,nsite)
 
- !- Get the furthest ~10% of sites
- inbound  = int((1.-boundary_frac)*nsite)
- outbound = nsite
+ !- Get the furthest sites
+ bounds_ok = .false.
+ do while (.not.bounds_ok)
+    inbound  = int((1.-boundary_frac)*nsite)
+    outbound = nsite
+    if (outbound-inbound > 5) then 
+       bounds_ok = .true.
+    else 
+       boundary_frac = boundary_frac + 0.05
+    endif 
+ enddo
 
  !- Check nH of these sites 
  check_nH: do ifurthest = 1,outbound-inbound+1 
@@ -1378,8 +1387,8 @@ subroutine partition_pos(n,array,iarray,first,last,partition)
  integer, intent(inout) :: iarray(n)
  real,    intent(inout) :: array(n)
  integer, intent(out)   :: partition
- integer :: i,j
- real    :: temp,itemp,pivot
+ integer :: i,j,itemp
+ real    :: temp,pivot
 
  pivot = array(last)
  i = first - 1        !- pointer for greater element
