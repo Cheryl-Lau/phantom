@@ -82,7 +82,7 @@ module photoionize_cmi
  !- or
  ! Manually set location, starting/ending time and ionizing photon flux [cgs units] of sources
  integer, public, parameter :: nsetphotosrc = 1
- real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 4.0169e+18, 5.8504e+18, 1.3752e+18, 0.,1E60,1E50 /),&
+ real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 0.,0.,0., 0.,1E60,1E50 /),&
                                                                     shape=(/6,nsetphotosrc/))
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
@@ -106,8 +106,8 @@ module photoionize_cmi
  logical, public :: auto_tree_acc = .false.
 
  ! Options for cropping simulation domain being passed to CMI (to avoid segfault; use with caution)
- logical, public :: crop_domain  = .true.
  real,    public :: crop_fac     = 2.5          ! bounds = crop_fac*rcut_opennode (>1)
+ logical, public :: crop_domain  = .true.
 
  ! Options for heating/cooling
  real,    public :: temp_hii     = 1E4          ! K
@@ -169,7 +169,7 @@ module photoionize_cmi
  logical :: print_cmi   = .false.          ! show CMI shell outputs
  logical :: write_nH_u_distri  = .false.   ! write u of particles vs nH
  logical :: write_node_prop    = .false.   ! write properties of the current set of cmi-nodes
- logical :: plot_cropped_sites = .false.   ! write properties of the current cropped set of cmi-nodes
+ logical :: plot_cropped_sites = .true.   ! write properties of the current cropped set of cmi-nodes
  logical :: catch_noroot_parts = .false.   ! write particles with no therm-equil roots
 
 contains
@@ -1869,6 +1869,8 @@ subroutine write_options_photoionize(iunit)
  call write_inopt(delta_rcut_cgs,'delta_rcut_cgs','Increase in rcut_opennode_cgs and rcut_leafpart_cgs per iter step',iunit)
  call write_inopt(nHlimit_fac,'nHlimit_fac','Paramter controlling resolution of ionization front',iunit)
  call write_inopt(min_nodesize_toflag,'min_nodesize_toflag','Minimum node size to check nH',iunit)
+ call write_inopt(crop_domain,'crop_domain','Crop simulation domain to pass to CMI',iunit)
+ call write_inopt(crop_fac,'crop_fac','Factor of rcut_leaf to crop',iunit)
  call write_inopt(temp_hii,'temp_hii','Temperature of ionized gas',iunit)
  call write_inopt(fix_temp_hii,'fix_temp_hii','Heat ionized particles to specified temp_hii',iunit)
  call write_inopt(implicit_cmi,'implicit_cmi','Use implicit method to update internal energies',iunit)
@@ -1958,6 +1960,13 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
     read(valstring,*,iostat=ierr) min_nodesize_toflag
     ngot = ngot + 1
     if (min_nodesize_toflag < 0.) call fatal(label,'invalid setting for min_nodesize_toflag')
+ case('crop_domain')
+    read(valstring,*,iostat=ierr) crop_domain
+    ngot = ngot + 1
+ case('crop_fac')
+    read(valstring,*,iostat=ierr) crop_fac
+    ngot = ngot + 1
+    if (crop_fac <= 0.) call fatal(label,'invalid setting for crop_fac')
  case('temp_hii')
     read(valstring,*,iostat=ierr) temp_hii
     ngot = ngot + 1
@@ -1974,7 +1983,7 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
  case default
     imatch = .false.
  end select
- igotall = ( ngot >= 22 )
+ igotall = ( ngot >= 24 )
 
 end subroutine read_options_photoionize
 
