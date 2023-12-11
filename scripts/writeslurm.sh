@@ -23,7 +23,7 @@ case $yn in
 esac
 echo '#SBATCH --output='$infile'.qout'
 echo '#SBATCH --error='$infile'.err'
-echo '#SBATCH --mail-type=END,FAIL'
+echo '#SBATCH --mail-type=BEGIN,END,FAIL'
 echo '#SBATCH --mail-user='$USER'@st-andrews.ac.uk'
 echo '#SBATCH --mem=80G'
 
