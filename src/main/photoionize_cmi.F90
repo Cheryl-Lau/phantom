@@ -52,6 +52,8 @@ module photoionize_cmi
 !   - delta_rcut_cgs      : *Increase in rcut_opennode_cgs and rcut_leafpart_cgs in an iteration step*
 !   - nHlimit_fac         : *Free parameter which controls the resolution of the ionization front*
 !   - min_nodesize_toflag : *Minimum node size (relative to root node) to check neutral frac*
+!   - crop_domain         : *Automatically crop the simulation domain being exposed to CMI*
+!   - crop_fac            : *Cropping out a spherical region of radius crop_fac*rcut_opennode*
 !   - temp_hii            : *Presumed temperature of ionized gas*
 !   - fix_temp_hii        : *Heats ionized particles to temp_hii, else computes heating and cooling*
 !   - implicit_cmi        : *Update internal energy of particles with implicit method, else explicit*
