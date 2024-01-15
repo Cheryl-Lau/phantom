@@ -430,7 +430,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
     photoionize_tree  = .true.
     tree_accuracy_cmi = 0.3
-    nHlimit_fac       = 50
+    nHlimit_fac       = 100.
     rcut_opennode_cgs = 6.0*pc
     rcut_leafpart_cgs = 4.0*pc
     delta_rcut_cgs    = 0.5*pc
