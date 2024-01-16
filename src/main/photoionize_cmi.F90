@@ -111,6 +111,9 @@ module photoionize_cmi
  real,    public :: crop_fac     = 1.2          ! bounds = crop_fac*rcut_opennode (>1)
  logical, public :: crop_domain  = .true.
 
+ ! Options for modifying the voronoi grid to enlarge the smallest cells
+ logical, public :: limit_voronoi = .true.
+ 
  ! Options for heating/cooling
  real,    public :: temp_hii     = 1E4          ! K
  logical, public :: fix_temp_hii = .false.      ! else computes heating and cooling
@@ -1469,14 +1472,24 @@ end subroutine run_cmacionize
 ! Writes the Voronoi sites and the .param input files to be read by CMI
 !+
 !-----------------------------------------------------------------------------
-subroutine write_cmi_infiles(nsite,x,y,z,h,m)
+subroutine write_cmi_infiles(nsite_in,x_in,y_in,z_in,h,m)
  use io,  only:fatal
- integer, intent(in) :: nsite
- real,    intent(in) :: x(:),y(:),z(:),h(:),m(:)
- integer :: i,isrc
+ integer, intent(in) :: nsite_in
+ real,    intent(in) :: x_in(:),y_in(:),z_in(:),h(:),m(:)
+ integer :: i,isrc,nsite
  real    :: xmin,xmax,ymin,ymax,zmin,zmax,dx,dy,dz,space_fac
  real    :: xmin_si,ymin_si,zmin_si,dx_si,dy_si,dz_si
+ real,   allocatable :: x(:),y(:),z(:)
  logical :: redo_grid
+
+ nsite = nsite_in   !- only modify these properties within this subroutine
+ allocate(x(nsite))
+ allocate(y(nsite))
+ allocate(z(nsite))
+ x = x_in
+ y = y_in
+ z = z_in
+ if (limit_voronoi) call modify_grid(nsite,x,y,z,h)
 
  !
  ! Set boundaries only around the given sites
@@ -1667,6 +1680,53 @@ subroutine write_cmi_infiles(nsite,x,y,z,h,m)
  close(2026)
 
 end subroutine write_cmi_infiles
+
+!
+! Routine to merge the smallest grid cells by removing the generation sites 
+! with very small smoothing lengths 
+!
+subroutine modify_grid(nsite,x,y,z,h)
+ use io, only:warning,fatal
+ integer, intent(inout) :: nsite 
+ real,    intent(inout) :: x(nsite),y(nsite),z(nsite)
+ real,    intent(in)    :: h(nsite)
+ integer :: isite,nsite_store
+ real    :: hmin,hmax,hlimit 
+ real    :: x_store(nsite),y_store(nsite),z_store(nsite)
+ real    :: hlimit_fac = 1E-4
+ 
+ !- find the max and min of h
+ hmin = huge(hmin)
+ hmax = tiny(hmax)
+ do isite = 1,nsite 
+    hmin = min(hmin,h(isite))
+    hmax = max(hmax,h(isite))
+ enddo 
+ 
+ !- set filter - h smaller than it will be removed 
+ hlimit = hmin + (hmax-hmin)*hlimit_fac
+ 
+ !- keep only those with h > hlimit
+ nsite_store = 0
+ do isite = 1,nsite 
+    if (h(isite) > hlimit) then 
+       nsite_store = nsite_store + 1 
+       x_store(nsite_store) = x(isite)
+       y_store(nsite_store) = y(isite)
+       z_store(nsite_store) = z(isite)
+    endif 
+ enddo
+ 
+ if (nsite_store == nsite) call warning('photoionize_cmi','no cells merged')
+ if ((nsite-nsite_store)/nsite > 0.05) call fatal('photoionize_cmi','merged too many small cells!') 
+ write(*,'(2x,a8,i4,a25)') 'Removed ',nsite-nsite_store,' Voronoi generation sites'
+
+ nsite = nsite_store 
+ x(1:nsite) = x_store(1:nsite)
+ y(1:nsite) = y_store(1:nsite)
+ z(1:nsite) = z_store(1:nsite)
+
+end subroutine modify_grid 
 
 !-----------------------------------------------------------------------------
 !+
