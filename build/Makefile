@@ -901,7 +901,7 @@ ifeq ($(SETUP), sncavity)
 #	 Injecting SN into cloud with cavity and channels to hit on neighbouring cloud
     SETUPFILE=velfield_fromcubes.f90 setup_twosphere_channel.f90
     SRCINJECT=inject_sne_sphng.f90
-    ANALYSIS=analysis_cell_near_sn.f90
+    ANALYSIS=analysis_detector_near_sn.f90
     MODFILE=moddump_clear_channel.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
@@ -2199,8 +2199,8 @@ OBJMOD1 = utils_omp.F90 utils_summary.f90 utils_indtimesteps.F90 \
           random.f90 set_disc.F90 set_dust.f90 \
           ${SRCTURB} ${SRCNIMHD} ${SRCCHEM} dust_formation.F90 ptmass_radiation.F90 \
           icosahedron.f90 radiation_utils.f90 cons2prim.f90 \
-          partinject.F90 utils_inject.f90 ${SRCINJECT} ${SRCPHOTOION} \
-          density_profiles.f90 ptmass.F90 damping.f90 readwrite_infile.f90 checksetup.f90 ${MODFILE:.f90=.o}
+          partinject.F90 utils_inject.f90 ptmass.F90 ${SRCINJECT} \
+          density_profiles.f90 damping.f90 readwrite_infile.f90 checksetup.f90 ${MODFILE:.f90=.o}
 OBJMOD2 = ${OBJMOD1:.F90=.o}
 OBJMOD = ${OBJMOD2:.f90=.o}
 OBJDA= ${OBJDUMP} ${OBJMOD} phantom_moddump.o
