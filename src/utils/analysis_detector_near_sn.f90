@@ -29,7 +29,7 @@ module analysis
 contains
 
 subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
- use linklist, only:node,ifirstincell,listneigh
+ use linklist, only:node,ifirstincell,listneigh,set_linklist
  use kdtree,   only:getneigh
  use dim,      only:maxneigh
  use kernel,   only:get_kernel,cnormk,radkern2
@@ -42,26 +42,39 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  real,             intent(in) :: xyzh(:,:),vxyzu(:,:)
  real,             intent(in) :: particlemass,time
  integer, parameter :: neighcachesize = 1E5
- integer :: ip,nneigh,ixyzcachesize,ineigh,ipart
+ integer :: i,ip,iclosest,ineigh,nneigh,ixyzcachesize
  real    :: xyzcache(3,neighcachesize)
- real    :: hmean,rad_neigh
- real    :: pmass,x,y,z,h,rho,vx,vy,vz,v,u
- real    :: rho_target,v_target,thermpr_target,rampr_target
- real    :: time_si
- real    :: xyz_target_si(3) 
+ real    :: pmass,hmean,dist2,dist2_min,rad_neigh
+ real    :: vx_sum,rho_sum,thermpr_sum,rampr_sum
+ real    :: dr2,q2,q,wkern,wkern_norm,grkern
+ real    :: xyz_b(3),h_b,vx_b,rho_b,rampr_b,thermpr_b
+ real    :: rho_target,vx_target,thermpr_target,rampr_target
+ real    :: time_si,xyz_target_si(3)
+ real,   allocatable :: dumxyzh(:,:)
  character(len=70) :: filename
 
  !- Particle mass
  pmass = massoftype(igas)
 
- !- Get list of neighbours around detector point 
- hmean = 0.
+ !- Build tree 
+ allocate(dumxyzh(4,npart))
+ dumxyzh = xyzh
+ call set_linklist(npart,npart,dumxyzh,vxyzu)
+
+ !- Estimate the compact support radius at target point 
+ dist2_min = huge(dist2_min)
  do ip = 1,npart 
-    hmean = hmean + xyzh(4,ip)
+    dist2 = mag2(xyzh(1:3,ip)-xyz_target(1:3))
+    if (dist2 < dist2_min) then 
+       dist2_min = dist2 
+       iclosest  = ip
+    endif 
  enddo 
- hmean = hmean/npart 
- rad_neigh = hmean*2.
+ rad_neigh = xyzh(4,iclosest) * 2. 
+
+ !- Get list of neighbours around detector point 
  call getneigh(node,xyz_target,0.,rad_neigh,3,listneigh,nneigh,xyzh,xyzcache,neighcachesize,ifirstincell,.false.)
+ if (nneigh < 50) call fatal('analysis_detector_near_sn','not enough trial neighbours')
 
  !- Compute properties by interpolating from true neighbours 
  vx_sum  = 0.
@@ -95,20 +108,22 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  rho_target = rho_sum*unit_density*1000.
  vx_target  = vx_sum*unit_velocity*0.01
  rampr_target = rampr_sum*unit_pressure*0.1
- thermpr_target = thermpr_target*unit_pressure*0.1
+ thermpr_target = thermpr_sum*unit_pressure*0.1
  do i = 1,3
-    xyz_target(i) = xyz_target(i)*udist*0.01
+    xyz_target_si(i) = xyz_target(i)*udist*0.01
  enddo 
  time_si  = time*utime
 
  filename = 'gasflow_'//TRIM(dumpfile)//'.dat'
  open(unit=2206,file=filename)
  write(2206,'(4a20)') 'time [s]','x [m]','y [m]','z [m]'
- write(2206,*) time_si, xyz_target(1:3)
+ write(2206,'(4e20.10)') time_si, xyz_target_si(1:3)
  write(2206,'(4a25)') 'rho [kg m^-3]','v_x [m s^-1]','therm pr [kg m^-1 s^-2]','ram pr [kg m^-1 s^-2]'
- write(2206,*) rho_target, vx_target, thermpr_target, rampr_target 
+ write(2206,'(4e25.10)') rho_target, vx_target, thermpr_target, rampr_target 
 
  close(2206)
+
+ deallocate(dumxyzh)
 
 end subroutine do_analysis
 
