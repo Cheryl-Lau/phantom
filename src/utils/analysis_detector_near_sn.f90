@@ -93,8 +93,8 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
        ! get neigh particle properties 
        vx_b  = vxyzu(1,ip)
        rho_b = rhoh(h_b,pmass)
-       rampr_b   = rho_b*mag2(vxyzu(1:3,ip))
-       thermpr_b = rho_b*(gamma-1.)*vxyzu(4,ip)
+       rampr_b   = rho_b*mag2(vxyzu(1:3,ip))    ! rho*v2 
+       thermpr_b = rho_b*(gamma-1.)*vxyzu(4,ip) ! rho*(gamma-1)*u
        ! Compute SPH sum
        wkern_norm = cnormk/(h_b**3)*wkern 
        vx_sum  = vx_sum + vx_b*pmass/rho_b*wkern_norm 
