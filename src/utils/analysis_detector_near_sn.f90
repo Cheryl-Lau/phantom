@@ -100,7 +100,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
        vx_sum  = vx_sum + vx_b*pmass/rho_b*wkern_norm 
        rho_sum = rho_sum + pmass*wkern_norm
        rampr_sum   = rampr_sum + rampr_b*pmass/rho_b*wkern_norm 
-       thermpr_sum = thermpr_sum + rampr_b*pmass/rho_b*wkern_norm 
+       thermpr_sum = thermpr_sum + thermpr_b*pmass/rho_b*wkern_norm 
     endif 
  enddo over_neigh
 
