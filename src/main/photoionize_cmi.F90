@@ -171,7 +171,7 @@ module photoionize_cmi
 
  ! Switches for plotting/debugging
  logical :: write_gamma = .false.          ! write heating rates vs nH (from both phantom and CMI)
- logical :: print_cmi   = .false.          ! show CMI shell outputs
+ logical :: print_cmi   = .true.          ! show CMI shell outputs
  logical :: write_nH_u_distri  = .false.   ! write u of particles vs nH
  logical :: write_node_prop    = .false.   ! write properties of the current set of cmi-nodes
  logical :: plot_cropped_sites = .true.   ! write properties of the current cropped set of cmi-nodes
