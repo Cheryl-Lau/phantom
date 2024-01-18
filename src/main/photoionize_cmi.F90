@@ -446,9 +446,11 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
     disttomin2 = mag2((/xmin_allsrc,ymin_allsrc,zmin_allsrc/) - cen_crop)
     disttomax2 = mag2((/xmax_allsrc,ymax_allsrc,zmax_allsrc/) - cen_crop)
     rcrop_min  = max(disttomin2,disttomax2)
-    print*,'-Cropping simulation domain-'
-    print*,' centre: ',cen_crop
-    print*,' radius that encapsulates all sources: ',rcrop_min
+    if (inject_rad) then 
+       print*,'-Cropping simulation domain-'
+       print*,' centre: ',cen_crop
+       print*,' radius that encapsulates all sources: ',rcrop_min
+    endif 
  endif 
 
  !- Convert to SI units for CMI param file
