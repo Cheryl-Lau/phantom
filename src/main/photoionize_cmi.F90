@@ -1693,7 +1693,7 @@ subroutine modify_grid(nsite,x,y,z,h)
  integer :: isite,nsite_store
  real    :: hmin,hmax,hlimit 
  real    :: x_store(nsite),y_store(nsite),z_store(nsite)
- real    :: hlimit_fac = 1E-4
+ real    :: hlimit_fac = 5E-4
  
  !- find the max and min of h
  hmin = huge(hmin)
