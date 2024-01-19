@@ -120,7 +120,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real               :: r_sn_cgs,engsn_cgs,pmsncrit_cgs
  real               :: h_acc_cgs,h_soft_sinksink_cgs,h_soft_sinkgas_cgs,rho_crit_cgs_recomm
  logical            :: iexist,in_iexist,add_particle
- logical            :: remove_cloud1       = .false. ! temporarily removing objects to check virial ratio
+ logical            :: remove_cloud1       = .true. ! temporarily removing objects to check virial ratio
  logical            :: remove_cloud2       = .true.
  logical            :: remove_envelope     = .false.
  logical            :: place_sink_in_setup = .false.
