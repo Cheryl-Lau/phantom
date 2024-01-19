@@ -6,7 +6,8 @@
 !--------------------------------------------------------------------------!
 module photoionize_cmi
 !
-! The CMI suite: *photoionize_cmi.F90* kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90
+! The CMI suite: *photoionize_cmi.F90* kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 
+!                utils_cmi.f90
 ! This module contains all the subroutines necessary for doing photoionization
 ! using the Monte Carlo Radiative Transfer code CMacIonize
 !
@@ -374,9 +375,10 @@ end subroutine init_ionizing_radiation_cmi
 ! Updates nphotosrc and xyz_photosrc
 !
 subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
- use io,       only:fatal
- use physcon,  only:solarm
- use units,    only:utime,udist
+ use io,        only:fatal
+ use physcon,   only:solarm
+ use units,     only:utime,udist
+ use utils_cmi, only:mag2
  integer, intent(in) :: nptmass
  real,    intent(in) :: time
  real,    intent(in) :: xyzmh_ptmass(:,:)
@@ -446,11 +448,6 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
     disttomin2 = mag2((/xmin_allsrc,ymin_allsrc,zmin_allsrc/) - cen_crop)
     disttomax2 = mag2((/xmax_allsrc,ymax_allsrc,zmax_allsrc/) - cen_crop)
     rcrop_min  = max(disttomin2,disttomax2)
-    if (inject_rad) then 
-       print*,'-Cropping simulation domain-'
-       print*,' centre: ',cen_crop
-       print*,' radius that encapsulates all sources: ',rcrop_min
-    endif 
  endif 
 
  !- Convert to SI units for CMI param file
@@ -926,6 +923,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
  use linklist,   only:node,ifirstincell
  use kdtree_cmi, only:extract_cminodes_from_tree
  use hnode_cmi,  only:hnode_iterate
+ use utils_cmi,  only:mag2 
  use io,         only:fatal,warning
  real,    intent(in)  :: time
  real,    intent(in)  :: xyzh(:,:)
@@ -1237,6 +1235,7 @@ end subroutine collect_and_combine_cminodes
 !-----------------------------------------------------------------------------
 subroutine remove_unnecessary_opennode(ncminode)
  use allocutils, only:allocate_array
+ use utils_cmi,  only:mag2 
  integer, intent(in)  :: ncminode
  real,    allocatable :: nHmin(:)
  integer :: nnextopen_old,inextopen,isite,irowafter
@@ -1302,6 +1301,7 @@ end subroutine remove_unnecessary_opennode
 !+
 !-----------------------------------------------------------------------------
 subroutine check_cropped_space_ionization(nsite,x,y,z,nH,must_iter)
+ use utils_cmi,  only:quick_sort,mag2 
  integer, intent(in)  :: nsite 
  real,    intent(in)  :: x(nsite),y(nsite),z(nsite),nH(nsite)
  logical, intent(out) :: must_iter   !- flag to immediately jump to next resolve_ionfront iteration
@@ -1361,81 +1361,6 @@ subroutine check_cropped_space_ionization(nsite,x,y,z,nH,must_iter)
 
 end subroutine check_cropped_space_ionization
 
-!
-! Sorts input array along with iarray (carrying indices)
-!
-recursive subroutine quick_sort(n,array,iarray,first,last)
- integer, intent(in)    :: n
- integer, intent(in)    :: first,last
- integer, intent(inout) :: iarray(n)
- real,    intent(inout) :: array(n)
- integer :: partition,nleft,nright
-
- if (first < last .and. n > 0) then
-     !- Set pivot
-    call partition_pos(n,array,iarray,first,last,partition)
-
-    nleft = partition - first
-    call quick_sort(nleft,array,iarray,first,partition-1)
-
-    nright = last - partition
-    call quick_sort(nright,array,iarray,partition+1,last)
- endif
-
-end subroutine quick_sort
-
-!
-! Function for finding a pivot such that those smaller than pivot
-! would be on the left and vice versa
-!
-subroutine partition_pos(n,array,iarray,first,last,partition)
- integer, intent(in)    :: n
- integer, intent(in)    :: first,last
- integer, intent(inout) :: iarray(n)
- real,    intent(inout) :: array(n)
- integer, intent(out)   :: partition
- integer :: i,j,itemp
- real    :: temp,pivot
-
- pivot = array(last)
- i = first - 1        !- pointer for greater element
-
- do j = first,last
-    if (array(j) < pivot) then
-       i = i + 1
-       temp = array(i)
-       array(i) = array(j)
-       array(j) = temp
-
-       itemp = iarray(i)
-       iarray(i) = iarray(j)
-       iarray(j) = itemp
-    endif
- enddo
- temp = array(i+1)
- array(i+1) = array(last)
- array(last) = temp
-
- itemp = iarray(i+1)
- iarray(i+1) = iarray(last)
- iarray(last) = itemp
-
- partition = i + 1
-
-end subroutine partition_pos
-
-!-----------------------------------------------------------------------------
-!+
-! Math tools 
-!+
-!-----------------------------------------------------------------------------
-real function mag2(vec)
- real, intent(in) :: vec(3)
-
- mag2 = dot_product(vec,vec)
-
-end function mag2
-
 !-----------------------------------------------------------------------------
 !+
 ! Pass the positions, masses and smoothing lengths of given sites (nodes/particles)
@@ -1448,7 +1373,6 @@ subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
  real,    intent(in)  :: x(nsite),y(nsite),z(nsite),h(nsite),m(nsite)
  real,    intent(out) :: nH(nsite)
  integer :: talk,numthreads
-
  !
  ! Initialize CMI
  !
@@ -1474,17 +1398,19 @@ end subroutine run_cmacionize
 ! Writes the Voronoi sites and the .param input files to be read by CMI
 !+
 !-----------------------------------------------------------------------------
-subroutine write_cmi_infiles(nsite_in,x_in,y_in,z_in,h,m)
- use io,  only:fatal
+subroutine write_cmi_infiles(nsite_in,x_in,y_in,z_in,h_in,m_in)
+ use utils_cmi, only:modify_grid,set_bounds
+ use io,        only:fatal
  integer, intent(in) :: nsite_in
- real,    intent(in) :: x_in(:),y_in(:),z_in(:),h(:),m(:)
+ real,    intent(in) :: x_in(:),y_in(:),z_in(:),h_in(:),m_in(:)
  integer :: i,isrc,nsite
  real    :: xmin,xmax,ymin,ymax,zmin,zmax,dx,dy,dz,space_fac
  real    :: xmin_si,ymin_si,zmin_si,dx_si,dy_si,dz_si
  real,   allocatable :: x(:),y(:),z(:)
  logical :: redo_grid
 
- nsite = nsite_in   !- only modify these properties within this subroutine
+ !- Modify these properties only within this subroutine; avoid intent(in) error 
+ nsite = nsite_in   
  allocate(x(nsite))
  allocate(y(nsite))
  allocate(z(nsite))
@@ -1493,37 +1419,8 @@ subroutine write_cmi_infiles(nsite_in,x_in,y_in,z_in,h,m)
  z = z_in
  if (limit_voronoi) call modify_grid(nsite,x,y,z,h)
 
- !
- ! Set boundaries only around the given sites
- ! also check that the input xyzhm are sensible
- !
- xmax = -huge(xmax)
- ymax = -huge(ymax)
- zmax = -huge(zmax)
- xmin =  huge(xmin)
- ymin =  huge(ymin)
- zmin =  huge(zmin)
- !$omp parallel do default(none) shared(nsite,x,y,z,h,m) private(i) &
- !$omp reduction(min:xmin,ymin,zmin) &
- !$omp reduction(max:xmax,ymax,zmax) &
- !$omp schedule(runtime)
- do i = 1,nsite
-    if (x(i) /= x(i) .or. y(i) /= y(i) .or. z(i) /= z(i) .or. &
-        h(i) < tiny(h) .or. m(i) < tiny(m)) then
-       print*,x(i),y(i),z(i),h(i),m(i)
-       call fatal('photoionize_cmi','invalid xyzhm input')
-    endif
-    xmin = min(xmin,x(i))
-    ymin = min(ymin,y(i))
-    zmin = min(zmin,z(i))
-    xmax = max(xmax,x(i))
-    ymax = max(ymax,y(i))
-    zmax = max(zmax,z(i))
- enddo
- !$omp end parallel do
- dx = abs(xmax - xmin)
- dy = abs(ymax - ymin)
- dz = abs(zmax - zmin)
+ !- Set boundaries to only around the given sites
+ call set_bounds(nsite,x,y,z,h_in,m_in,xmin,xmax,ymin,ymax,zmin,zmax,dx,dy,dz)
 
  !- Add some space to the edges and convert to SI units
  space_fac = 1E-2
@@ -1680,55 +1577,11 @@ subroutine write_cmi_infiles(nsite_in,x_in,y_in,z_in,h,m)
  write(2026,'(2x,a22)') "sulphur_4: 0. m^3 s^-1"
 
  close(2026)
+ deallocate(x)
+ deallocate(y)
+ deallocate(z)
 
 end subroutine write_cmi_infiles
-
-!
-! Routine to merge the smallest grid cells by removing the generation sites 
-! with very small smoothing lengths 
-!
-subroutine modify_grid(nsite,x,y,z,h)
- use io, only:warning,fatal
- integer, intent(inout) :: nsite 
- real,    intent(inout) :: x(nsite),y(nsite),z(nsite)
- real,    intent(in)    :: h(nsite)
- integer :: isite,nsite_store
- real    :: hmin,hmax,hlimit 
- real    :: x_store(nsite),y_store(nsite),z_store(nsite)
- real    :: hlimit_fac = 5E-4
- 
- !- find the max and min of h
- hmin = huge(hmin)
- hmax = tiny(hmax)
- do isite = 1,nsite 
-    hmin = min(hmin,h(isite))
-    hmax = max(hmax,h(isite))
- enddo 
- 
- !- set filter - h smaller than it will be removed 
- hlimit = hmin + (hmax-hmin)*hlimit_fac
- 
- !- keep only those with h > hlimit
- nsite_store = 0
- do isite = 1,nsite 
-    if (h(isite) > hlimit) then 
-       nsite_store = nsite_store + 1 
-       x_store(nsite_store) = x(isite)
-       y_store(nsite_store) = y(isite)
-       z_store(nsite_store) = z(isite)
-    endif 
- enddo
- 
- if (nsite_store == nsite) call warning('photoionize_cmi','no cells merged')
- if ((nsite-nsite_store)/nsite > 0.05) call fatal('photoionize_cmi','merged too many small cells!') 
- write(*,'(2x,a8,i4,a25)') 'Removed ',nsite-nsite_store,' Voronoi generation sites'
-
- nsite = nsite_store 
- x(1:nsite) = x_store(1:nsite)
- y(1:nsite) = y_store(1:nsite)
- z(1:nsite) = z_store(1:nsite)
-
-end subroutine modify_grid 
 
 !-----------------------------------------------------------------------------
 !+
@@ -1736,6 +1589,7 @@ end subroutine modify_grid
 !+
 !-----------------------------------------------------------------------------
 subroutine init_write_snapshot
+ use utils_cmi,  only:gen_filename 
  integer :: ifile_search
  logical :: lastfile_found,iexist
  character(len=50) :: filename_search,filename
@@ -1766,9 +1620,10 @@ end subroutine init_write_snapshot
 
 
 subroutine write_nH_snapshot(time,nsite,xyzh_parts,x_in,y_in,z_in,h_in,m_in,nH_in)
- use part,  only:isdead_or_accreted
- use units, only:utime
- use io,    only:fatal,warning
+ use part,      only:isdead_or_accreted
+ use utils_cmi, only:gen_filename 
+ use units,     only:utime
+ use io,        only:fatal,warning
  integer, intent(in) :: nsite
  real,    intent(in) :: time
  real,    intent(in), optional :: xyzh_parts(:,:)
@@ -1827,21 +1682,6 @@ subroutine write_nH_snapshot(time,nsite,xyzh_parts,x_in,y_in,z_in,h_in,m_in,nH_i
  endif
 
 end subroutine write_nH_snapshot
-
-
-subroutine gen_filename(ifile,filename)
- integer,           intent(in)  :: ifile
- character(len=50), intent(out) :: filename
- character(len=5)   :: ifile_char
-
- write(ifile_char,'(i5.5)') ifile  !- convert to str
- if (photoionize_tree) then
-    filename = 'nixyzhmf_'//trim(ifile_char)//'.txt'
- else
-    filename = 'xyzhmf_'//trim(ifile_char)//'.txt'
- endif
-
-end subroutine gen_filename
 
 !-----------------------------------------------------------------------
 !+

@@ -818,7 +818,7 @@ ifeq ($(SETUP), starbench)
     SETUPFILE=setup_unifdis_cmi.f90
     ANALYSIS=analysis_partinfo.f90
     FPPFLAGS= -DPHOTOION
-    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
+    SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE=yes
     PERIODIC=no
     GRAVITY=no
@@ -836,7 +836,7 @@ ifeq ($(SETUP), rhdsne)
     SRCINJECT=inject_sne_sphng.f90
     ANALYSIS=analysis_angmom.f90
     FPPFLAGS= -DPHOTOION
-    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
+    SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE=yes
     PERIODIC=no
     GRAVITY=yes
@@ -853,7 +853,7 @@ ifeq ($(SETUP), rhdsne_hpc)
     SRCINJECT=inject_sne_sphng.f90
     ANALYSIS=analysis_bindensity.f90
     FPPFLAGS= -DPHOTOION
-    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
+    SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE_KENNEDY=yes
     PERIODIC=no
     GRAVITY=yes
@@ -869,7 +869,7 @@ ifeq ($(SETUP), elongcloud_env)
     SETUPFILE=velfield_fromcubes.f90 setup_elongated_envelope.f90
     SRCINJECT=inject_sne_sphng.f90
     FPPFLAGS= -DPHOTOION
-    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
+    SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE=yes
     PERIODIC=no
     GRAVITY=yes
@@ -886,7 +886,7 @@ ifeq ($(SETUP), elongcloud_env_hpc)
     SRCINJECT=inject_sne_sphng.f90
     ANALYSIS=analysis_get_sinkinfo.f90
     FPPFLAGS= -DPHOTOION
-    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
+    SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE_KENNEDY=yes
     PERIODIC=no
     GRAVITY=yes
@@ -904,7 +904,7 @@ ifeq ($(SETUP), sncavity)
     ANALYSIS=analysis_detector_near_sn.f90
     MODFILE=moddump_clear_channel.f90
     FPPFLAGS= -DPHOTOION
-    SRCPHOTOION=kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
+    SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE=yes
     PERIODIC=no
     GRAVITY=no

@@ -6,7 +6,8 @@
 !--------------------------------------------------------------------------!
 module hnode_cmi
 !
-! The CMI suite: photoionize_cmi.F90 kdtree_cmi.f90 *hnode_cmi.f90* heating_cooling_cmi.f90
+! The CMI suite: photoionize_cmi.F90 kdtree_cmi.f90 *hnode_cmi.f90* heating_cooling_cmi.f90 
+!                utils_cmi.f90
 ! This module contains all the subroutines necessary for solving the smoothing lengths
 ! of cmi-nodes picked from walking the kd-tree.
 !
@@ -276,6 +277,7 @@ subroutine getfunc_from_neigh_sum(h,pos_node,node,nnodeneigh,listnodeneigh,xyzca
                                   nrealneigh,func,dfunc)
  use dtypekdtree, only:kdnode
  use kernel,      only:get_kernel,cnormk,radkern2
+ use utils_cmi,   only:mag2
  type(kdnode), intent(in)  :: node(:)
  integer,      intent(in)  :: nnodeneigh
  integer,      intent(in)  :: listnodeneigh(:)
@@ -408,6 +410,7 @@ end subroutine init_get_nodeneigh
 subroutine get_nodeneigh(node,na,pos_na,nxyzm_treetocmi,ncminode,nnodeneigh,listnodeneigh,&
                          xyzcache_nodeneigh,n_kmid,nkmid,avgneigh_est,size_kmid)
  use dtypekdtree, only:kdnode
+ use utils_cmi,   only:mag2 
  use io,          only:fatal
  type(kdnode), intent(in)    :: node(:)
  integer,      intent(in)    :: na  !- target node
@@ -478,13 +481,5 @@ subroutine get_nodeneigh(node,na,pos_na,nxyzm_treetocmi,ncminode,nnodeneigh,list
  enddo over_nb
 
 end subroutine get_nodeneigh
-
-
-real function mag2(vec)
- real,   intent(in) :: vec(3)
-
- mag2 = dot_product(vec,vec)
-
-end function mag2
 
 end module hnode_cmi

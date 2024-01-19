@@ -6,7 +6,8 @@
 !--------------------------------------------------------------------------!
 module kdtree_cmi
 !
-! The CMI suite: photoionize_cmi.F90 *kdtree_cmi.f90* hnode_cmi.f90 heating_cooling_cmi.f90
+! The CMI suite: photoionize_cmi.F90 *kdtree_cmi.f90* hnode_cmi.f90 heating_cooling_cmi.f90 
+!                utils_cmi.f90
 ! This module contains all the subroutines necessary for extracting nodes from
 ! the built kdtree to be then passed to the photoionization code CMacIonize.
 !
@@ -43,6 +44,7 @@ subroutine extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
  use dtypekdtree, only:kdnode
  use kdtree,      only:irootnode,inodeparts,inoderange
  use kdtree,      only:maxlevel,maxlevel_indexed
+ use utils_cmi,   only:mag2
  use io,          only:fatal
  type(kdnode), intent(in)    :: node(:)
  integer,      intent(in)    :: ifirstincell(:)
@@ -206,12 +208,5 @@ subroutine extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
 
 end subroutine extract_cminodes_from_tree
 
-
-real function mag2(vec)
- real,   intent(in) :: vec(3)
-
- mag2 = dot_product(vec,vec)
-
-end function mag2
 
 end module kdtree_cmi

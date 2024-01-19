@@ -6,7 +6,8 @@
 !--------------------------------------------------------------------------!
 module heatcool_cmi
 !
-! The CMI suite: photoionize_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 *heating_cooling_cmi.f90*
+! The CMI suite: photoionize_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 *heating_cooling_cmi.f90* 
+!                utils_cmi.f90
 ! This module contains all the subroutines necessary for doing the heating and cooling
 ! processes involved in photoionization.
 !
