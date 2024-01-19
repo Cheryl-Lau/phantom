@@ -110,6 +110,7 @@ subroutine modify_grid(npart,x,y,z,h)
        x_mod(npart_mod) = x(ip)
        y_mod(npart_mod) = y(ip)
        z_mod(npart_mod) = z(ip)
+       if (x_mod(npart_mod) /= x_mod(npart_mod)) print*,'nan in store directly',ip
     endif 
  enddo 
  ngroup = k
@@ -117,18 +118,21 @@ subroutine modify_grid(npart,x,y,z,h)
  !- Loop through each group to locate its centre 
  do k = 1,ngroup 
     np_in_k = npart_grp(k)
+    if (np_in_k == 0) print*,'np_in_k = 0!'
     xmean = 0.
     ymean = 0.
     zmean = 0. 
     over_parts: do i_in_k = 1,np_in_k
        ip = parts_grp(k,i_in_k)  ! extract particle index 
+       if (ip /= ip) print*,'nan in ip extracted',ip
        xmean = xmean + x(ip)
        ymean = ymean + y(ip)
        zmean = zmean + z(ip) 
     enddo over_parts
-    xmean = xmean/np_in_k
-    ymean = ymean/np_in_k
-    zmean = zmean/np_in_k 
+    xmean = xmean/real(np_in_k)
+    ymean = ymean/real(np_in_k)
+    zmean = zmean/real(np_in_k)
+    if (xmean /= xmean) print*,'nan in nodes',k
     !- store it as a new particle 
     npart_mod = npart_mod + 1 
     x_mod(npart_mod) = xmean
@@ -136,12 +140,14 @@ subroutine modify_grid(npart,x,y,z,h)
     z_mod(npart_mod) = zmean
  enddo 
  
- if (npart_mod == npart) call warning('photoionize_cmi','no cells merged')
- if ((npart-npart_mod)/npart > 0.05) call fatal('photoionize_cmi','merged too many small cells!') 
+ if (npart_mod == npart) call warning('utils_cmi','no cells merged')
+ if ((npart-npart_mod)/npart > 0.05) call fatal('utils_cmi','merged too many small cells!') 
  write(*,'(2x,i6,a38,i5)') npart-npart_mod,' Voronoi generation sites merged into ',ngroup
 
  !- Output the modified sites 
+ print*,'npart before',npart
  npart = npart_mod
+ print*,'npart after',npart
  x(1:npart) = x_mod(1:npart)
  y(1:npart) = y_mod(1:npart)
  z(1:npart) = z_mod(1:npart)
@@ -185,7 +191,7 @@ subroutine set_bounds(nsite,x,y,z,h,m,xmin,xmax,ymin,ymax,zmin,zmax,dx,dy,dz)
     if (x(i) /= x(i) .or. y(i) /= y(i) .or. z(i) /= z(i) .or. &
         h(i) < tiny(h) .or. m(i) < tiny(m)) then
        print*,x(i),y(i),z(i),h(i),m(i)
-       call fatal('photoionize_cmi','invalid xyzhm input')
+       call fatal('utils_cmi','invalid xyzhm input')
     endif
     xmin = min(xmin,x(i))
     ymin = min(ymin,y(i))
