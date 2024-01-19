@@ -87,6 +87,7 @@ subroutine modify_grid(npart,x,y,z,h)
           !- put first particle in
           np_in_k = 1 
           parts_grp(k,np_in_k) = ip 
+          npart_grp(k)         = np_in_k
           !- loop over all other particles 
           xyz_ip = (/ x(ip), y(ip), z(ip) /)
           over_neigh: do ip_neigh = 1,npart 
@@ -115,10 +116,15 @@ subroutine modify_grid(npart,x,y,z,h)
  enddo 
  ngroup = k
 
+ print*,'ngroup',ngroup
+ print*,'npart_grp array',npart_grp(:)
+
  !- Loop through each group to locate its centre 
  do k = 1,ngroup 
+    print*,'k',k
     np_in_k = npart_grp(k)
-    if (np_in_k == 0) print*,'np_in_k = 0!'
+    print*,'np_in_k',np_in_k
+    if (np_in_k == 0) print*,'np_in_k = 0 !'
     xmean = 0.
     ymean = 0.
     zmean = 0. 
