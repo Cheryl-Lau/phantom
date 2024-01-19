@@ -1417,7 +1417,7 @@ subroutine write_cmi_infiles(nsite_in,x_in,y_in,z_in,h_in,m_in)
  x = x_in
  y = y_in
  z = z_in
- if (limit_voronoi) call modify_grid(nsite,x,y,z,h)
+ if (limit_voronoi) call modify_grid(nsite,x,y,z,h_in)
 
  !- Set boundaries to only around the given sites
  call set_bounds(nsite,x,y,z,h_in,m_in,xmin,xmax,ymin,ymax,zmin,zmax,dx,dy,dz)
@@ -1601,7 +1601,7 @@ subroutine init_write_snapshot
  ifile_search = maxoutfile
  lastfile_found = .false.
  do while (.not.lastfile_found)
-    call gen_filename(ifile_search,filename_search)
+    call gen_filename(photoionize_tree,ifile_search,filename_search)
     inquire(file=trim(filename_search),exist=iexist)
     if (iexist) then
         lastfile_found = .true.
@@ -1613,7 +1613,7 @@ subroutine init_write_snapshot
     endif
  enddo
  ifile = ifile_search + 1
- call gen_filename(ifile,filename)
+ call gen_filename(photoionize_tree,ifile,filename)
  print*,'Beginning with snapshot file ',trim(filename)
 
 end subroutine init_write_snapshot
@@ -1646,7 +1646,7 @@ subroutine write_nH_snapshot(time,nsite,xyzh_parts,x_in,y_in,z_in,h_in,m_in,nH_i
  if (ifile < maxoutfile) then
     if (mod(iruncmi,ncall_writefile) == 0) then
 
-       call gen_filename(ifile,allsites_filename)
+       call gen_filename(photoionize_tree,ifile,allsites_filename)
        print*,'Writing outputs to ',trim(allsites_filename)
 
        open(unit=iunit,file=trim(allsites_filename),status='replace')

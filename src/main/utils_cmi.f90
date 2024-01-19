@@ -48,6 +48,13 @@ subroutine modify_grid(npart,x,y,z,h)
  real,    allocatable :: x_mod(:),y_mod(:),z_mod(:)
  logical :: flag_particle(npart)
  
+ ! testing 
+ open(2050,file='before_mod_grid.txt')
+ do ip = 1,npart
+    write(2050,*) x(ip), y(ip), z(ip)
+ enddo 
+ close(2050)
+
  !- find the max and min of h
  hmin = huge(hmin)
  hmax = tiny(hmax)
@@ -143,6 +150,13 @@ subroutine modify_grid(npart,x,y,z,h)
  deallocate(y_mod)
  deallocate(z_mod)
 
+ ! testing 
+ open(2070,file='after_mod_grid.txt')
+ do ip = 1,npart
+    write(2070,*) x(ip), y(ip), z(ip)
+ enddo 
+ close(2070)
+
 end subroutine modify_grid 
 
 !-----------------------------------------------------------------------
@@ -185,7 +199,7 @@ subroutine set_bounds(nsite,x,y,z,h,m,xmin,xmax,ymin,ymax,zmin,zmax,dx,dy,dz)
  dy = abs(ymax - ymin)
  dz = abs(zmax - zmin)
 
-end subroutine find_bounds 
+end subroutine set_bounds 
 
 !-----------------------------------------------------------------------
 !+
@@ -266,7 +280,7 @@ end function mag2
 
 !-----------------------------------------------------------------------
 !+
-! Routine to merge the smallest Voronoi grid cells 
+! Routine to generate output file name 
 !+
 !-----------------------------------------------------------------------
 subroutine gen_filename(photoionize_tree,ifile,filename)
