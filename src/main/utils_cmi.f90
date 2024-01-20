@@ -47,13 +47,16 @@ subroutine modify_grid(npart,x,y,z,h)
  real    :: xyz_ip(3),xyz_neigh(3),dist2,xmean,ymean,zmean
  real,    allocatable :: x_mod(:),y_mod(:),z_mod(:)
  logical :: flag_particle(npart)
+ logical :: check_modgrid = .true.
  
  ! testing 
- open(2050,file='before_mod_grid.txt')
- do ip = 1,npart
-    write(2050,*) x(ip), y(ip), z(ip)
- enddo 
- close(2050)
+ if (check_modgrid) then 
+    open(2050,file='before_mod_grid.txt')
+    do ip = 1,npart
+       write(2050,*) x(ip), y(ip), z(ip)
+    enddo 
+    close(2050)
+ endif 
 
  !- find the max and min of h
  hmin = huge(hmin)
@@ -111,26 +114,18 @@ subroutine modify_grid(npart,x,y,z,h)
        x_mod(npart_mod) = x(ip)
        y_mod(npart_mod) = y(ip)
        z_mod(npart_mod) = z(ip)
-       if (x_mod(npart_mod) /= x_mod(npart_mod)) print*,'nan in store directly',ip
     endif 
  enddo 
  ngroup = k
 
- print*,'ngroup',ngroup
- print*,'npart_grp array',npart_grp(:)
-
  !- Loop through each group to locate its centre 
  do k = 1,ngroup 
-    print*,'k',k
     np_in_k = npart_grp(k)
-    print*,'np_in_k',np_in_k
-    if (np_in_k == 0) print*,'np_in_k = 0 !'
     xmean = 0.
     ymean = 0.
     zmean = 0. 
     over_parts: do i_in_k = 1,np_in_k
        ip = parts_grp(k,i_in_k)  ! extract particle index 
-       if (ip /= ip) print*,'nan in ip extracted',ip
        xmean = xmean + x(ip)
        ymean = ymean + y(ip)
        zmean = zmean + z(ip) 
@@ -138,7 +133,6 @@ subroutine modify_grid(npart,x,y,z,h)
     xmean = xmean/real(np_in_k)
     ymean = ymean/real(np_in_k)
     zmean = zmean/real(np_in_k)
-    if (xmean /= xmean) print*,'nan in nodes',k
     !- store it as a new particle 
     npart_mod = npart_mod + 1 
     x_mod(npart_mod) = xmean
@@ -163,11 +157,13 @@ subroutine modify_grid(npart,x,y,z,h)
  deallocate(z_mod)
 
  ! testing 
- open(2070,file='after_mod_grid.txt')
- do ip = 1,npart
-    write(2070,*) x(ip), y(ip), z(ip)
- enddo 
- close(2070)
+ if (check_modgrid) then 
+    open(2070,file='after_mod_grid.txt')
+    do ip = 1,npart
+       write(2070,*) x(ip), y(ip), z(ip)
+    enddo 
+    close(2070)
+ endif 
 
 end subroutine modify_grid 
 
