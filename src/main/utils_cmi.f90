@@ -44,7 +44,7 @@ subroutine modify_grid(npart,x,y,z,h)
  integer :: npart_grp(maxgrp)               ! stores number of particles in each group 
  real    :: hmin,hmax,hlimit 
  real    :: hlimit_fac = 1E-3
- real    :: extradist_fac = 2.
+ real    :: extradist_fac = 1.5
  real    :: xyz_ip(3),xyz_neigh(3),dist2,xmean,ymean,zmean
  real,    allocatable :: x_mod(:),y_mod(:),z_mod(:)
  logical :: flag_particle(npart)
