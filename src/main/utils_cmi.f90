@@ -44,6 +44,7 @@ subroutine modify_grid(npart,x,y,z,h)
  integer :: npart_grp(maxgrp)               ! stores number of particles in each group 
  real    :: hmin,hmax,hlimit 
  real    :: hlimit_fac = 1E-3
+ real    :: extradist_fac = 2.
  real    :: xyz_ip(3),xyz_neigh(3),dist2,xmean,ymean,zmean
  real,    allocatable :: x_mod(:),y_mod(:),z_mod(:)
  logical :: flag_particle(npart)
@@ -98,7 +99,7 @@ subroutine modify_grid(npart,x,y,z,h)
              xyz_neigh = (/ x(ip_neigh), y(ip_neigh), z(ip_neigh) /)
              dist2 = mag2(xyz_ip - xyz_neigh)
              !- extract those with overlapping h
-             if (dist2 < (h(ip) + h(ip_neigh))**2) then 
+             if (dist2 < ((h(ip) + h(ip_neigh))*extradist_fac)**2) then 
                 np_in_k = np_in_k + 1
                 if (np_in_k > maxp_per_grp) call fatal('utils_cmi','number of particles in group exceeded limit')
                 parts_grp(k,np_in_k) = ip_neigh 
@@ -145,9 +146,9 @@ subroutine modify_grid(npart,x,y,z,h)
  write(*,'(2x,i6,a38,i5)') npart-npart_mod,' Voronoi generation sites merged into ',ngroup
 
  !- Output the modified sites 
- print*,'npart before',npart
+ print*,'nsite before',npart
  npart = npart_mod
- print*,'npart after',npart
+ print*,'nsite after',npart
  x(1:npart) = x_mod(1:npart)
  y(1:npart) = y_mod(1:npart)
  z(1:npart) = z_mod(1:npart)
