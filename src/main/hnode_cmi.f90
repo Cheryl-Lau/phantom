@@ -38,7 +38,7 @@ module hnode_cmi
  private
  integer, parameter :: maxnodeneigh   = 1E7
  integer, parameter :: neighcachesize = 5000
- integer, parameter :: maxkmid = 1E2
+ integer, parameter :: maxkmid = 1E3
 
 contains
 !-----------------------------------------------------------------------
@@ -57,7 +57,7 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
  real,         intent(inout) :: h_solvertocmi(:)
  integer :: listnodeneigh(maxnodeneigh)
  integer :: icminode,na,nnodeneigh,avgneigh
- integer :: maxnode_bruteforce = 1E6
+ integer :: maxnode_bruteforce = 1E7
  integer :: n_kmid(maxkmid)
  integer :: nkmid,ierr,i,inosol
  real    :: xyzcache_nodeneigh(3,neighcachesize)
@@ -371,18 +371,20 @@ subroutine init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,n_kmid,nkmid,avgneig
  integer,      intent(inout) :: nkmid
  real,         intent(inout) :: avgneigh_est,size_kmid
  integer,      intent(out)   :: n_kmid(:)
- integer :: max_n,inode,kmid_old,kmid_start,kmid_end,n
+ integer :: min_n,inode,kmid_old,kmid_start,kmid_end,n
  logical :: kmid_ok
 
  !- Make sure kmid is above all nodes
- max_n = 1
+ min_n = huge(min_n)
  do inode = 1,ncminode
-    max_n = max(max_n,int(nxyzm_treetocmi(1,inode)))
+    min_n = min(min_n,int(nxyzm_treetocmi(1,inode)))
  enddo
  kmid_old = kmid
  kmid_ok = .false.
  do while (.not.kmid_ok)
-    kmid_ok = ( 2**kmid+(2**(kmid+1)-1) < max_n/2. )
+    kmid_end = int(2**(kmid+1)-1)
+    if (kmid_end <= 1) call fatal('hnode_cmi','invalid node n on kmid')
+    kmid_ok = ( kmid_end < min_n )
     if (.not.kmid_ok) kmid = kmid - 1
  enddo
  if (kmid <= 0) call fatal('hnode_cmi','invalid kmid')
@@ -397,9 +399,11 @@ subroutine init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,n_kmid,nkmid,avgneig
     nkmid = nkmid + 1
     if (nkmid > maxkmid) call fatal('hnode_cmi','require a larger maxkmid')
     n_kmid(nkmid) = n
+    if (node(n)%size /= node(n)%size) call fatal('hnode_cmi','invalid node')
     size_kmid = size_kmid + node(n)%size
  enddo
  size_kmid = size_kmid/nkmid
+ print*,'size_kmid',size_kmid
 
  !- Estimate number of neighbours
  avgneigh_est = 10.67*pi*hfact_node**3.
@@ -424,15 +428,18 @@ subroutine get_nodeneigh(node,na,pos_na,nxyzm_treetocmi,ncminode,nnodeneigh,list
  real,         intent(out)   :: xyzcache_nodeneigh(:,:)
  integer :: ka,icminode,ikmid,n,nb,kb,deltak
  integer :: na_neigh_above,kabove,kabove_start,kabove_end
+ integer :: n_kmid_inbound
  real    :: rcut,rcut2,size_neigh,pos_n(3),dist2
  logical :: close_to_na(maxkmid)
+
  !
  ! Define rcut of na
  !
  ka = int(log(real(na))/log(2.))
- kabove = ka - 1  ! <- can use even higher levels in case there're 'jumps' in tree-walk
+ kabove = ka ! - 1  ! <- can use even higher levels in case there're 'jumps' in tree-walk
  kabove_start = int(2**kabove)
  kabove_end   = int(2**(kabove+1)-1)
+
  rcut = epsilon(rcut)
  do na_neigh_above = kabove_start,kabove_end
     size_neigh = node(na_neigh_above)%size
@@ -440,15 +447,18 @@ subroutine get_nodeneigh(node,na,pos_na,nxyzm_treetocmi,ncminode,nnodeneigh,list
  enddo
  rcut  = rcut*avgneigh_est**(1./3.) + size_kmid
  rcut2 = rcut*rcut
+
  !
  ! Compute distance of na to nodes on kmid to determine in or out
  !
+ n_kmid_inbound = 0
  do ikmid = 1,maxkmid
     if (ikmid <= nkmid) then
        n = n_kmid(ikmid)
        pos_n = node(n)%xcen(1:3)
        dist2 = mag2(pos_n(1:3)-pos_na(1:3))
        if (dist2 < rcut2) then
+          n_kmid_inbound = n_kmid_inbound + 1 
           close_to_na(ikmid) = .true.
        else
           close_to_na(ikmid) = .false.
@@ -457,6 +467,8 @@ subroutine get_nodeneigh(node,na,pos_na,nxyzm_treetocmi,ncminode,nnodeneigh,list
        close_to_na(ikmid) = .false.
     endif
  enddo
+! print*,'n_kmid_inbound',n_kmid_inbound,nkmid
+
  !
  ! Loop over all other cmi-nodes to pick the right nb
  !
