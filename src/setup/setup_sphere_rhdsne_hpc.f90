@@ -439,8 +439,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  infilename=trim(fileprefix)//'.in'
  inquire(file=infilename,exist=in_iexist)
  if (.not.in_iexist) then
-    tmax      = 3.15360E14/utime ! 1E1 Myr
-    dtmax     = 3.15360E10/utime ! 1E-3 Myr
+    tmax      = 1.1*t_ff
+    dtmax     = 0.01*t_ff
     nout      = 100
     nfulldump = 1
     nmaxdumps = -1

@@ -87,6 +87,7 @@ module photoionize_cmi
  integer, public, parameter :: nsetphotosrc = 1
  real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 4.0169e+18, 5.8504e+18, 1.3752e+18, 0.,1E60,1E50 /),&
                                                                     shape=(/6,nsetphotosrc/))
+
  ! Monte Carlo simulation settings
  integer, public :: nphoton    = 1E6
  integer, public :: niter_mcrt = 10
