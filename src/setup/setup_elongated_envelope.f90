@@ -369,7 +369,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  infilename=trim(fileprefix)//'.in'
  inquire(file=infilename,exist=in_iexist)
  if (.not.in_iexist) then
-    tmax      = 1.5*t_ff
+    tmax      = 5.0*t_ff
     dtmax     = 0.001*t_ff
     nout      = 1
     nfulldump = 1
