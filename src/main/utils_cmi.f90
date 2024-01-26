@@ -97,7 +97,7 @@ subroutine modify_grid(npart,x,y,z,h)
           xyz_ip = (/ x(ip), y(ip), z(ip) /)
           over_neigh: do ip_neigh = 1,npart 
              if (ip_neigh == ip) cycle over_neigh 
-             if (h(ip_neigh) < hlimit) then 
+             if (h(ip_neigh) < hlimit .and. .not.flag_particle(ip_neigh)) then 
                 xyz_neigh = (/ x(ip_neigh), y(ip_neigh), z(ip_neigh) /)
                 dist2 = mag2(xyz_ip - xyz_neigh)
                 !- extract those with overlapping h
@@ -119,9 +119,6 @@ subroutine modify_grid(npart,x,y,z,h)
        z_mod(npart_mod) = z(ip)
     endif 
  enddo 
- print*,'npart_mod after adding big h parts',npart_mod
- 
- print*,'npart-npart_mod',npart-npart_mod
 
  ngroup = k
 
@@ -149,21 +146,16 @@ subroutine modify_grid(npart,x,y,z,h)
     z_mod(npart_mod) = zmean
  enddo 
 
- print*,'npart_mod after adding groups',npart_mod
-
- print*,'npart_merged (should match prev npart-npart_mod)',npart_merged
-
  if (npart_mod == npart) then
     call warning('utils_cmi','no cells merged')
  else 
     write(*,'(2x,i6,a38,i5)') npart_merged,' Voronoi generation sites merged into ',ngroup
+    write(*,'(2x,a20,i7,a4,i7)') 'Changing nsite from ',npart,' to ',npart_mod
  endif 
  if ((npart-npart_mod)/npart > 0.05) call fatal('utils_cmi','merged too many small cells!') 
 
  !- Output the modified sites 
- print*,'nsite before',npart
  npart = npart_mod
- print*,'nsite after',npart
  x(1:npart) = x_mod(1:npart)
  y(1:npart) = y_mod(1:npart)
  z(1:npart) = z_mod(1:npart)
