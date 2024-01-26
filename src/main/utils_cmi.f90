@@ -119,6 +119,9 @@ subroutine modify_grid(npart,x,y,z,h)
        z_mod(npart_mod) = z(ip)
     endif 
  enddo 
+ print*,'npart_mod after adding big h parts',npart_mod
+ 
+ print*,'npart-npart_mod',npart-npart_mod
 
  ngroup = k
 
@@ -145,7 +148,11 @@ subroutine modify_grid(npart,x,y,z,h)
     y_mod(npart_mod) = ymean
     z_mod(npart_mod) = zmean
  enddo 
- 
+
+ print*,'npart_mod after adding groups',npart_mod
+
+ print*,'npart_merged (should match prev npart-npart_mod)',npart_merged
+
  if (npart_mod == npart) then
     call warning('utils_cmi','no cells merged')
  else 
