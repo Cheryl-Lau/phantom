@@ -38,7 +38,7 @@ subroutine modify_grid(npart,x,y,z,h)
  real,    intent(in)    :: h(npart)
  integer, parameter :: maxgrp = 10000
  integer, parameter :: maxp_per_grp = 500 
- integer :: ip,ip_neigh,npart_smallh,npart_mod
+ integer :: ip,ip_neigh,npart_smallh,npart_mod,npart_merged
  integer :: k,ngroup,np_in_k,i_in_k
  integer :: parts_grp(maxgrp,maxp_per_grp)  ! stores index of particles in each group 
  integer :: npart_grp(maxgrp)               ! stores number of particles in each group 
@@ -71,6 +71,7 @@ subroutine modify_grid(npart,x,y,z,h)
  hlimit = hmin + (hmax-hmin)*hlimit_fac
  
  !- Init arrays for storing groups
+ ngroup = 0
  parts_grp(:,:) = 0. 
  npart_grp(:)   = 0 
  flag_particle(:) = .false. 
@@ -96,18 +97,19 @@ subroutine modify_grid(npart,x,y,z,h)
           xyz_ip = (/ x(ip), y(ip), z(ip) /)
           over_neigh: do ip_neigh = 1,npart 
              if (ip_neigh == ip) cycle over_neigh 
-             xyz_neigh = (/ x(ip_neigh), y(ip_neigh), z(ip_neigh) /)
-             dist2 = mag2(xyz_ip - xyz_neigh)
-             !- extract those with overlapping h
-             if (dist2 < ((h(ip) + h(ip_neigh))*extradist_fac)**2) then 
-                np_in_k = np_in_k + 1
-                if (np_in_k > maxp_per_grp) call fatal('utils_cmi','number of particles in group exceeded limit')
-                parts_grp(k,np_in_k) = ip_neigh 
-                npart_grp(k)         = np_in_k
-                flag_particle(ip_neigh) = .true.  ! to avoid being placed in group again
+             if (h(ip_neigh) < hlimit) then 
+                xyz_neigh = (/ x(ip_neigh), y(ip_neigh), z(ip_neigh) /)
+                dist2 = mag2(xyz_ip - xyz_neigh)
+                !- extract those with overlapping h
+                if (dist2 < ((h(ip) + h(ip_neigh))*extradist_fac)**2) then 
+                   np_in_k = np_in_k + 1
+                   if (np_in_k > maxp_per_grp) call fatal('utils_cmi','number of particles in group exceeded limit')
+                   parts_grp(k,np_in_k) = ip_neigh 
+                   npart_grp(k)         = np_in_k
+                   flag_particle(ip_neigh) = .true.  ! to avoid being placed in group again
+                endif 
              endif 
           enddo over_neigh 
-          if (np_in_k == 1) call warning('utils_cmi','only one particle in this group')
        endif 
     elseif (h(ip) >= hlimit) then  
        !- store directly 
@@ -117,11 +119,14 @@ subroutine modify_grid(npart,x,y,z,h)
        z_mod(npart_mod) = z(ip)
     endif 
  enddo 
+
  ngroup = k
 
  !- Loop through each group to locate its centre 
+ npart_merged = 0
  do k = 1,ngroup 
     np_in_k = npart_grp(k)
+    npart_merged = npart_merged + np_in_k
     xmean = 0.
     ymean = 0.
     zmean = 0. 
@@ -141,9 +146,12 @@ subroutine modify_grid(npart,x,y,z,h)
     z_mod(npart_mod) = zmean
  enddo 
  
- if (npart_mod == npart) call warning('utils_cmi','no cells merged')
+ if (npart_mod == npart) then
+    call warning('utils_cmi','no cells merged')
+ else 
+    write(*,'(2x,i6,a38,i5)') npart_merged,' Voronoi generation sites merged into ',ngroup
+ endif 
  if ((npart-npart_mod)/npart > 0.05) call fatal('utils_cmi','merged too many small cells!') 
- write(*,'(2x,i6,a38,i5)') npart-npart_mod,' Voronoi generation sites merged into ',ngroup
 
  !- Output the modified sites 
  print*,'nsite before',npart
