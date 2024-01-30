@@ -37,7 +37,7 @@ rho_env = 3e-24 *1000           # density of envelope
 p_env = 1.65e-15                # pressure of envelope 
 
 gamma = 5/3                     # adiabatic index 
-omega = 4*np.pi*0.3             # solid angle of channell in Sr
+omega = 4*np.pi*0.2             # solid angle of channell in Sr
 
 # NOTE: p - thermal pressure; ramp - ram pressure 
 #       if assuming SN energy is completely thermalized by the time it reaches the shell,
@@ -119,7 +119,7 @@ def free_field_sn(ax1,ax2,ax3):
 
     print('- Free-field SN -')
     print('Supernova energy: ',E_sn)
-    print('Supernova energy in direction of detector: ',E_sn*s_out/(4*np.pi*r_stag**2))
+    print('Supernova energy in direction of detector: ',E_sn*omega/(4*np.pi))
     print('Accumulated energy in direction of detector: ',etot,' J')
 
 
@@ -163,11 +163,14 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
     # Store 
     r_cavi = r_cav 
     m_cavi = m_cav 
+    vol_cavi = vol_cav
 
     time = []
     v_vent_evol = []        # velocity at vent / detector
     p_vent_evol = []        # thermal pressure 
     ramp_vent_evol = []     # ram pressure 
+    vel_cav_evol = []       # velocity of cavity shell kicked by SN shock
+    r_cav_evol = []         # radius of cavity
 
     t = 0.
     etot = 0.               # accumulated energy passing through s_out 
@@ -205,6 +208,9 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
         v_vent_evol.append(v_out)
         p_vent_evol.append(p_cav)
         ramp_vent_evol.append(ramp_vent)
+        if (expand_cav):
+            vel_cav_evol.append(vel_cav)
+            r_cav_evol.append(r_cav)
         
     
     if (plot_velocity):
@@ -225,14 +231,31 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
         ax3.set_xlabel('time [s]')
         ax3.set_ylabel('ram pressure [kg/m/s^2]')
     
+    if (expand_cav):
+        fig4 = plt.figure(figsize=[7,5])
+        ax4 = fig4.add_subplot(111)
+        ax4.scatter(time,r_cav_evol,s=0.1)
+        ax4.set_yscale('log')
+        ax4.set_xlabel('time [s]')
+        ax4.set_ylabel('cavity shell radius [m]')
+
+        fig5 = plt.figure(figsize=[7,5])
+        ax5 = fig5.add_subplot(111)
+        ax5.scatter(time,vel_cav_evol,s=0.1)
+        ax5.set_yscale('log')
+        ax5.set_xlabel('time [s]')
+        ax5.set_ylabel('cavity shell velocity [m/s]')
+
     print('')
     print('- Partially-confined SN -')
     print('Supernova energy: ',E_sn)
     if (with_HII):
-        print('HII region energy: ',p_hii/(gamma-1)*(vol_cav-vol_sn))
+        print('HII region energy: ',p_hii/(gamma-1)*(vol_cavi-vol_sn))
     print('Accumulated escaped energy: ',etot,' J')
     print('Initial mass: ',m_cavi,' kg')
     print('Accumulated mass: ',mtot,' kg')    
+    print('Initial cavity radius',r_cavi,'m')
+    print('Final cavity radius',r_cav,'m')
     
     
 def main():
