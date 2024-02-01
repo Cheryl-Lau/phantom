@@ -22,14 +22,15 @@ module moddump
 !
  implicit none
 
- real   :: rad_chnl = 5. 
- real   :: omegafrac_chnl = 0.1 
- real   :: pfrac_chnl = 0.5  
+ real   :: rad_chnl = 25.
+ real   :: omegafrac_chnl = 0.2
+ real   :: pfrac_chnl = 0.9
 
 contains
 
 subroutine modify_dump(npart,npartoftype,massoftype,xyzh,vxyzu)
  use random,  only:ran2
+ use part,    only:igas
  use physcon, only:pi
  use io,      only:fatal
  integer, intent(inout) :: npart
@@ -81,6 +82,9 @@ subroutine modify_dump(npart,npartoftype,massoftype,xyzh,vxyzu)
  npart = npart_store
  xyzh(:,:)  = xyzh_store(:,:)
  vxyzu(:,:) = vxyzu_store(:,:)
+
+ npartoftype(:) = 0
+ npartoftype(igas) = npart
 
  return
 end subroutine modify_dump
