@@ -61,7 +61,7 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
  integer :: n_kmid(maxkmid)
  integer :: nkmid,ierr,i,inosol
  real    :: xyzcache_nodeneigh(3,neighcachesize)
- real    :: avgneigh_est,size_kmid
+ real    :: avgneigh_est
  real    :: pos_node(3),size_node
  real    :: time_neigh,time1_neigh,time2_neigh,time_iterate,time1_iterate,time2_iterate
  real    :: tottime_neigh,tottime_iterate
@@ -78,7 +78,7 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
     print*,'  brute-force deactivated - switching to neighbour-find algorithm'
     brute_force = .false.
     nkmid = 0
-    call init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,n_kmid,nkmid,avgneigh_est,size_kmid)
+    call init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,n_kmid,nkmid,avgneigh_est)
     if (nkmid == 0) call fatal('hnode_cmi','init_get_nodeneigh failed')
  endif
 
@@ -90,7 +90,7 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
  tottime_iterate = 0.
  !$omp parallel do default(none) shared(ncminode,nxyzm_treetocmi,node) &
  !$omp shared(hfact_node,h_solvertocmi,tolh_node,brute_force) &
- !$omp shared(n_kmid,nkmid,avgneigh_est,size_kmid) &
+ !$omp shared(n_kmid,nkmid,avgneigh_est) &
  !$omp shared(node_failed,inosol,pos_node_nosol) &
  !$omp private(icminode,na,pos_node,size_node,nnodeneigh,listnodeneigh,xyzcache_nodeneigh) &
  !$omp private(ierr) &
@@ -111,7 +111,7 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
                                      xyzcache_nodeneigh)
     else
        call get_nodeneigh(node,na,pos_node,nxyzm_treetocmi,ncminode,nnodeneigh,listnodeneigh,&
-                          xyzcache_nodeneigh,n_kmid,nkmid,avgneigh_est,size_kmid)
+                          xyzcache_nodeneigh,n_kmid,nkmid,avgneigh_est)
     endif
     if (nnodeneigh == 0) call fatal('hnode_cmi','no neighbours found')
     time2_neigh = omp_get_wtime()
@@ -361,7 +361,7 @@ end subroutine get_nodeneigh_bruteforce
 ! Get trial neighbours for a given node na using their indicies
 !+
 !-----------------------------------------------------------------------
-subroutine init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,n_kmid,nkmid,avgneigh_est,size_kmid)
+subroutine init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,n_kmid,nkmid,avgneigh_est)
  use dtypekdtree, only:kdnode
  use physcon,     only:pi
  use io,          only:fatal
@@ -369,9 +369,9 @@ subroutine init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,n_kmid,nkmid,avgneig
  integer,      intent(in)    :: ncminode
  real,         intent(in)    :: nxyzm_treetocmi(:,:)
  integer,      intent(inout) :: nkmid
- real,         intent(inout) :: avgneigh_est,size_kmid
+ real,         intent(inout) :: avgneigh_est
  integer,      intent(out)   :: n_kmid(:)
- integer :: min_n,inode,kmid_old,kmid_start,kmid_end,n
+ integer :: n,min_n,inode,kmid_old,kmid_start,kmid_end
  logical :: kmid_ok
 
  !- Make sure kmid is above all nodes
@@ -390,20 +390,15 @@ subroutine init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,n_kmid,nkmid,avgneig
  if (kmid <= 0) call fatal('hnode_cmi','invalid kmid')
  if (kmid /= kmid_old) print*,'changing kmid to ',kmid
 
- !- Get all nodes on level kmid and its avg node size
+ !- Get all nodes on level kmid and store
  kmid_start = int(2**kmid)
  kmid_end   = int(2**(kmid+1)-1)
  nkmid = 0
- size_kmid = 0.
  do n = kmid_start,kmid_end
     nkmid = nkmid + 1
     if (nkmid > maxkmid) call fatal('hnode_cmi','require a larger maxkmid')
     n_kmid(nkmid) = n
-    if (node(n)%size /= node(n)%size) call fatal('hnode_cmi','invalid node')
-    size_kmid = size_kmid + node(n)%size
  enddo
- size_kmid = size_kmid/nkmid
- print*,'size_kmid',size_kmid
 
  !- Estimate number of neighbours
  avgneigh_est = 10.67*pi*hfact_node**3.
@@ -412,7 +407,7 @@ end subroutine init_get_nodeneigh
 
 
 subroutine get_nodeneigh(node,na,pos_na,nxyzm_treetocmi,ncminode,nnodeneigh,listnodeneigh,&
-                         xyzcache_nodeneigh,n_kmid,nkmid,avgneigh_est,size_kmid)
+                         xyzcache_nodeneigh,n_kmid,nkmid,avgneigh_est)
  use dtypekdtree, only:kdnode
  use utils_cmi,   only:mag2 
  use io,          only:fatal
@@ -422,30 +417,35 @@ subroutine get_nodeneigh(node,na,pos_na,nxyzm_treetocmi,ncminode,nnodeneigh,list
  real,         intent(in)    :: nxyzm_treetocmi(:,:)
  integer,      intent(in)    :: ncminode,nkmid
  integer,      intent(in)    :: n_kmid(maxkmid)
- real,         intent(in)    :: avgneigh_est,size_kmid
+ real,         intent(in)    :: avgneigh_est
  integer,      intent(inout) :: nnodeneigh
  integer,      intent(out)   :: listnodeneigh(:)
  real,         intent(out)   :: xyzcache_nodeneigh(:,:)
- integer :: ka,icminode,ikmid,n,nb,kb,deltak
+ integer :: ka,icminode,ikmid,n,nb,kb,deltak,n_mid
  integer :: na_neigh_above,kabove,kabove_start,kabove_end
  integer :: n_kmid_inbound
- real    :: rcut,rcut2,size_neigh,pos_n(3),dist2
+ real    :: rcut,rcut2,size_neigh,pos_n(3),dist2,size_kmid
  logical :: close_to_na(maxkmid)
 
  !
  ! Define rcut of na
  !
  ka = int(log(real(na))/log(2.))
- kabove = ka ! - 1  ! <- can use even higher levels in case there're 'jumps' in tree-walk
+ kabove = ka !- 1  ! <- can use even higher levels in case there're 'jumps' in tree-walk
  kabove_start = int(2**kabove)
  kabove_end   = int(2**(kabove+1)-1)
+
+ deltak = ka - kmid
+ n_mid = int(real(na)/real(2**deltak))  ! parent of na on kmid 
+ size_kmid = node(n_mid)%size
 
  rcut = epsilon(rcut)
  do na_neigh_above = kabove_start,kabove_end
     size_neigh = node(na_neigh_above)%size
     rcut = max(rcut,size_neigh)
  enddo
- rcut  = rcut*avgneigh_est**(1./3.) + size_kmid
+ rcut  = rcut*real(avgneigh_est)**(1./3.) + size_kmid
+ print*,'rcut terms from ka; kmid ',rcut*avgneigh_est**(1./3.),size_kmid
  rcut2 = rcut*rcut
 
  !
