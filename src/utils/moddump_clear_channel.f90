@@ -23,7 +23,7 @@ module moddump
  implicit none
 
  real   :: rad_chnl = 25.
- real   :: omegafrac_chnl = 0.2
+ real   :: omegafrac_chnl = 0.25
  real   :: pfrac_chnl = 0.9
 
 contains

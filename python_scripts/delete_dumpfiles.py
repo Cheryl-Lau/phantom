@@ -9,7 +9,7 @@ import re
 dump_prefix = "sphere_"
 idump_lastdumptocheck = 20
 
-print('dump prefix: ',dump_prefix)
+print('dump prefix:          ',dump_prefix)
 print('last idump to delete: ',idump_lastdumptocheck)
 
 proceed = input('Proceed [y/n]? ')
