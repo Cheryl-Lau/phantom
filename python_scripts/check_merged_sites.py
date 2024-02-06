@@ -1,7 +1,11 @@
 import numpy as np 
 import matplotlib.pyplot as plt 
 
-# cropped voronoi sites 
+# ionization of cropped voronoi sites 
+x_ion,y_ion,z_ion,nH = np.loadtxt('xyzf_cminode_cropping.txt',unpack=True,skiprows=1)
+show_ionization = True
+
+# modified cropped voronoi sites 
 x_before,y_before,z_before = np.loadtxt('before_mod_grid.txt',unpack=True)
 x_after,y_after,z_after = np.loadtxt('after_mod_grid.txt',unpack=True)
 
@@ -29,7 +33,7 @@ print('created sites',len(sites_created))
 print('unchanged sites',len(sites_unchanged))
 # Note - might not be the same as output from phantom since some groups = new site = same original particle 
 
-nslice = 30
+nslice = 40
 minz = min(z_before)
 maxz = max(z_before)
 dz = (maxz-minz)/nslice 
@@ -53,6 +57,12 @@ for i in range(nslice):
         if (sites_unchanged[isite][2] > lowzbound and sites_unchanged[isite][2] < upzbound):
             xyslice_unchanged.append((sites_unchanged[isite][0],sites_unchanged[isite][1]))
 
+    xyslice_ionized = []
+    for isite in range(len(x_ion)):
+        if (nH[isite] < 1.0):
+            if (z_ion[isite] > lowzbound and z_ion[isite] < upzbound):
+                xyslice_ionized.append((x_ion[isite],y_ion[isite]))
+
     plt.figure()
     if (len(xyslice_unchanged) > 0):
         plt.scatter(np.array(xyslice_unchanged)[:,0],np.array(xyslice_unchanged)[:,1],color='black',s=0.1,marker='.')
@@ -60,11 +70,13 @@ for i in range(nslice):
         plt.scatter(np.array(xyslice_eaten)[:,0],np.array(xyslice_eaten)[:,1],color='blue',s=0.1,marker='.')
     if (len(xyslice_created) > 0):
         plt.scatter(np.array(xyslice_created)[:,0],np.array(xyslice_created)[:,1],color='red',s=0.1,marker='.')
+    if (show_ionization == True and len(xyslice_ionized) > 0):
+        plt.scatter(np.array(xyslice_ionized)[:,0],np.array(xyslice_ionized)[:,1],color='yellow',s=0.1,marker='.')
     plt.xlim([-0.5,2.5])
     plt.ylim([0,3])
 #    plt.xlim([minx,maxx])
 #    plt.ylim([miny,maxy])
-    plt.savefig('slice_'+str(i)+'_voronoi_sites.png',dpi=300)
+    plt.savefig('slice_'+str(i)+'_voronoi_sites.png',dpi=100)
 
 
 
