@@ -14,30 +14,30 @@ plot_ramp = True
 
 # Sedov is a self-similar solution, here we'll put everything in SI units 
 
-t_end = 1E14
+t_end = 1.5E13
 dt = 1E10
 
 r_detect = 24. *3.086e+16       # location of detector 
 
 r_sn = 0.1 *3.086e+16           # SN ejecta radius 
-E_sn = 1e51 *1e-7               # SN energy 
+E_sn = 0.7*1e51 *1e-7           # SN energy 
 m_sn = 1e8 *1.989e+30           # SN ejecta mass 
 vol_sn = 4/3*np.pi*r_sn**3      # volume occupied by SN ejecta 
 
 r_stag = 10. *3.086e+16         # HII region stagnation radius 
-rho_hii = 1e-21 *1000           # density of HII region
-p_hii = 1.27e-10                # pressure of HII region 
+rho_hii = 1e-21 *1e+3           # density of HII region
+p_hii = 6.36e-13 *1e-1          # pressure of HII region 
 
-rho_cloud = 1e-21 *1000         # density of cloud around HII region/cavity
+rho_cloud = 1e-21 *1e+3         # density of cloud around HII region/cavity
 
 rho_inshell = 1.5e-19           # density within swept-up shell 
-dr_inshell = 1.8 *3.086e+16     # thickness of shell 
+dr_inshell = 2.0 *3.086e+16     # thickness of shell 
 
-rho_env = 3e-24 *1000           # density of envelope 
-p_env = 1.65e-15                # pressure of envelope 
+rho_env = 3e-24 *1e+3           # density of envelope 
+p_env = 8.97e-15 *1e-1          # pressure of envelope 
 
 gamma = 5/3                     # adiabatic index 
-omega = 4*np.pi*0.2             # solid angle of channell in Sr
+omega = 4*np.pi*0.1             # solid angle of channell in Sr
 
 # NOTE: p - thermal pressure; ramp - ram pressure 
 #       if assuming SN energy is completely thermalized by the time it reaches the shell,
@@ -66,13 +66,13 @@ def free_field_sn(ax1,ax2,ax3):
 
     while (t < t_end): 
         # Update shell radius as it expands 
-        v_shell = 2/5 * (E_sn/rho_env)**(1/2) * r_shell**(-3/2)  # sedov sol 
+        v_shell = 2/5 * (1.17)**(5/2) * (E_sn/rho_env)**(1/2) * r_shell**(-3/2)  # sedov sol 
         r_shell = r_shell + v_shell*dt 
         
         # Properties immediately behind shock according to Sedov equations
-        v_shell = 2/5 * (E_sn/rho_env)**(1/2) * r_shell**(-3/2)
-        p_shell = 4/25 * E_sn * r_shell**(-3)
-        rho_shell = 1/r_shell**5 * E_sn * t**2
+        v_shell = 2/5 * (1.17)**(5/2) * (E_sn/rho_env)**(1/2) * r_shell**(-3/2)
+        p_shell = 4/25 * (1.17)**5 * E_sn * r_shell**(-3)
+        rho_shell = (1.17/r_shell)**5 * E_sn * t**2
         cs = np.sqrt(gamma*p_env/rho_env)
         mach = v_shell/cs
         
@@ -165,6 +165,10 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
     m_cavi = m_cav 
     vol_cavi = vol_cav
 
+    # Init ram pressure at vent to aid the escape 
+    v_shell = 2/5 * (1.17)**(5/2) * (E_sn/rho_env)**(1/2) * r_cav**(-3/2)
+    ramp_vent = rho_vent * v_shell**2
+
     time = []
     v_vent_evol = []        # velocity at vent / detector
     p_vent_evol = []        # thermal pressure 
@@ -178,7 +182,7 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
 
     while(t < t_end): 
         # Update velocity of escaping gas
-        v_out = np.sqrt(2*gamma/(gamma-1)*p_env/rho_env*((p_cav/p_env)**((gamma-1)/gamma)-1))  # bernoulli
+        v_out = np.sqrt(2*gamma/(gamma-1)*p_env/rho_env*(((p_cav+ramp_vent)/p_env)**((gamma-1)/gamma)-1))  # bernoulli
 
         # Update mass contained within cavity 
         dmdt = rho_vent * v_out * s_out 
@@ -235,7 +239,6 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
         fig4 = plt.figure(figsize=[7,5])
         ax4 = fig4.add_subplot(111)
         ax4.scatter(time,r_cav_evol,s=0.1)
-        ax4.set_yscale('log')
         ax4.set_xlabel('time [s]')
         ax4.set_ylabel('cavity shell radius [m]')
 
