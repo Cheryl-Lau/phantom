@@ -116,7 +116,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real               :: cloud_sep,minx_clouds,minyz_clouds
  real               :: omega,area,radius,rad_circ,x,y,z,rad_strom,rad_stag,rad_strom_cgs,u_hii,cs_0,cs_i
  real               :: r_outer(3),psep_outer,scale_param,rho_outer,vol_outer,totmass_outer
- real               :: temp_envelope,cs_envelope_cgs,cs_envelope,u_envelope
+ real               :: temp_envelope,cs_envelope_cgs,cs_envelope,u_envelope,p_envelope,p_envelope_cgs
  real               :: r_sn_cgs,engsn_cgs,pmsncrit_cgs
  real               :: h_acc_cgs,h_soft_sinksink_cgs,h_soft_sinkgas_cgs,rho_crit_cgs_recomm
  logical            :: iexist,in_iexist,add_particle
@@ -538,6 +538,11 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     do ip = npart_cloud1+npart_cloud2+1,npart
        vxyzu(4,ip) = u_envelope
     enddo
+
+    !- Pressure
+    p_envelope     = cs_envelope**2*(rho_envelope_cgs/unit_density)/gamma
+    p_envelope_cgs = p_envelope*unit_pressure
+    print*,'pressure envelope g/cm/s^2 ',p_envelope_cgs
 
     npart_diff = npart_cloud1 + npart_cloud2 + npart_tmp_outer - npart
     if (npart_diff > 0) then
