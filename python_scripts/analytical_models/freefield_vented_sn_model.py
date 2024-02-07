@@ -218,19 +218,19 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
         
     
     if (plot_velocity):
-        ax1.scatter(time,v_vent_evol,s=0.1,color='red',label='confined')
+        ax1.scatter(time,v_vent_evol,s=0.1,color='red',label='partially-confined')
         ax1.set_yscale('log')
         ax1.set_xlabel('time [s]')
         ax1.set_ylabel('velocity [m/s]')   
 
     if (plot_thermp):
-        ax2.scatter(time,p_vent_evol,s=0.1,color='red',label='confined')
+        ax2.scatter(time,p_vent_evol,s=0.1,color='red',label='partially-confined')
         ax2.set_yscale('log')
         ax2.set_xlabel('time [s]')
         ax2.set_ylabel('thermal pressure [kg/m/s^2]')  
         
     if (plot_ramp):
-        ax3.scatter(time,ramp_vent_evol,s=0.1,color='red',label='confined')
+        ax3.scatter(time,ramp_vent_evol,s=0.1,color='red',label='partially-confined')
         ax3.set_yscale('log')
         ax3.set_xlabel('time [s]')
         ax3.set_ylabel('ram pressure [kg/m/s^2]')
@@ -266,12 +266,17 @@ def main():
     with_HII_region = True 
     expanding_cavity = True
 
-    fig1 = plt.figure(figsize=[7,5])
+    fig1 = plt.figure(figsize=[7,5])    # vx
     ax1 = fig1.add_subplot(111)
-    fig2 = plt.figure(figsize=[7,5])
+    ax1.set_ylim([5E3,6E5])
+
+    fig2 = plt.figure(figsize=[7,5])    # thermp
     ax2 = fig2.add_subplot(111)
-    fig3 = plt.figure(figsize=[7,5])
+    ax2.set_ylim([2E-13,6E-6])
+
+    fig3 = plt.figure(figsize=[7,5])    # ramp
     ax3 = fig3.add_subplot(111)
+    ax3.set_ylim([3E-15,5E-5])
     
     free_field_sn(ax1,ax2,ax3)
     part_confined_sn(with_HII_region,expanding_cavity,ax1,ax2,ax3)
@@ -279,6 +284,10 @@ def main():
     ax1.legend()
     ax2.legend()
     ax3.legend()
+
+    fig1.savefig('mod_vx.png', dpi=200)
+    fig2.savefig('mod_thermp.png', dpi=200)
+    fig3.savefig('mod_ramp.png', dpi=200)
 
     plt.show()
     
