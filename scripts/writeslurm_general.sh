@@ -41,6 +41,6 @@ echo 'echo Time is `date`'
 echo 'echo Directory is `pwd`'
 
 echo 'echo "starting run"'
-echo 'export outfile='$jobname'.log'
+echo 'export outfile="'$jobname'.log"'
 echo 'echo "writing output to $outfile"'
 echo $command' '$infile' >& $outfile'
