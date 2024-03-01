@@ -81,11 +81,11 @@ module photoionize_cmi
 
  ! Using sinks as source
  logical, public :: sink_ionsrc = .false.
- real,    public :: masscrit_ionize_cgs = 1.39237E34  ! 7 M_sun
+ real,    public :: masscrit_ionize_cgs = 3.978E34  ! 20 M_sun
  !- or
  ! Manually set location, starting/ending time and ionizing photon flux [cgs units] of sources
  integer, public, parameter :: nsetphotosrc = 1
- real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 4.0169e+18, 5.8504e+18, 1.3752e+18, 0.,1E60,1E50 /),&
+ real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 0., 0., 0. , 0.,1E60,1E49 /),&
                                                                     shape=(/6,nsetphotosrc/))
 
  ! Monte Carlo simulation settings
@@ -111,7 +111,7 @@ module photoionize_cmi
 
  ! Options for cropping simulation domain being passed to CMI (to avoid segfault; use with caution)
  real,    public :: crop_fac     = 1.2          ! bounds = crop_fac*rcut_opennode (>1)
- logical, public :: crop_domain  = .true.
+ logical, public :: crop_domain  = .false.
 
  ! Options for modifying the voronoi grid to enlarge the smallest cells
  logical, public :: limit_voronoi = .true.
@@ -175,8 +175,8 @@ module photoionize_cmi
  logical :: write_gamma = .false.          ! write heating rates vs nH (from both phantom and CMI)
  logical :: print_cmi   = .false.          ! show CMI shell outputs
  logical :: write_nH_u_distri  = .false.   ! write u of particles vs nH
- logical :: write_node_prop    = .false.   ! write properties of the current set of cmi-nodes
- logical :: plot_cropped_sites = .true.   ! write properties of the current cropped set of cmi-nodes
+ logical :: write_node_prop    = .true.    ! write properties of the current set of cmi-nodes
+ logical :: plot_cropped_sites = .true.    ! write properties of the current cropped set of cmi-nodes
  logical :: catch_noroot_parts = .false.   ! write particles with no therm-equil roots
 
 contains
@@ -1001,6 +1001,15 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
           endif 
        enddo 
        write(*,'(2x,a42,i8)') 'Number of pseudo-particles after cropping:',ncminode_in
+       if (ncminode_in == 0) then 
+          print*,' No particles left!'
+          call deallocate_cmi_inoutputs(x,y,z,h,m,nH)
+          print*,' ** Adjusting rcut_opennode and rcut_leafpart **'
+          rcut_opennode = rcut_opennode + delta_rcut
+          rcut_leafpart = rcut_leafpart + delta_rcut
+          niter = niter + 1
+          cycle resolve_ionfront
+       endif 
     else 
        x(1:ncminode) = nixyzhmf_cminode(3,1:ncminode)
        y(1:ncminode) = nixyzhmf_cminode(4,1:ncminode)
