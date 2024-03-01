@@ -44,7 +44,7 @@ subroutine modify_grid(npart,x,y,z,h)
  integer :: npart_grp(maxgrp)               ! stores number of particles in each group 
  real    :: hmin,hmax,hlimit 
  real    :: hlimit_fac = 1E-2
- real    :: extradist_fac = 2.0
+ real    :: extradist_fac = 1.5
  real    :: xyz_ip(3),xyz_neigh(3),dist2,xmean,ymean,zmean
  real,    allocatable :: x_mod(:),y_mod(:),z_mod(:)
  logical :: flag_particle(npart)
@@ -66,10 +66,10 @@ subroutine modify_grid(npart,x,y,z,h)
     hmin = min(hmin,h(ip))
     hmax = max(hmax,h(ip))
  enddo 
- 
+
  !- set filter - h smaller than this limit will need to be dealt with 
  hlimit = hmin + (hmax-hmin)*hlimit_fac
- 
+
  !- Init arrays for storing groups
  ngroup = 0
  parts_grp(:,:) = 0. 
@@ -81,7 +81,8 @@ subroutine modify_grid(npart,x,y,z,h)
  allocate(x_mod(npart))
  allocate(y_mod(npart))
  allocate(z_mod(npart))
- 
+
+
  k = 0  ! group index
  do ip = 1,npart
     if (h(ip) < hlimit) then 
