@@ -38,7 +38,7 @@ module hnode_cmi
  private
  integer, parameter :: maxnodeneigh   = 1E7
  integer, parameter :: neighcachesize = 5000
- integer, parameter :: maxkmid = 500
+ integer, parameter :: maxkmid = 1024
 
  logical :: check_neighfind = .false.  ! switch for debugging
 
