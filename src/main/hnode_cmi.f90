@@ -20,9 +20,10 @@ module hnode_cmi
 ! :Owner: Cheryl Lau
 !
 ! :Runtime parameters:
-!   - hfact_node : *proportionality fac of hnode to mean local node spacing*
-!   - tolh_node  : *tolerance on hnode-iteration*
-!   - kmid       : *an arbitrary level midway on the tree to be used in the neighbour-find*
+!   - hfact_node         : *proportionality fac of hnode to mean local node spacing*
+!   - tolh_node          : *tolerance on hnode-iteration*
+!   - kmid               : *an arbitrary level midway on the tree to be used in the neighbour-find*
+!   - maxnode_bruteforce : *threshold number of nodes below which we use brute-force to get neighbours*
 !
 ! :Dependencies: infile_utils, io, dtypekdtree, kdtree, kernel
 !
@@ -34,6 +35,7 @@ module hnode_cmi
  real,    public :: hfact_node = 1.1
  real,    public :: tolh_node  = 1E-2
  integer, public :: kmid = 10
+ integer, public :: maxnode_bruteforce = 1E4   ! based on runtime test results 
 
  private
  integer, parameter :: maxnodeneigh   = 1E7
@@ -59,12 +61,11 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
  real,         intent(inout) :: h_solvertocmi(:)
  integer :: listnodeneigh(maxnodeneigh)
  integer :: icminode,na,nnodeneigh,avgneigh
- integer :: maxnode_bruteforce = 1E4
  integer :: n_kmid(maxkmid)
  integer :: nkmid,ierr,i,inosol
  real    :: pos_kmid(3,maxkmid)
  real    :: xyzcache_nodeneigh(3,neighcachesize)
- real    :: avgneigh_est
+ real    :: nneigh1d_fac
  real    :: pos_node(3),size_node
  real    :: time_neigh,time1_neigh,time2_neigh,time_iterate,time1_iterate,time2_iterate
  real    :: tottime_neigh,tottime_iterate
@@ -81,7 +82,7 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
     print*,'  brute-force deactivated - switching to neighbour-find algorithm'
     brute_force = .false.
     nkmid = 0
-    call init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,n_kmid,pos_kmid,nkmid,avgneigh_est)
+    call init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,n_kmid,pos_kmid,nkmid,nneigh1d_fac)
     if (nkmid == 0) call fatal('hnode_cmi','init_get_nodeneigh failed')
  endif
 
@@ -93,7 +94,7 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
  tottime_iterate = 0.
  !$omp parallel do default(none) shared(ncminode,nxyzm_treetocmi,node) &
  !$omp shared(hfact_node,h_solvertocmi,tolh_node,brute_force) &
- !$omp shared(n_kmid,pos_kmid,nkmid,avgneigh_est) &
+ !$omp shared(n_kmid,pos_kmid,nkmid,nneigh1d_fac) &
  !$omp shared(node_failed,inosol,pos_node_nosol) &
  !$omp private(icminode,na,pos_node,size_node,nnodeneigh,listnodeneigh,xyzcache_nodeneigh) &
  !$omp private(ierr) &
@@ -114,7 +115,7 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
                                      xyzcache_nodeneigh)
     else
        call get_nodeneigh(node,na,pos_node,nxyzm_treetocmi,ncminode,nnodeneigh,listnodeneigh,&
-                          xyzcache_nodeneigh,n_kmid,pos_kmid,nkmid,avgneigh_est)
+                          xyzcache_nodeneigh,n_kmid,pos_kmid,nkmid,nneigh1d_fac)
     endif
     if (nnodeneigh == 0) call fatal('hnode_cmi','no neighbours found')
     time2_neigh = omp_get_wtime()
@@ -364,7 +365,7 @@ end subroutine get_nodeneigh_bruteforce
 ! Get trial neighbours for a given node na using their indicies
 !+
 !-----------------------------------------------------------------------
-subroutine init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,n_kmid,pos_kmid,nkmid,avgneigh_est)
+subroutine init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,n_kmid,pos_kmid,nkmid,nneigh1d_fac)
  use dtypekdtree, only:kdnode
  use physcon,     only:pi
  use io,          only:fatal
@@ -372,10 +373,11 @@ subroutine init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,n_kmid,pos_kmid,nkmi
  integer,      intent(in)    :: ncminode
  real,         intent(in)    :: nxyzm_treetocmi(:,:)
  integer,      intent(inout) :: nkmid
- real,         intent(inout) :: avgneigh_est
+ real,         intent(inout) :: nneigh1d_fac
  integer,      intent(out)   :: n_kmid(:)
  real,         intent(out)   :: pos_kmid(:,:)
  integer :: n,min_n,inode,kmid_old,kmid_start,kmid_end
+ real    :: avgneigh_est
  logical :: kmid_ok
 
  !- Make sure kmid is above all nodes, if not, shift it up
@@ -406,16 +408,22 @@ subroutine init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,n_kmid,pos_kmid,nkmi
  enddo
 
  !- Estimate number of neighbours
- avgneigh_est = 10.67*pi*hfact_node**3.
+ avgneigh_est = 10.67*pi*hfact_node**3.   ! nneigh = 4/3*pi*(2*hfact)**3
+
+ !- Pre-compute term for estimating rcut 
+ nneigh1d_fac = (real(avgneigh_est)/(2./3.*pi))**(1./3.)  
+ ! number density n = nneigh/(4/3*pi*rcut**3) = 1/((2*nodesize)**3)
+ ! rearranging gives ruct = nodesize * (nneigh/(2/3*pi))**(1/3)
 
 end subroutine init_get_nodeneigh
 
 
 subroutine get_nodeneigh(node,na,pos_na,nxyzm_treetocmi,ncminode,nnodeneigh,listnodeneigh,&
-                         xyzcache_nodeneigh,n_kmid,pos_kmid,nkmid,avgneigh_est)
+                         xyzcache_nodeneigh,n_kmid,pos_kmid,nkmid,nneigh1d_fac)
  use dtypekdtree, only:kdnode
  use utils_cmi,   only:mag2 
  use io,          only:fatal
+ use physcon,     only:pi
  type(kdnode), intent(in)    :: node(:)
  integer,      intent(in)    :: na  !- target node
  real,         intent(in)    :: pos_na(3)
@@ -423,7 +431,7 @@ subroutine get_nodeneigh(node,na,pos_na,nxyzm_treetocmi,ncminode,nnodeneigh,list
  integer,      intent(in)    :: ncminode,nkmid
  integer,      intent(in)    :: n_kmid(:)
  real,         intent(in)    :: pos_kmid(:,:)
- real,         intent(in)    :: avgneigh_est
+ real,         intent(in)    :: nneigh1d_fac
  integer,      intent(inout) :: nnodeneigh
  integer,      intent(out)   :: listnodeneigh(:)
  real,         intent(out)   :: xyzcache_nodeneigh(:,:)
@@ -440,18 +448,19 @@ subroutine get_nodeneigh(node,na,pos_na,nxyzm_treetocmi,ncminode,nnodeneigh,list
  !
  ka = int(log(real(na))/log(2.))        ! level of target node
 
- !- Considering kmid 
+ !- Consider kmid 
  deltak = ka - kmid
  n_mid = int(real(na)/real(2**deltak))  ! parent of na on kmid 
- size_kmid = node(n_mid)%size
+ size_kmid = node(n_mid)%size 
+ size_kmid = sqrt(2.*size_kmid**2)      ! take diagonal - encapsulates whole cell
 
  rcut = epsilon(rcut)
 
  !- Check if node is high on tree close to kmid by doing a qucik estimate
- rcut_trial = node(na)%size*real(avgneigh_est)**0.333
+ rcut_trial = node(na)%size*nneigh1d_fac
  if (rcut_trial > size_kmid) then 
-    !- Considering kabove 
-    kabove = ka !- 1    ! <- can use one level above in case there're 'jumps' in tree-walk
+    !- Consider kabove (or ka itself)
+    kabove = ka - 1  !<- can use a few levels above in case there're 'jumps' in tree-walk
     kabove_start = int(2**kabove)
     kabove_end   = int(2**(kabove+1)-1)
     !- Takes max ndoe size across level kabove 
@@ -460,7 +469,7 @@ subroutine get_nodeneigh(node,na,pos_na,nxyzm_treetocmi,ncminode,nnodeneigh,list
        size_neigh = node(na_neigh_above)%size
        size_kabove = max(size_kabove,size_neigh)
     enddo
-    rcut = size_kabove*real(avgneigh_est)**0.333
+    rcut = size_kabove*nneigh1d_fac
     if (check_neighfind) print*,'rcut from kabove; kmid ',rcut, size_kmid
  endif 
 
@@ -490,7 +499,7 @@ subroutine get_nodeneigh(node,na,pos_na,nxyzm_treetocmi,ncminode,nnodeneigh,list
     kb = int(log(real(nb))/log(2.))
     deltak = kb - kmid
     if (deltak < 0) call fatal('hnode_cmi','kmid should be above kb')
-    n_ancestor = int(real(nb)/real(2**deltak))  ! direct parent on kmid 
+    n_ancestor = int(real(nb)/real(2**deltak))  ! index of direct parent on kmid 
     ikmid = n_ancestor - int(2**kmid) + 1       ! its position on kmid
     if (ikmid <= 0 .or. ikmid > nkmid) call fatal('hnode_cmi','errorenous ikmid')
     if (close_to_na(ikmid) .and. nb /= na) then
