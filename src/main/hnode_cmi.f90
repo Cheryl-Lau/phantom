@@ -114,7 +114,7 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
        call get_nodeneigh_bruteforce(node,na,nxyzm_treetocmi,ncminode,nnodeneigh,listnodeneigh,&
                                      xyzcache_nodeneigh)
     else
-       call get_nodeneigh(node,na,pos_node,nxyzm_treetocmi,ncminode,nnodeneigh,listnodeneigh,&
+       call get_nodeneigh(node,na,pos_node,size_node,nxyzm_treetocmi,ncminode,nnodeneigh,listnodeneigh,&
                           xyzcache_nodeneigh,n_kmid,pos_kmid,nkmid,nneigh1d_fac)
     endif
     if (nnodeneigh == 0) call fatal('hnode_cmi','no neighbours found')
@@ -418,7 +418,7 @@ subroutine init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,n_kmid,pos_kmid,nkmi
 end subroutine init_get_nodeneigh
 
 
-subroutine get_nodeneigh(node,na,pos_na,nxyzm_treetocmi,ncminode,nnodeneigh,listnodeneigh,&
+subroutine get_nodeneigh(node,na,pos_na,size_na,nxyzm_treetocmi,ncminode,nnodeneigh,listnodeneigh,&
                          xyzcache_nodeneigh,n_kmid,pos_kmid,nkmid,nneigh1d_fac)
  use dtypekdtree, only:kdnode
  use utils_cmi,   only:mag2 
@@ -427,6 +427,7 @@ subroutine get_nodeneigh(node,na,pos_na,nxyzm_treetocmi,ncminode,nnodeneigh,list
  type(kdnode), intent(in)    :: node(:)
  integer,      intent(in)    :: na  !- target node
  real,         intent(in)    :: pos_na(3)
+ real,         intent(in)    :: size_na
  real,         intent(in)    :: nxyzm_treetocmi(:,:)
  integer,      intent(in)    :: ncminode,nkmid
  integer,      intent(in)    :: n_kmid(:)
@@ -457,18 +458,13 @@ subroutine get_nodeneigh(node,na,pos_na,nxyzm_treetocmi,ncminode,nnodeneigh,list
  rcut = epsilon(rcut)
 
  !- Check if node is high on tree close to kmid by doing a qucik estimate
- rcut_trial = node(na)%size*nneigh1d_fac
+ rcut_trial = size_na*nneigh1d_fac
  if (rcut_trial > size_kmid) then 
-    !- Consider kabove (or ka itself)
-    kabove = ka - 1  !<- can use a few levels above in case there're 'jumps' in tree-walk
-    kabove_start = int(2**kabove)
-    kabove_end   = int(2**(kabove+1)-1)
-    !- Takes max ndoe size across level kabove 
-    size_kabove = epsilon(size_kabove)
-    do na_neigh_above = kabove_start,kabove_end
-       size_neigh = node(na_neigh_above)%size
-       size_kabove = max(size_kabove,size_neigh)
-    enddo
+    !- Consider kabove
+    kabove = ka - 1   !<- can use a few levels above in case there're 'jumps' in tree-walk
+    deltak = ka - kabove 
+    n_above = int(real(na)/real(2**deltak))
+    size_kabove = node(n_above)%size
     rcut = size_kabove*nneigh1d_fac
     if (check_neighfind) print*,'rcut from kabove; kmid ',rcut, size_kmid
  endif 
