@@ -114,7 +114,7 @@ module photoionize_cmi
  logical, public :: crop_domain  = .false.
 
  ! Options for modifying the voronoi grid to enlarge the smallest cells
- logical, public :: limit_voronoi = .true.
+ logical, public :: limit_voronoi = .false.
  
  ! Options for heating/cooling
  real,    public :: temp_hii     = 1E4          ! K
