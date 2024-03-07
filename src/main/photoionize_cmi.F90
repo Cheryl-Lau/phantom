@@ -76,12 +76,14 @@ module photoionize_cmi
 
  ! Position of sources emitting radiation at current time
  integer, public, parameter :: maxphotosrc = 10
- integer, public :: nphotosrc                    !- Current number of sources
- real   , public :: xyz_photosrc(3,maxphotosrc)  !- Locations of current sources [code units]
+ integer, public :: nphotosrc                      !- Current number of sources
+ real   , public :: xyz_photosrc(3,maxphotosrc)    !- Locations of current sources [code units]
 
  ! Using sinks as source
  logical, public :: sink_ionsrc = .false.
- real,    public :: masscrit_ionize_cgs = 3.978E34  ! 20 M_sun
+ logical, public :: one_sink_ionsrc = .true.       !- Set a specific sink to be the source
+ integer, public :: isink_ionsrc = 5               !- Index of this sink
+ real,    public :: masscrit_ionize_cgs = 3.978E34 ! 20 M_sun
  !- or
  ! Manually set location, starting/ending time and ionizing photon flux [cgs units] of sources
  integer, public, parameter :: nsetphotosrc = 1
@@ -114,7 +116,7 @@ module photoionize_cmi
  logical, public :: crop_domain  = .false.
 
  ! Options for modifying the voronoi grid to enlarge the smallest cells
- logical, public :: limit_voronoi = .false.
+ logical, public :: limit_voronoi = .true.
  
  ! Options for heating/cooling
  real,    public :: temp_hii     = 1E4          ! K
@@ -387,6 +389,7 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
  real    :: time_startsrc,time_endsrc,mptmass,fluxq
  real    :: xmin_allsrc,xmax_allsrc,ymin_allsrc,ymax_allsrc,zmin_allsrc,zmax_allsrc
  real    :: disttomin2,disttomax2
+ logical :: target_sink_found
 
  !- Init/Reset
  nphotosrc = 0
@@ -398,18 +401,34 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
  ! Extract sources which currently emit radiation
  !
  if (sink_ionsrc .and. nptmass > 0) then !- Check sink
-    do isink = 1,nptmass
-       mptmass = xyzmh_ptmass(4,isink)
-       if (mptmass >= masscrit_ionize) then
-          nphotosrc = nphotosrc + 1
-          if (nphotosrc > maxphotosrc) call fatal('photoionize_cmi','number of sources &
-                                                  &exceeded maxphotosrc')
-          xyz_photosrc(1:3,nphotosrc) = xyzmh_ptmass(1:3,isink)
-          fluxq = get_ionflux_star(mptmass)
-          ionflux_photosrc(nphotosrc) = fluxq    ! [nphoton/s]
-          mass_photosrc(nphotosrc)    = mptmass
-       endif
-    enddo
+    if (one_sink_ionsrc) then 
+       nphotosrc = 1
+       target_sink_found = .false. 
+       do isink = 1,nptmass 
+          if (isink == isink_ionsrc) then 
+             target_sink_found = .true. 
+             xyz_photosrc(1:3,nphotosrc) = xyzmh_ptmass(1:3,isink)
+             mptmass = xyzmh_ptmass(4,isink)
+             fluxq = get_ionflux_star(mptmass)
+             ionflux_photosrc(nphotosrc) = fluxq    ! [nphoton/s]
+             mass_photosrc(nphotosrc)    = mptmass
+          endif 
+       enddo 
+       if (.not.target_sink_found) call fatal('photoionize_cmi','target sink not found')
+    else
+       do isink = 1,nptmass
+          mptmass = xyzmh_ptmass(4,isink)
+          if (mptmass >= masscrit_ionize) then
+             nphotosrc = nphotosrc + 1
+             if (nphotosrc > maxphotosrc) call fatal('photoionize_cmi','number of sources &
+                                                    &exceeded maxphotosrc')
+             xyz_photosrc(1:3,nphotosrc) = xyzmh_ptmass(1:3,isink)
+             fluxq = get_ionflux_star(mptmass)
+             ionflux_photosrc(nphotosrc) = fluxq    ! [nphoton/s]
+             mass_photosrc(nphotosrc)    = mptmass
+          endif
+       enddo
+    endif 
  elseif (.not.sink_ionsrc) then !- Check time
     do isrc = 1,nsetphotosrc
        time_startsrc = xyztq_setphotosrc_cgs(4,isrc)/utime
@@ -1776,6 +1795,8 @@ subroutine write_options_photoionize(iunit)
  write(iunit,"(/,a)") '# options controlling photoionization'
  call write_inopt(inject_rad,'inject_rad','Inject radiation',iunit)
  call write_inopt(sink_ionsrc,'sink_ionsrc','Using sinks as ionizing sources',iunit)
+ call write_inopt(one_sink_ionsrc,'one_sink_ionsrc','Using one specific sink as ionizing source',iunit)
+ call write_inopt(isink_ionsrc,'isink_ionsrc','Sink label for ionizing source',iunit)
  call write_inopt(masscrit_ionize_cgs,'masscrit_ionize_cgs','Critical sink mass to begin emitting radiation',iunit)
  call write_inopt(niter_mcrt,'niter_mcrt','Number of photon-release iterations',iunit)
  call write_inopt(nphoton,'nphoton','Number of photons per iteration',iunit)
@@ -1824,6 +1845,13 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
  case('sink_ionsrc')
     read(valstring,*,iostat=ierr) sink_ionsrc
     ngot = ngot + 1
+ case('one_sink_ionsrc')
+    read(valstring,*,iostat=ierr) one_sink_ionsrc
+    ngot = ngot + 1
+ case('isink_ionsrc')
+    read(valstring,*,iostat=ierr) isink_ionsrc
+    ngot = ngot + 1
+    if (isink_ionsrc <= 0.) call fatal(label,'invalid setting for isink_ionsrc (<=0)')
  case('masscrit_ionize_cgs')
     read(valstring,*,iostat=ierr) masscrit_ionize_cgs
     ngot = ngot + 1
@@ -1906,7 +1934,7 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
  case default
     imatch = .false.
  end select
- igotall = ( ngot >= 24 )
+ igotall = ( ngot >= 26 )
 
 end subroutine read_options_photoionize
 
