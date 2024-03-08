@@ -409,9 +409,9 @@ subroutine init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,pos_kmid,size_kmid,k
  avgneigh_est = 10.67*pi*hfact_node**3.   ! nneigh = 4/3*pi*(2*hfact)**3
 
  !- Pre-compute term for estimating rcut 
- nneigh1d_fac = (real(avgneigh_est)/(2./3.*pi))**(1./3.)  
+ nneigh1d_fac = (6.*real(avgneigh_est)/pi)**(1./3.)  
  !  number density n = nneigh/(4/3*pi*rcut**3) = 1/((2*nodesize)**3)
- !  rearranging gives ruct = nodesize * (nneigh/(2/3*pi))**(1/3)
+ !  rearranging gives rcut = nodesize * (6*nneigh/pi)**(1/3)
  !                         = nodesize * nneigh1d_fac
 
 end subroutine init_get_nodeneigh
@@ -451,10 +451,10 @@ subroutine get_nodeneigh(node,na,pos_na,size_na,nxyzm_treetocmi,ncminode,nnodene
 
  !- Consider kmid 
  deltak = ka - kmid
- n_ancestor  = int(real(na)/real(2**deltak))   ! direct ancestor of na on kmid 
- ikmid       = n_ancestor - kmid_start + 1     ! its position on kmid
+ n_ancestor  = int(real(na)/real(2**deltak)) ! direct ancestor of na on kmid 
+ ikmid       = n_ancestor - kmid_start + 1   ! its position on kmid
  size_kmid_a = size_kmid(ikmid)
- size_kmid_a = sqrt(2.*size_kmid_a**2)         ! take diagonal - encapsulates whole cell
+ size_kmid_a = 1.73205*size_kmid_a           ! take diagonal sqrt(3*size**2) - encapsulates whole cell
 
  rcut = epsilon(rcut)
 
