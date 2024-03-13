@@ -42,7 +42,7 @@ module setup
  character(len=20)  :: dist_unit,mass_unit
  character(len=100) :: glass_filename
 
- logical :: use_glass = .true.
+ logical :: use_glass = .false.
 
 contains
 !----------------------------------------------------------------
@@ -135,7 +135,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        !
        ! Get glass file
        !
-       glass_filename = 'glassCube_128.dat'
+       glass_filename = 'glassCube_64.dat'
        call prompt('Enter filename of glass cube',glass_filename)
        glass_filename = trim(adjustl(glass_filename))
     endif
@@ -397,7 +397,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  ! Set runtime parameters
  !
  ieos      = 2     ! adiabatic eos
- nout      = 10
+ nout      = 1
  nfulldump = 1
  Tfloor    = 3.
  ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
@@ -414,11 +414,11 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  treat_Rtype_phase = .false.
 
  photoionize_tree  = .true.
- tree_accuracy_cmi = 0.3
+ tree_accuracy_cmi = 0.1
  nHlimit_fac       = 100
- rcut_opennode_cgs = 1.2E18  ! 0.4 pc
- rcut_leafpart_cgs = 6.1E17  ! 0.2 pc
- delta_rcut_cgs    = 3.1E17  ! 0.1 pc
+ rcut_opennode_cgs = 0.8*pc
+ rcut_leafpart_cgs = 0.4*pc
+ delta_rcut_cgs    = 0.1*pc
 
  !- Print summary - for checking
  print*,' -SUMMARY- '

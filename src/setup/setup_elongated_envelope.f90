@@ -371,7 +371,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  if (.not.in_iexist) then
     tmax      = 5.0*t_ff
     dtmax     = 0.001*t_ff
-    nout      = 1
+    nout      = 10
     nfulldump = 1
     nmaxdumps = 1000
     dtwallmax = 1800.  ! s
@@ -421,7 +421,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Photoionization settings
     !
-    inject_rad = .true.
+    inject_rad = .false.
     sink_ionsrc = .false.
 
     monochrom_source  = .false.
