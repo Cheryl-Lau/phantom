@@ -375,7 +375,6 @@ subroutine init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,pos_kmid,size_kmid,k
  real,         intent(out)   :: pos_kmid(:,:)
  real,         intent(out)   :: size_kmid(:)
  integer :: n,min_n,inode,kmid_old,kmid_end
- real    :: avgneigh_est
  logical :: kmid_ok
 
  !- Make sure kmid is above all nodes, if not, shift it up
@@ -405,14 +404,8 @@ subroutine init_get_nodeneigh(node,ncminode,nxyzm_treetocmi,pos_kmid,size_kmid,k
     size_kmid(nkmid)    = node(n)%size 
  enddo
 
- !- Estimate number of neighbours
- avgneigh_est = 10.67*pi*hfact_node**3.   ! nneigh = 4/3*pi*(2*hfact)**3
-
- !- Pre-compute term for estimating rcut 
- nneigh1d_fac = (6.*real(avgneigh_est)/pi)**(1./3.)  
- !  number density n = nneigh/(4/3*pi*rcut**3) = 1/((2*nodesize)**3)
- !  rearranging gives rcut = nodesize * (6*nneigh/pi)**(1/3)
- !                         = nodesize * nneigh1d_fac
+ !- Pre-compute term for estimating compact support radius  
+ nneigh1d_fac = 4.*hfact_node
 
 end subroutine init_get_nodeneigh
 
