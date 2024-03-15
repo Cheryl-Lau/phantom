@@ -251,17 +251,21 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
                                  filex,filey,filez,1.,turbboxsize,.false.,ierr)
     if (ierr /= 0) call fatal('setup','error setting up velocity field on clouds')
 
+    print*,'checking turbcube',vxyzu(1,100),vxyzu(2,100),vxyzu(3,100)
     rmsmach = 0.0
     do ip = 1,npart_cloud
-       v2i     = dot_product(vxyzu(1:3,i),vxyzu(1:3,i))
+       v2i     = dot_product(vxyzu(1:3,ip),vxyzu(1:3,ip))
        rmsmach = rmsmach + v2i/cs_cloud**2
+       print*,'v2i,cs_cloud',v2i, cs_cloud
     enddo
     rmsmach = sqrt(rmsmach/npart_cloud)
+    print*,'rmsmach',rmsmach
     if (rmsmach > 0.) then
        turbfac = rms_mach/rmsmach ! normalise the energy to the desired mach number
     else
        turbfac = 0.
     endif
+    print*,'turbfac',turbfac
     do ip = 1,npart_cloud
        vxyzu(1:3,ip) = turbfac*vxyzu(1:3,ip)
     enddo
