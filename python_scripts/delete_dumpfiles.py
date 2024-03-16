@@ -20,6 +20,8 @@ pwd = os.getcwd()
 for file in os.listdir(pwd):
     if file.startswith(dump_prefix.strip()):
         idump = re.findall(r'\d+',file.replace(dump_prefix, ''))
+        if (not idump):
+            continue 
         idump = int(idump[0])
 
         if (idump < idump_lastdumptocheck):
