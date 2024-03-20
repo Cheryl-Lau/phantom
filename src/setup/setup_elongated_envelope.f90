@@ -75,6 +75,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use photoionize_cmi, only:photoionize_tree,tree_accuracy_cmi,nHlimit_fac
  use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
  use photoionize_cmi, only:sink_ionsrc,inject_rad
+ use photoionize_cmi, only:nsetphotosrc,xyztq_setphotosrc_cgs
  use inject,          only:inject_sn,sink_progenitor
  integer,           intent(in)    :: id
  integer,           intent(inout) :: npart
