@@ -828,6 +828,22 @@ ifeq ($(SETUP), starbench)
     MAXP=5000000
 endif
 
+ifeq ($(SETUP), starbench_hpc)
+#	 Benchmark test for the Phantom-CMI RHD scheme
+    SETUPFILE=setup_unifdis_cmi_hpc.f90
+    ANALYSIS=analysis_partinfo.f90
+    FPPFLAGS= -DPHOTOION
+    SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
+    CMACIONIZE_KENNEDY=yes
+    PERIODIC=no
+    GRAVITY=no
+    ISOTHERMAL=no
+    IND_TIMESTEPS=no
+    KNOWN_SETUP=yes
+    MAXP=20000000
+endif
+
+
 ifeq ($(SETUP), rhdsne)
 #	 Turbulent spherical/ellipsoidal cloud
 #	 Injects ionizing radiation upon request by coupling Phantom to CMI
