@@ -212,7 +212,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     npart = 0
     deltax = (xmaxi-xmini)/np_req**(1./3.)
-    call set_unifdis('closepacked',id,master,xmini,xmaxi,ymini,ymaxi,zmini,zmaxi,deltax,hfact,&
+    call set_unifdis('cubic',id,master,xmini,xmaxi,ymini,ymaxi,zmini,zmaxi,deltax,hfact,&
                      npart,xyzh_raw,periodic)
     !
     ! Update totmass with the new npart
