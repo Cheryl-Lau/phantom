@@ -98,7 +98,7 @@ module photoionize_cmi
  logical, public :: lloyd      = .true.
  logical, public :: monochrom_source = .false.   ! else blackbody spec
 
- ! Move grid-construction up the tree
+ ! Move particles up the tree
  logical, public :: photoionize_tree = .true.
 
  ! Options for extracting cmi-nodes from kdtree
@@ -115,9 +115,11 @@ module photoionize_cmi
  real,    public :: crop_fac     = 1.2          ! bounds = crop_fac*rcut_opennode (>1)
  logical, public :: crop_domain  = .false.
 
- ! Options for modifying the voronoi grid to enlarge the smallest cells
+ ! Options for modifying the voronoi grid to merge the smallest cells
  logical, public :: limit_voronoi = .true.
- 
+ real,    public :: hlimit_fac    = 1E-3    ! threshold in h to merge 
+ real,    public :: extradist_fac = 2.0     ! merging distance factor (>= 1.)
+
  ! Options for heating/cooling
  real,    public :: temp_hii     = 1E4          ! K
  logical, public :: fix_temp_hii = .false.      ! else computes heating and cooling
@@ -1446,7 +1448,7 @@ subroutine write_cmi_infiles(nsite_in,x_in,y_in,z_in,h_in,m_in)
  x = x_in
  y = y_in
  z = z_in
- if (limit_voronoi) call modify_grid(nsite,x,y,z,h_in)
+ if (limit_voronoi) call modify_grid(nsite,x,y,z,h_in,hlimit_fac,extradist_fac)
 
  !- Set boundaries to only around the given sites
  call set_bounds(nsite,x,y,z,h_in,m_in,xmin,xmax,ymin,ymax,zmin,zmax,dx,dy,dz)
@@ -1803,6 +1805,9 @@ subroutine write_options_photoionize(iunit)
  call write_inopt(photon_eV,'photon_eV','Energy of ionizing photons in eV',iunit)
  call write_inopt(tol_vsite,'tol_vsite','Threshold to update Voronoi gen-sites',iunit)
  call write_inopt(lloyd,'lloyd','Apply Lloyd iteration to construct Voronoi grid',iunit)
+ call write_inopt(limit_voronoi,'limit_voronoi','Merge tightly packed cells in Voronoi grid',iunit)
+ call write_inopt(hlimit_fac,'hlimit_fac','Threshold fraction in h to merge',iunit)
+ call write_inopt(extradist_fac,'extradist_fac','Radius factor to merge',iunit)
  call write_inopt(monochrom_source,'monochrom_source','Use monochromatic source',iunit)
  call write_inopt(photoionize_tree,'photoionize_tree','Pass tree nodes as pseudo-particles to CMI',iunit)
  call write_inopt(tree_accuracy_cmi,'tree_accuracy_cmi','Tree-opening criteria for cmi-nodes',iunit)
@@ -1875,6 +1880,17 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
  case('lloyd')
     read(valstring,*,iostat=ierr) lloyd
     ngot = ngot + 1
+ case('limit_voronoi')
+    read(valstring,*,iostat=ierr) limit_voronoi
+    ngot = ngot + 1
+ case('hlimit_fac')
+    read(valstring,*,iostat=ierr) hlimit_fac
+    ngot = ngot + 1
+    if (hlimit_fac < 0.) call fatal(label,'invalid setting for hlimit_fac (<0)')
+ case('extradist_fac')
+    read(valstring,*,iostat=ierr) extradist_fac
+    ngot = ngot + 1
+    if (extradist_fac < 1.) call fatal(label,'invalid setting for extradist_fac (<1)')
  case('monochrom_source')
     read(valstring,*,iostat=ierr) monochrom_source
     ngot = ngot + 1
@@ -1934,7 +1950,7 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
  case default
     imatch = .false.
  end select
- igotall = ( ngot >= 26 )
+ igotall = ( ngot >= 29 )
 
 end subroutine read_options_photoionize
 

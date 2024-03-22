@@ -31,20 +31,20 @@ contains
 ! done to avoid seg-fault in CMI grid initialization stage 
 !+
 !-----------------------------------------------------------------------
-subroutine modify_grid(npart,x,y,z,h)
+subroutine modify_grid(npart,x,y,z,h,hlimit_fac,extradist_fac)
  use io,   only:warning,fatal
  integer, intent(inout) :: npart
  real,    intent(inout) :: x(npart),y(npart),z(npart)
  real,    intent(in)    :: h(npart)
+ real,    intent(in)    :: hlimit_fac
+ real,    intent(in)    :: extradist_fac
  integer, parameter :: maxgrp = 10000
- integer, parameter :: maxp_per_grp = 5000 
+ integer, parameter :: maxp_per_grp = 5000
  integer :: ip,ip_neigh,npart_smallh,npart_mod,npart_merged
  integer :: k,ngroup,np_in_k,i_in_k
  integer :: parts_grp(maxgrp,maxp_per_grp)  ! stores index of particles in each group 
  integer :: npart_grp(maxgrp)               ! stores number of particles in each group 
  real    :: hmin,hmax,hlimit 
- real    :: hlimit_fac = 1E-3
- real    :: extradist_fac = 2.0
  real    :: xyz_ip(3),xyz_neigh(3),dist2,xmean,ymean,zmean
  real,    allocatable :: x_mod(:),y_mod(:),z_mod(:)
  logical :: flag_particle(npart)
