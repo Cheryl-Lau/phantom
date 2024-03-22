@@ -65,7 +65,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use timestep,     only:nout
  use prompting,    only:prompt
  use photoionize_cmi, only:monochrom_source,fix_temp_hii,treat_Rtype_phase
- use photoionize_cmi, only:photoionize_tree,tree_accuracy_cmi,nHlimit_fac
+ use photoionize_cmi, only:photoionize_tree,tree_accuracy_cmi,nHlimit_fac,limit_voronoi 
  use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
  use photoionize_cmi, only:nsetphotosrc,xyztq_setphotosrc_cgs
  integer,           intent(in)    :: id

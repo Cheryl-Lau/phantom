@@ -67,7 +67,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use timestep,     only:nout
  use prompting,    only:prompt
  use photoionize_cmi, only:monochrom_source,fix_temp_hii,treat_Rtype_phase
- use photoionize_cmi, only:photoionize_tree,nHlimit_fac
+ use photoionize_cmi, only:photoionize_tree,nHlimit_fac,limit_voronoi
  use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
  use photoionize_cmi, only:nsetphotosrc,xyztq_setphotosrc_cgs
  integer,           intent(in)    :: id
@@ -130,8 +130,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        !
        ! Set number of particles (to be updated after set_unifdis)
        !
-       npmax = int(2.0/3.0*size(xyzh(1,:)))
-       np_req = 1E6
+       npmax = int(size(xyzh(1,:)))
+       np_req = 1E7
        call prompt('Enter total number of particles',np_req,1)
        if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
     else
@@ -164,7 +164,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set timestep and end-time
     !
     dtmax_cgs = 3.15360E9    ! 1E-4 Myr
-    tmax_cgs  = 6.*dtmax_cgs ! run only 5 steps for runtime measure 
+    tmax_cgs  = 5.*dtmax_cgs ! run only 5 steps for runtime measure 
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)

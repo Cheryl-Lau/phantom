@@ -815,7 +815,7 @@ endif
 
 ifeq ($(SETUP), starbench)
 #	 Benchmark test for the Phantom-CMI RHD scheme
-    SETUPFILE=setup_unifdis_cmi.f90
+    SETUPFILE=setup_unifdis_cmi_hpc.f90
     ANALYSIS=analysis_partinfo.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
@@ -825,7 +825,7 @@ ifeq ($(SETUP), starbench)
     ISOTHERMAL=no
     IND_TIMESTEPS=no
     KNOWN_SETUP=yes
-    MAXP=5000000
+    MAXP=2000000
 endif
 
 ifeq ($(SETUP), starbench_hpc)
@@ -840,7 +840,7 @@ ifeq ($(SETUP), starbench_hpc)
     ISOTHERMAL=no
     IND_TIMESTEPS=no
     KNOWN_SETUP=yes
-    MAXP=20000000
+    MAXP=50000000
 endif
 
 
