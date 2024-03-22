@@ -30,6 +30,7 @@ module setup
 !
  use setup_params,  only:rhozero
  use timestep,      only:dtmax,tmax
+ use photoionize_cmi, only:tree_accuracy_cmi
  implicit none
 
  public  :: setpart
@@ -38,6 +39,7 @@ module setup
 
  integer :: np_req
  real    :: pmass,cs0
+ real    :: rcut_opennode,rcut_leafpart
  real(kind=8)       :: udist,umass
  character(len=20)  :: dist_unit,mass_unit
  character(len=100) :: glass_filename
@@ -65,7 +67,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use timestep,     only:nout
  use prompting,    only:prompt
  use photoionize_cmi, only:monochrom_source,fix_temp_hii,treat_Rtype_phase
- use photoionize_cmi, only:photoionize_tree,tree_accuracy_cmi,nHlimit_fac,limit_voronoi 
+ use photoionize_cmi, only:photoionize_tree,nHlimit_fac,limit_voronoi 
  use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
  use photoionize_cmi, only:nsetphotosrc,xyztq_setphotosrc_cgs
  integer,           intent(in)    :: id
@@ -128,7 +130,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        !
        ! Set number of particles (to be updated after set_unifdis)
        !
-       npmax = int(2.0/3.0*size(xyzh(1,:)))
+       npmax = int(size(xyzh(1,:)))
        np_req = 1E6
        call prompt('Enter total number of particles',np_req,1)
        if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
@@ -167,6 +169,17 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)
     call prompt('Enter simulation end-time in code units',tmax,0.)
+    !
+    ! Set tree accuracy parameters 
+    ! 
+    tree_accuracy_cmi = 0.1 
+    rcut_opennode_cgs = 0.5*pc
+    rcut_leafpart_cgs = 0.4*pc
+    rcut_opennode = rcut_opennode_cgs/udist 
+    rcut_leafpart = rcut_leafpart_cgs/udist 
+    call prompt('Enter the tree accuracy for tree-walk',tree_accuracy_cmi,0.)
+    call prompt('Enter the radius for leaves in code units',rcut_opennode,0.)
+    call prompt('Enter the radius for individual particles in code units',rcut_leafpart,0.)
 
     if (id==master) call write_setupfile(filename)
     stop 'rerun phantomsetup after editing .setup file'
@@ -415,10 +428,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  treat_Rtype_phase = .false.
 
  photoionize_tree  = .true.
- tree_accuracy_cmi = 0.1
  nHlimit_fac       = 100
- rcut_opennode_cgs = 0.5*pc
- rcut_leafpart_cgs = 0.4*pc
+ rcut_opennode_cgs = rcut_opennode*udist 
+ rcut_leafpart_cgs = rcut_leafpart*udist 
  delta_rcut_cgs    = 0.1*pc
 
 
@@ -471,6 +483,10 @@ subroutine write_setupfile(filename)
  call write_inopt(dtmax,'dtmax','timestep in code units',iunit)
  call write_inopt(tmax,'tmax','end-time in code units',iunit)
 
+ call write_inopt(tree_accuracy_cmi,'tree_accuracy_cmi','tree accuracy for cmi nodes',iunit)
+ call write_inopt(rcut_opennode,'rcut_opennode','rcut_leaf in code units',iunit)
+ call write_inopt(rcut_leafpart,'rcut_leafpart','rcut_part in code units',iunit)
+
  close(iunit)
 
 end subroutine write_setupfile
@@ -512,6 +528,11 @@ subroutine read_setupfile(filename,ierr)
  call read_inopt(cs0,'cs0',db,min=0.,errcount=nerr)
  call read_inopt(dtmax,'dtmax',db,min=0.,errcount=nerr)
  call read_inopt(tmax,'tmax',db,min=0.,errcount=nerr)
+
+ call read_inopt(tree_accuracy_cmi,'tree_accuracy_cmi',db,min=0.,errcount=nerr)
+ call read_inopt(rcut_opennode,'rcut_opennode',db,min=0.,errcount=nerr)
+ call read_inopt(rcut_leafpart,'rcut_leafpart',db,min=0.,errcount=nerr)
+
  call close_db(db)
  !
  ! parse units
