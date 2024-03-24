@@ -38,17 +38,16 @@ subroutine modify_grid(npart,x,y,z,h,hlimit_fac,extradist_fac)
  real,    intent(in)    :: h(npart)
  real,    intent(in)    :: hlimit_fac
  real,    intent(in)    :: extradist_fac
- integer, parameter :: maxgrp = 10000
- integer, parameter :: maxp_per_grp = 5000
+ integer :: maxgrp,maxp_per_grp
  integer :: ip,ip_neigh,npart_smallh,npart_mod,npart_merged
  integer :: k,ngroup,np_in_k,i_in_k
- integer :: parts_grp(maxgrp,maxp_per_grp)  ! stores index of particles in each group 
- integer :: npart_grp(maxgrp)               ! stores number of particles in each group 
  real    :: hmin,hmax,hlimit 
  real    :: xyz_ip(3),xyz_neigh(3),dist2,xmean,ymean,zmean
+ integer, allocatable :: parts_grp(:,:)  
+ integer, allocatable :: npart_grp(:)   
  real,    allocatable :: x_mod(:),y_mod(:),z_mod(:)
  logical :: flag_particle(npart)
- logical :: check_modgrid = .true.
+ logical :: check_modgrid = .false.
  
  ! testing 
  if (check_modgrid) then 
@@ -58,6 +57,12 @@ subroutine modify_grid(npart,x,y,z,h,hlimit_fac,extradist_fac)
     enddo 
     close(2050)
  endif 
+
+ !- init storage for groups 
+ maxgrp = npart*1E-2
+ maxp_per_grp = npart*1E-2
+ allocate(parts_grp(maxgrp,maxp_per_grp))  ! stores index of particles in each group 
+ allocate(npart_grp(maxgrp))               ! stores number of particles in each group 
 
  !- find the max and min of h
  hmin = huge(hmin)
@@ -154,6 +159,9 @@ subroutine modify_grid(npart,x,y,z,h,hlimit_fac,extradist_fac)
     write(*,'(2x,a20,i7,a4,i7)') 'Changing nsite from ',npart,' to ',npart_mod
  endif 
  if ((npart-npart_mod)/npart > 0.05) call fatal('utils_cmi','merged too many small cells!') 
+
+ deallocate(parts_grp)
+ deallocate(npart_grp) 
 
  !- Output the modified sites 
  npart = npart_mod
