@@ -59,8 +59,8 @@ subroutine modify_grid(npart,x,y,z,h,hlimit_fac,extradist_fac)
  endif 
 
  !- init storage for groups 
- maxgrp = npart*1E-2
- maxp_per_grp = npart*1E-2
+ maxgrp = npart*1E-1
+ maxp_per_grp = npart*1E-1
  allocate(parts_grp(maxgrp,maxp_per_grp))  ! stores index of particles in each group 
  allocate(npart_grp(maxgrp))               ! stores number of particles in each group 
 
