@@ -367,6 +367,9 @@ subroutine init_ionizing_radiation_cmi(time,npart,xyzh,nptmass,dt)
  open(2050,file='cpu_wall_time_record.txt',status='replace',iostat=io_file)
  if (io_file /= 0) call fatal('photoionize_cmi','unable to open time-record file')
 
+ open(2060,file='CMI_cpu_time_record.txt',status='replace',iostat=io_file)
+ if (io_file /= 0) call fatal('photoionize_cmi','unable to open cmi time-record file')
+
 end subroutine init_ionizing_radiation_cmi
 
 
@@ -1404,6 +1407,10 @@ subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
  real,    intent(in)  :: x(nsite),y(nsite),z(nsite),h(nsite),m(nsite)
  real,    intent(out) :: nH(nsite)
  integer :: talk,numthreads
+ real    :: time_before_cmi,time_after_cmi
+
+ call cpu_time(time_before_cmi)
+
  !
  ! Initialize CMI
  !
@@ -1421,6 +1428,12 @@ subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
  call cmi_compute_neutral_fraction_dp(x(1:nsite),y(1:nsite),z(1:nsite),h(1:nsite),&
                                       m(1:nsite),nH(1:nsite),int8(nsite))
  call cmi_destroy
+
+
+ call cpu_time(time_after_cmi)
+ open(2060,file='CMI_cpu_time_record.txt',position='append')
+ write(2060,*) iruncmi, time_before_cmi, time_after_cmi
+ close(2060)
 
 end subroutine run_cmacionize
 

@@ -825,7 +825,7 @@ ifeq ($(SETUP), starbench)
     ISOTHERMAL=no
     IND_TIMESTEPS=no
     KNOWN_SETUP=yes
-    MAXP=2000000
+    MAXP=12000000
 endif
 
 ifeq ($(SETUP), starbench_hpc)
