@@ -38,14 +38,10 @@ subroutine modify_grid(npart,x,y,z,h,hlimit_fac,extradist_fac)
  real,    intent(in)    :: h(npart)
  real,    intent(in)    :: hlimit_fac
  real,    intent(in)    :: extradist_fac
- integer, parameter :: maxgrp = 10000
- integer, parameter :: maxp_per_grp = 10000
  integer :: ip,ip_neigh,npart_smallh,npart_mod,npart_merged
- integer :: k,ngroup,np_in_k,i_in_k
+ integer :: k,ngroup,np_in_grp
  real    :: hmin,hmax,hlimit 
  real    :: xyz_ip(3),xyz_neigh(3),dist2,xmean,ymean,zmean
- integer :: parts_grp(maxgrp,maxp_per_grp)  
- integer :: npart_grp(maxgrp)   
  real,    allocatable :: x_mod(:),y_mod(:),z_mod(:)
  logical :: flag_particle(npart)
  logical :: check_modgrid = .false.
@@ -70,30 +66,27 @@ subroutine modify_grid(npart,x,y,z,h,hlimit_fac,extradist_fac)
  !- set filter - h smaller than this limit will need to be dealt with 
  hlimit = hmin + (hmax-hmin)*hlimit_fac
 
- !- Init arrays for storing groups
- ngroup = 0
- parts_grp(:,:) = 0. 
- npart_grp(:)   = 0 
- flag_particle(:) = .false. 
-
  !- Init for the final set of particles
  npart_mod = 0
  allocate(x_mod(npart))
  allocate(y_mod(npart))
  allocate(z_mod(npart))
 
+ flag_particle(:) = .false. 
+ ngroup = 0
+ npart_merged = 0
 
- k = 0  ! group index
  do ip = 1,npart
     if (h(ip) < hlimit) then 
        if (.not.flag_particle(ip)) then 
           !- start new group
-          k = k + 1 
-          if (k > maxgrp) call fatal('utils_cmi','number of groups exceeded limit')
+          ngroup = ngroup + 1 
           !- put first particle in
-          np_in_k = 1 
-          parts_grp(k,np_in_k) = ip 
-          npart_grp(k)         = np_in_k
+          np_in_grp = 1 
+          npart_merged = npart_merged + 1 
+          xmean = x(ip)
+          ymean = y(ip)
+          zmean = z(ip) 
           !- loop over all other particles 
           xyz_ip = (/ x(ip), y(ip), z(ip) /)
           over_neigh: do ip_neigh = 1,npart 
@@ -103,14 +96,23 @@ subroutine modify_grid(npart,x,y,z,h,hlimit_fac,extradist_fac)
                 dist2 = mag2(xyz_ip - xyz_neigh)
                 !- extract those with overlapping h
                 if (dist2 < ((h(ip) + h(ip_neigh))*extradist_fac)**2) then 
-                   np_in_k = np_in_k + 1
-                   if (np_in_k > maxp_per_grp) call fatal('utils_cmi','number of particles in group exceeded limit')
-                   parts_grp(k,np_in_k) = ip_neigh 
-                   npart_grp(k)         = np_in_k
+                   np_in_grp = np_in_grp + 1
+                   npart_merged = npart_merged + 1 
+                   xmean = xmean + x(ip_neigh)
+                   ymean = ymean + y(ip_neigh)
+                   zmean = zmean + z(ip_neigh) 
                    flag_particle(ip_neigh) = .true.  ! to avoid being placed in group again
                 endif 
              endif 
           enddo over_neigh 
+          xmean = xmean/real(np_in_grp)
+          ymean = ymean/real(np_in_grp)
+          zmean = zmean/real(np_in_grp)
+          !- store it as a new particle 
+          npart_mod = npart_mod + 1 
+          x_mod(npart_mod) = xmean
+          y_mod(npart_mod) = ymean
+          z_mod(npart_mod) = zmean
        endif 
     elseif (h(ip) >= hlimit) then  
        !- store directly 
@@ -119,32 +121,6 @@ subroutine modify_grid(npart,x,y,z,h,hlimit_fac,extradist_fac)
        y_mod(npart_mod) = y(ip)
        z_mod(npart_mod) = z(ip)
     endif 
- enddo 
-
- ngroup = k
-
- !- Loop through each group to locate its centre 
- npart_merged = 0
- do k = 1,ngroup 
-    np_in_k = npart_grp(k)
-    npart_merged = npart_merged + np_in_k
-    xmean = 0.
-    ymean = 0.
-    zmean = 0. 
-    over_parts: do i_in_k = 1,np_in_k
-       ip = parts_grp(k,i_in_k)  ! extract particle index 
-       xmean = xmean + x(ip)
-       ymean = ymean + y(ip)
-       zmean = zmean + z(ip) 
-    enddo over_parts
-    xmean = xmean/real(np_in_k)
-    ymean = ymean/real(np_in_k)
-    zmean = zmean/real(np_in_k)
-    !- store it as a new particle 
-    npart_mod = npart_mod + 1 
-    x_mod(npart_mod) = xmean
-    y_mod(npart_mod) = ymean
-    z_mod(npart_mod) = zmean
  enddo 
 
  if (npart_mod == npart) then
