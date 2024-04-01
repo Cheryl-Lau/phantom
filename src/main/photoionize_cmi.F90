@@ -367,8 +367,8 @@ subroutine init_ionizing_radiation_cmi(time,npart,xyzh,nptmass,dt)
  open(2050,file='cpu_wall_time_record.txt',status='replace',iostat=io_file)
  if (io_file /= 0) call fatal('photoionize_cmi','unable to open time-record file')
 
- open(2060,file='CMI_cpu_time_record.txt',status='replace',iostat=io_file)
- if (io_file /= 0) call fatal('photoionize_cmi','unable to open cmi time-record file')
+ open(2060,file='CMI_cpu_wall_time_record.txt',status='replace',iostat=io_file)
+ if (io_file /= 0) call fatal('photoionize_cmi','unable to open CMI time-record file')
 
 end subroutine init_ionizing_radiation_cmi
 
@@ -612,6 +612,7 @@ subroutine compute_ionization_cmi(time,npart,xyzh,vxyzu)
  real    :: nH_part,nH_site
 
  if (nphotosrc == 0) return
+ print*,'Injecting radiation at',xyz_photosrc(:,1:nphotosrc)
 
  if (photoionize_tree) then
     !
@@ -1407,9 +1408,10 @@ subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
  real,    intent(in)  :: x(nsite),y(nsite),z(nsite),h(nsite),m(nsite)
  real,    intent(out) :: nH(nsite)
  integer :: talk,numthreads
- real    :: time_before_cmi,time_after_cmi
+ real    :: cputime1,cputime2,walltime1,walltime2
 
- call cpu_time(time_before_cmi)
+ call cpu_time(cputime1)
+ walltime1 = omp_get_wtime()
 
  !
  ! Initialize CMI
@@ -1424,15 +1426,16 @@ subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
  !
  ! Run CMI
  !
- if (.not.print_cmi) write(*,'(2x,a11)') 'Running CMI'
+ if (.not.print_cmi) write(*,'(2x,a15,i3,a8)') 'Running CMI on ',numthreads,' threads'
  call cmi_compute_neutral_fraction_dp(x(1:nsite),y(1:nsite),z(1:nsite),h(1:nsite),&
                                       m(1:nsite),nH(1:nsite),int8(nsite))
  call cmi_destroy
 
 
- call cpu_time(time_after_cmi)
- open(2060,file='CMI_cpu_time_record.txt',position='append')
- write(2060,*) iruncmi, time_before_cmi, time_after_cmi
+ call cpu_time(cputime2)
+ walltime2 = omp_get_wtime()
+ open(2060,file='CMI_cpu_wall_time_record.txt',position='append')
+ write(2060,*) iruncmi, cputime2-cputime1, walltime2-walltime1
  close(2060)
 
 end subroutine run_cmacionize
