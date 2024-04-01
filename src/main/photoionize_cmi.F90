@@ -118,7 +118,7 @@ module photoionize_cmi
  ! Options for modifying the voronoi grid to merge the smallest cells
  logical, public :: limit_voronoi = .true.
  real,    public :: hlimit_fac    = 1E-3    ! threshold in h to merge 
- real,    public :: extradist_fac = 2.0     ! merging distance factor (>= 1.)
+ real,    public :: extradist_fac = 1.0     ! merging distance factor (>= 1.)
 
  ! Options for heating/cooling
  real,    public :: temp_hii     = 1E4          ! K
