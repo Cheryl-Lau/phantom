@@ -570,16 +570,21 @@ end function get_lumin_star
 ! obtained from fitting mass-flux in table 1 of Diaz-Miller et al. 1998
 !
 real function get_ionflux_star(mass_star)
- use units, only:umass
+ use physcon, only:solarm
+ use units,   only:umass
  real, intent(in) :: mass_star
- real :: mass_star_cgs
+ real :: mass_star_cgs,mass_star_solarm
 
  mass_star_cgs = mass_star*umass
- if (mass_star_cgs > 3.65E34) then
-    get_ionflux_star = 10**(2.817*log10(mass_star_cgs) - 49.561)
- else
-    get_ionflux_star = 10**(12.548*log10(mass_star_cgs) - 385.885)
- endif
+ mass_star_solarm = mass_star_cgs/solarm 
+
+ get_ionflux_star = 10**(48.1 + 0.02*(mass_star_solarm - 20.d0))
+
+! if (mass_star_cgs > 3.65E34) then
+!    get_ionflux_star = 10**(2.817*log10(mass_star_cgs) - 49.561)
+! else
+!    get_ionflux_star = 10**(12.548*log10(mass_star_cgs) - 385.885)
+! endif
 
 end function get_ionflux_star
 
