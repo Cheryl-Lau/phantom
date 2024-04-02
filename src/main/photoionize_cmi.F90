@@ -608,11 +608,14 @@ subroutine compute_ionization_cmi(time,npart,xyzh,vxyzu)
  real,    intent(in)    :: time
  real,    intent(inout) :: xyzh(:,:),vxyzu(:,:)
  real,    allocatable   :: x(:),y(:),z(:),h(:),m(:),nH(:)
- integer :: ip,ip_cmi,npart_cmi,i,n,ipnode,isite,ncminode
+ integer :: ip,ip_cmi,npart_cmi,i,n,ipnode,isite,ncminode,isrc
  real    :: nH_part,nH_site
 
  if (nphotosrc == 0) return
- print*,'Injecting radiation at',xyz_photosrc(:,1:nphotosrc)
+ print*,'Injecting radiation at'
+ do isrc = 1,nphotosrc 
+    print*,xyz_photosrc(:,isrc), ionflux_photosrc(isrc)
+ enddo 
 
  if (photoionize_tree) then
     !
