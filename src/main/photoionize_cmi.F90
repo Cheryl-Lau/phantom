@@ -83,7 +83,7 @@ module photoionize_cmi
  logical, public :: sink_ionsrc = .false.
  logical, public :: one_sink_ionsrc = .true.       !- Set a specific sink to be the source
  integer, public :: isink_ionsrc = 5               !- Index of this sink
- real,    public :: masscrit_ionize_cgs = 3.978E34 ! 20 M_sun
+ real,    public :: masscrit_ionize_cgs = 1.989E34 ! 10 M_sun
  !- or
  ! Manually set location, starting/ending time and ionizing photon flux [cgs units] of sources
  integer, public, parameter :: nsetphotosrc = 1
@@ -409,7 +409,7 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
     if (one_sink_ionsrc) then 
        nphotosrc = 1
        target_sink_found = .false. 
-       do isink = 1,nptmass 
+       over_sinks: do isink = 1,nptmass 
           if (isink == isink_ionsrc) then 
              target_sink_found = .true. 
              xyz_photosrc(1:3,nphotosrc) = xyzmh_ptmass(1:3,isink)
@@ -417,8 +417,9 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
              fluxq = get_ionflux_star(mptmass)
              ionflux_photosrc(nphotosrc) = fluxq    ! [nphoton/s]
              mass_photosrc(nphotosrc)    = mptmass
+             exit over_sinks
           endif 
-       enddo 
+       enddo over_sinks 
        if (.not.target_sink_found) call fatal('photoionize_cmi','target sink not found')
     else
        do isink = 1,nptmass
