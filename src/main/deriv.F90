@@ -184,6 +184,7 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
  endif
 
  if (icall == 1 .or. icall == 0) then
+    print*,'calling CMI at icall',icall
     !- Calling CMacIonize to compute nH map
     call compute_ionization_cmi(time,npart,xyzh,vxyzu)
     !- Compute du_cmi and update vxyzu (ie. vpred) if implicit

@@ -118,7 +118,7 @@ module photoionize_cmi
  ! Options for modifying the voronoi grid to merge the smallest cells
  logical, public :: limit_voronoi = .true.
  real,    public :: hlimit_fac    = 1E-3    ! threshold in h to merge 
- real,    public :: extradist_fac = 1.0     ! merging distance factor (>= 1.)
+ real,    public :: extradist_fac = 2.0     ! merging distance factor (>= 1.)
 
  ! Options for heating/cooling
  real,    public :: temp_hii     = 1E4          ! K
@@ -368,6 +368,7 @@ subroutine init_ionizing_radiation_cmi(time,npart,xyzh,nptmass,dt)
  if (io_file /= 0) call fatal('photoionize_cmi','unable to open time-record file')
 
  open(2060,file='CMI_cpu_wall_time_record.txt',status='replace',iostat=io_file)
+ open(2070,file='exclude_CMI_cpu_wall_time_record.txt',status='replace',iostat=io_file)
  if (io_file /= 0) call fatal('photoionize_cmi','unable to open CMI time-record file')
 
 end subroutine init_ionizing_radiation_cmi
@@ -578,8 +579,10 @@ real function get_ionflux_star(mass_star)
  mass_star_cgs = mass_star*umass
  mass_star_solarm = mass_star_cgs/solarm 
 
+ print*,'mass of ionizing star',mass_star_solarm
  get_ionflux_star = 10**(48.1 + 0.02*(mass_star_solarm - 20.d0))
 
+ print*,'forcefully set flux to 1E51'
  get_ionflux_star = 1E51 ! testing 
 
 ! if (mass_star_cgs > 3.65E34) then
@@ -1445,9 +1448,14 @@ subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
 
  call cpu_time(cputime2)
  walltime2 = omp_get_wtime()
+
  open(2060,file='CMI_cpu_wall_time_record.txt',position='append')
  write(2060,*) iruncmi, cputime2-cputime1, walltime2-walltime1
  close(2060)
+
+ open(2070,file='exclude_CMI_cpu_wall_time_record.txt',position='append')
+ write(2070,*) iruncmi, cputime2, walltime2, cputime1, walltime1
+ close(2070)
 
 end subroutine run_cmacionize
 
