@@ -31,6 +31,7 @@ def correct_kennedy_speed_cmi():
     return scale_cmi
 
 
+
 partnumsets = ['ten5particles','ten6particles','ten7particles','ten7particles_kennedy']
 totpart = [144666,1426800,9938375,9938375]
 colours = ['red','blue','black','grey']
@@ -76,7 +77,7 @@ for numpartdir, allpart in zip(partnumsets, totpart):
         istep, sim_time, cpu_time, wall_time = np.loadtxt(runtimefile, unpack=True)
 
         # correct for difference in cpu performance 
-        if (numpartdir == 'ten7particles_kennedy'):
+        if (numpartdir == 'ten7particles_kennedy' or setname == 'ten7particles/set16_fromkennedy'):
             wall_time = wall_time * scale_fac
 
         # total cpu_time per step and error 
@@ -93,7 +94,7 @@ for numpartdir, allpart in zip(partnumsets, totpart):
         wallerr_cmi = np.std(wall_cmi)/np.sqrt(len(wall_cmi))
 
         # correct for difference in cpu performance 
-        if (numpartdir == 'ten7particles_kennedy'):
+        if (numpartdir == 'ten7particles_kennedy' or setname == 'ten7particles/set16_fromkennedy'):
             wallmean_cmi = wallmean_cmi * scale_fac_cmi
             wallerr_cmi = wallerr_cmi * scale_fac_cmi
 
@@ -113,7 +114,6 @@ for numpartdir, allpart in zip(partnumsets, totpart):
             walldiff_avg = grad*dt - wallmean_cmi
             walldiff_err = np.sqrt((graderr*dt)**2 + wallerr_cmi**2)
 
-
         nppart_set.append(nppart)
         walltime_set.append(grad*dt)
         wallerr_set.append(graderr*dt)
@@ -129,7 +129,7 @@ for numpartdir, allpart in zip(partnumsets, totpart):
     treeerr_sorted = [i for _, i in sorted(zip(nppart_set, treeerr_set))]
 
 
-    # plot cputime vs pseudo-particles 
+    # plot walltime vs pseudo-particles 
     ax1.errorbar(nppart_sorted[:-1], walltime_sorted[:-1], yerr=wallerr_sorted[:-1], fmt='s', markersize=2, elinewidth=1, color=colours[i], label=labels[i])
 
     # plot all-particles case 
@@ -169,8 +169,8 @@ ax2.set_xscale('log')
 ax2.set_yscale('log')
 ax2.set_ylabel('SPH-side Wall time per step [s]')
 ax2.set_xlabel('Number of pseudo-particles')
-ax2.set_xlim([1.5e4,2e7])
-#ax2.set_ylim([1E0,8E4])
+ax2.set_xlim([1.5e4,1.5e7])
+ax2.set_ylim([9e-1,9e4])
 ax2.legend()
 fig2.savefig('sphside_wall_time_pseudoparts.png')
 

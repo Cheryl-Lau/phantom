@@ -32,6 +32,7 @@ def correct_kennedy_speed_cmi():
     return scale_cmi
 
 
+
 partnumsets = ['ten5particles','ten6particles','ten7particles','ten7particles_kennedy']
 totpart = [144666,1426800,9938375,9938375]
 colours = ['red','blue','black','grey']
@@ -81,7 +82,7 @@ for numpartdir, allpart in zip(partnumsets, totpart):
         istep, sim_time, cpu_time, wall_time = np.loadtxt(runtimefile, unpack=True)
 
         # correct for difference in cpu performance 
-        if (numpartdir == 'ten7particles_kennedy'):
+        if (numpartdir == 'ten7particles_kennedy' or setname == 'ten7particles/set16_fromkennedy'):
             cpu_time = cpu_time * scale_fac
 
         # total cpu_time per step and error 
@@ -98,7 +99,7 @@ for numpartdir, allpart in zip(partnumsets, totpart):
         cpuerr_cmi = np.std(cpu_cmi)
 
         # correct for difference in cpu performance 
-        if (numpartdir == 'ten7particles_kennedy'):
+        if (numpartdir == 'ten7particles_kennedy' or setname == 'ten7particles/set16_fromkennedy'):
             cpumean_cmi = cpumean_cmi * scale_fac_cmi
             cpuerr_cmi = cpuerr_cmi * scale_fac_cmi
 
@@ -157,8 +158,8 @@ for numpartdir, allpart in zip(partnumsets, totpart):
 
     # plot fit line
     smoothed_curve = make_interp_spline(nppart_sorted[:-2], treetime_sorted[:-2], k=1) 
-    treetime_curve = smoothed_curve(nppart_curve[:-2]) 
-    ax3.plot(nppart_curve[:-2], treetime_curve, linewidth=1, c=colours[i])
+    treetime_curve = smoothed_curve(nppart_curve[:-1]) 
+    ax3.plot(nppart_curve[:-1], treetime_curve, linewidth=1, c=colours[i])
 
 
     i += 1 
@@ -186,8 +187,8 @@ ax3.set_xscale('log')
 ax3.set_yscale('log')
 ax3.set_ylabel('SPH-side CPU time per step [s]')
 ax3.set_xlabel('Number of pseudo-particles')
-ax3.set_xlim([1.5e4,2e7])
-ax3.set_ylim([1e-1,8e4])
+ax3.set_xlim([1.5e4,1.5e7])
+ax3.set_ylim([9e-1,9e4])
 ax3.legend()
 fig3.savefig('sphside_cpu_time_pseudoparts.png')
 
