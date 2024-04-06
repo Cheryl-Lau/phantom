@@ -131,7 +131,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        ! Set number of particles (to be updated after set_unifdis)
        !
        npmax = int(size(xyzh(1,:)))
-       np_req = 1E6
+       np_req = 1E7
        call prompt('Enter total number of particles',np_req,1)
        if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
     else
@@ -164,7 +164,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set timestep and end-time
     !
     dtmax_cgs = 3.15360E9   ! 1E-4 Myr
-    tmax_cgs  = 4.41504E12  ! 0.14 Myr
+    tmax_cgs  = 5.*dtmax_cgs  ! 4.41504E12  ! 0.14 Myr
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)

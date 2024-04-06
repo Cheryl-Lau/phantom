@@ -582,8 +582,8 @@ real function get_ionflux_star(mass_star)
  print*,'mass of ionizing star',mass_star_solarm
  get_ionflux_star = 10**(48.1 + 0.02*(mass_star_solarm - 20.d0))
 
- print*,'forcefully set flux to 1E51'
- get_ionflux_star = 1E51 ! testing 
+ print*,'forcefully set flux to 7E50'
+ get_ionflux_star = 7E50 ! testing 
 
 ! if (mass_star_cgs > 3.65E34) then
 !    get_ionflux_star = 10**(2.817*log10(mass_star_cgs) - 49.561)
@@ -1455,6 +1455,7 @@ subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
 
  open(2070,file='exclude_CMI_cpu_wall_time_record.txt',position='append')
  write(2070,*) iruncmi, cputime2, walltime2, cputime1, walltime1
+ ! get runtime on SPH side with cputime1[istep+1] - cputime2[istep] 
  close(2070)
 
 end subroutine run_cmacionize

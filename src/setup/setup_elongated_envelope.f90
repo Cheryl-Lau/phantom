@@ -63,6 +63,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use part,         only:igas,abundance,set_particle_type
  use part,         only:nptmass,xyzmh_ptmass,vxyz_ptmass,ihacc,ihsoft
  use ptmass,       only:icreate_sinks,rho_crit_cgs,r_crit,h_acc,h_soft_sinksink,h_soft_sinkgas
+ use ptmass,       only:r_merge_cond,r_merge_uncond
  use timestep,     only:dtmax,tmax,dtwallmax,C_cour,C_force,C_cool,tolv,nout
  use options,      only:nfulldump,nmaxdumps,icooling,alpha,alphau
  use kernel,       only:hfact_default
@@ -370,13 +371,13 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  infilename=trim(fileprefix)//'.in'
  inquire(file=infilename,exist=in_iexist)
  if (.not.in_iexist) then
-    tmax      = 5.0*t_ff
-    dtmax     = 0.001*t_ff
+    tmax      = 1.0*t_ff
+    dtmax     = 1d-5*t_ff
     nout      = 10
     nfulldump = 1
     nmaxdumps = 1000
     dtwallmax = 1800.  ! s
-    iverbose  = 0
+    iverbose  = 1
 
     ieos      = 2    ! adiabatic eos with P = (gamma-1)*rho*u
     gmw       = gmw_in
@@ -412,6 +413,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        !- convert to code units
        h_acc           = h_acc_cgs/udist
        r_crit          = 2.*h_acc
+       r_merge_cond    = 2.*h_acc
        h_soft_sinksink = h_soft_sinksink_cgs/udist
        h_soft_sinkgas  = h_soft_sinkgas_cgs/udist
 
@@ -432,9 +434,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     photoionize_tree  = .true.
     tree_accuracy_cmi = 0.3
     nHlimit_fac       = 100.
-    rcut_opennode_cgs = 6.0*pc
-    rcut_leafpart_cgs = 4.0*pc
-    delta_rcut_cgs    = 0.5*pc
+    rcut_opennode_cgs = 2.6*pc
+    rcut_leafpart_cgs = 2.4*pc
+    delta_rcut_cgs    = 0.2*pc
 
     !
     ! Supernova settings
