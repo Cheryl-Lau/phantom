@@ -56,7 +56,7 @@ module heatcool_cmi
  real   :: rho_gamma_ueq_table(maxrho,maxgamma,6)  ! stores: rho,gamma,numroots,ueq1,ueq2,ueq3
 
  real   :: rhomin_cgs   = 1E-27
- real   :: rhomax_cgs   = 1E-13
+ real   :: rhomax_cgs   = 1E-12
  real   :: gammamin_cgs = 1E-27
  real   :: gammamax_cgs = 1E-10
  real   :: Tmin  = 1E0
