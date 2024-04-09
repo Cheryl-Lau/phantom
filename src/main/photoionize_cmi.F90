@@ -84,6 +84,7 @@ module photoionize_cmi
  logical, public :: one_sink_ionsrc = .true.       !- Set a specific sink to be the source
  integer, public :: isink_ionsrc = 5               !- Index of this sink
  real,    public :: masscrit_ionize_cgs = 1.989E34 ! 10 M_sun
+ logical, public :: sink_as_cluster = .true.  
  !- or
  ! Manually set location, starting/ending time and ionizing photon flux [cgs units] of sources
  integer, public, parameter :: nsetphotosrc = 1
@@ -571,25 +572,34 @@ end function get_lumin_star
 ! obtained from fitting mass-flux in table 1 of Diaz-Miller et al. 1998
 !
 real function get_ionflux_star(mass_star)
- use physcon, only:solarm
- use units,   only:umass
+ use physcon,   only:solarm
+ use units,     only:umass
+ use utils_cmi, only:imf_constant,cluster_totflux
  real, intent(in) :: mass_star
  real :: mass_star_cgs,mass_star_solarm
+ real :: mass_sink_solarm,constant,mass_star_lowerlim,totflux
 
- mass_star_cgs = mass_star*umass
- mass_star_solarm = mass_star_cgs/solarm 
+ if (.not.sink_as_cluster) then 
+    mass_star_cgs = mass_star*umass
+    mass_star_solarm = mass_star_cgs/solarm 
 
- print*,'mass of ionizing star',mass_star_solarm
- get_ionflux_star = 10**(48.1 + 0.02*(mass_star_solarm - 20.d0))
+    print*,'mass of ionizing star',mass_star_solarm
+    get_ionflux_star = 10**(48.1 + 0.02*(mass_star_solarm - 20.d0))
 
- print*,'forcefully set flux to 7E50'
- get_ionflux_star = 7E50 ! testing 
+    print*,'forcefully set flux to 1E51'
+    get_ionflux_star = 1E51 ! testing 
 
-! if (mass_star_cgs > 3.65E34) then
-!    get_ionflux_star = 10**(2.817*log10(mass_star_cgs) - 49.561)
-! else
-!    get_ionflux_star = 10**(12.548*log10(mass_star_cgs) - 385.885)
-! endif
+   ! if (mass_star_cgs > 3.65E34) then
+   !    get_ionflux_star = 10**(2.817*log10(mass_star_cgs) - 49.561)
+   ! else
+   !    get_ionflux_star = 10**(12.548*log10(mass_star_cgs) - 385.885)
+   ! endif
+ else 
+    mass_sink_solarm = mass_star*umass/solarm
+    constant = imf_constant(mass_sink_solarm)
+    mass_star_lowerlim = 20 
+    get_ionflux_star = cluster_totflux(constant,mass_star_lowerlim)
+ endif 
 
 end function get_ionflux_star
 
@@ -1835,6 +1845,7 @@ subroutine write_options_photoionize(iunit)
  call write_inopt(sink_ionsrc,'sink_ionsrc','Using sinks as ionizing sources',iunit)
  call write_inopt(one_sink_ionsrc,'one_sink_ionsrc','Using one specific sink as ionizing source',iunit)
  call write_inopt(isink_ionsrc,'isink_ionsrc','Sink label for ionizing source',iunit)
+ call write_inopt(sink_as_cluster,'sink_as_cluster','Sink represent clusters',iunit)
  call write_inopt(masscrit_ionize_cgs,'masscrit_ionize_cgs','Critical sink mass to begin emitting radiation',iunit)
  call write_inopt(niter_mcrt,'niter_mcrt','Number of photon-release iterations',iunit)
  call write_inopt(nphoton,'nphoton','Number of photons per iteration',iunit)
@@ -1893,6 +1904,9 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
     read(valstring,*,iostat=ierr) isink_ionsrc
     ngot = ngot + 1
     if (isink_ionsrc <= 0.) call fatal(label,'invalid setting for isink_ionsrc (<=0)')
+ case('sink_as_cluster')
+    read(valstring,*,iostat=ierr) sink_as_cluster
+    ngot = ngot + 1
  case('masscrit_ionize_cgs')
     read(valstring,*,iostat=ierr) masscrit_ionize_cgs
     ngot = ngot + 1
@@ -1986,7 +2000,7 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
  case default
     imatch = .false.
  end select
- igotall = ( ngot >= 29 )
+ igotall = ( ngot >= 30 )
 
 end subroutine read_options_photoionize
 

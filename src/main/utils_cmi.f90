@@ -20,6 +20,7 @@ module utils_cmi
 
  public :: modify_grid,set_bounds
  public :: mag2,quick_sort,gen_filename
+ public :: imf_constant,cluster_totflux
 
  private
 
@@ -258,6 +259,80 @@ subroutine partition_pos(n,array,iarray,first,last,partition)
  partition = i + 1
 
 end subroutine partition_pos
+
+!-----------------------------------------------------------------------
+!+
+! Routines for calculating ionizing flux from clusters 
+!+
+!-----------------------------------------------------------------------
+!
+! Normalize imf to total mass in sink 
+!
+real function imf_constant(mass_sink)
+ real, intent(in) :: mass_sink  ! in solar mass  
+ integer :: ninterval = 100
+ real    :: norm_integral
+
+ norm_integral = simpson_rule_logequi(mass_initial_mass_func,0.1,100.,ninterval)
+ imf_constant = mass_sink / norm_integral
+
+end function imf_constant
+
+!
+! Estimate total ionizing photon flux from the sink as a cluster 
+!
+real function cluster_totflux(constant,mass_star_lowerlim)
+ real, intent(in) :: constant,mass_star_lowerlim 
+ integer :: ninterval = 100
+ real :: totmass_abovelowlim,ionflux_star
+
+ totmass_abovelowlim = constant * simpson_rule_logequi(mass_initial_mass_func,mass_star_lowerlim,100.,ninterval)
+ totmass_abovelowlim = totmass_abovelowlim / mass_star_lowerlim
+
+ ionflux_star = 10**(48.1 + 0.02*(mass_star_lowerlim - 20.d0))
+
+ cluster_totflux = totmass_abovelowlim * ionflux_star
+
+end function cluster_totflux
+
+ !
+ ! mass x Salpeter Mass Function  
+ !
+ real function mass_initial_mass_func(mass)
+  real, intent(in) :: mass   ! stellar mass [Msun]
+
+  mass_initial_mass_func = mass* mass**(-2.35)
+
+ end function mass_initial_mass_func
+
+ !
+ ! Simpson-rule with log-equidistant spacing
+ !
+ real function simpson_rule_logequi(func,a,b,ninterval)
+  integer, intent(in) :: ninterval    ! number of sub-intervals
+  real,  intent(in) :: a,b          ! boundary values
+  real,  external   :: func         ! the function to be integrated
+  integer :: i
+  real    :: loga,dlogx,x1,x2,xm,f1,f2,fm,intsum
+
+  loga  = log(a)
+  dlogx = log(b/a)/dble(ninterval)           ! logx-subinterval
+  x1  = a                                    ! left
+  f1  = func(a)
+  intsum = 0.d0
+  do i = 1,ninterval
+     x2  = exp(loga + dble(i)*dlogx)          ! right
+     xm  = 0.5d0*(x1+x2)                      ! midpoint
+     f2  = func(x2)
+     fm  = func(xm)
+     intsum = intsum + (f1+4.d0*fm+f2)/6.d0*(x2-x1)   ! Simpson rule
+     x1  = x2
+     f1  = f2                                 ! save for next subinterval
+  enddo
+  simpson_rule_logequi = intsum
+
+ end function simpson_rule_logequi
+
 
 !-----------------------------------------------------------------------
 !+
