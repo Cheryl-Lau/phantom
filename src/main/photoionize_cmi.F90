@@ -84,7 +84,7 @@ module photoionize_cmi
  logical, public :: one_sink_ionsrc = .true.       !- Set a specific sink to be the source
  integer, public :: isink_ionsrc = 5               !- Index of this sink
  real,    public :: masscrit_ionize_cgs = 1.989E34 ! 10 M_sun
- logical, public :: sink_as_cluster = .true.  
+ logical, public :: sink_as_cluster = .false.  
  !- or
  ! Manually set location, starting/ending time and ionizing photon flux [cgs units] of sources
  integer, public, parameter :: nsetphotosrc = 1
@@ -253,14 +253,13 @@ subroutine init_ionizing_radiation_cmi(time,npart,xyzh,nptmass,dt)
  !- Check options for ionizing source
  if (monochrom_source) then
     if (sink_ionsrc) then
-       call fatal('photoionize_cmi','cannot use monochromatic spectrum for emissions from sinks')
-    else ! user-set
-       write(*,'(2x,a42,f5.2,a3)') 'Source: monochromatic photons with energy ',photon_eV,' eV'
-       if (.not.fix_temp_hii) then ! do heating/cooling
-          temp_star = (photon_eV-13.6)*eV /(3./2.*kboltz)
-          if (temp_star < tiny(temp_star)) call fatal('photoionize_cmi','photon_eV needs to be greater than 13.6 eV')
-          write(*,'(3x,a33,es10.4,a2)') 'setting source temperature to be ',temp_star,' K'
-       endif
+       call warning('photoionize_cmi','Use monochromatic spectrum for emissions from sinks?')
+    endif 
+    write(*,'(2x,a42,f5.2,a3)') 'Source: monochromatic photons with energy ',photon_eV,' eV'
+    if (.not.fix_temp_hii) then ! do heating/cooling
+       temp_star = (photon_eV-13.6)*eV /(3./2.*kboltz)
+       if (temp_star < tiny(temp_star)) call fatal('photoionize_cmi','photon_eV needs to be greater than 13.6 eV')
+       write(*,'(3x,a33,es10.4,a2)') 'setting source temperature to be ',temp_star,' K'
     endif
  else ! planck spectrum
     if (sink_ionsrc) then
