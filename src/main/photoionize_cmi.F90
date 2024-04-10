@@ -597,7 +597,7 @@ real function get_ionflux_star(mass_star)
  else 
     mass_sink_solarm = mass_star*umass/solarm
     constant = imf_constant(mass_sink_solarm)
-    mass_star_lowerlim = 20 
+    mass_star_lowerlim = 30 
     get_ionflux_star = cluster_totflux(constant,mass_star_lowerlim)
  endif 
 
