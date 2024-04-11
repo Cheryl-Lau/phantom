@@ -368,8 +368,10 @@ subroutine init_ionizing_radiation_cmi(time,npart,xyzh,nptmass,dt)
  if (io_file /= 0) call fatal('photoionize_cmi','unable to open time-record file')
 
  open(2060,file='CMI_cpu_wall_time_record.txt',status='replace',iostat=io_file)
- open(2070,file='exclude_CMI_cpu_wall_time_record.txt',status='replace',iostat=io_file)
  if (io_file /= 0) call fatal('photoionize_cmi','unable to open CMI time-record file')
+
+ open(2070,file='cpu_wall_time_indv_process.txt',status='replace',iostat=io_file)
+ if (io_file /= 0) call fatal('photoionize_cmi','unable to open time-record file for ind. processes')
 
 end subroutine init_ionizing_radiation_cmi
 
@@ -1001,7 +1003,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
     !
     ! Walk tree to pick cmi-nodes
     !
-    call extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
+    call extract_cminodes_from_tree(iruncmi,xyz_photosrc,nphotosrc,&
                                     node,ifirstincell,xyzh,&
                                     nxyzm_treetocmi,ixyzhm_leafparts,nnode_toreplace,&
                                     ncminode,nleafparts,ncloseleaf,&
@@ -1013,7 +1015,7 @@ subroutine treewalk_run_cmi_iterate(time,xyzh,ncminode)
     !
     ! Solve for the smoothing lengths of nodes
     !
-    call hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
+    call hnode_iterate(iruncmi,node,nxyzm_treetocmi,ncminode,h_solvertocmi)
     !
     ! Combine nodes and individual particles near the source into a single set of sites
     !
@@ -1230,11 +1232,15 @@ end subroutine treewalk_run_cmi_iterate
 !+
 !-----------------------------------------------------------------------------
 subroutine collect_and_combine_cminodes(ncminode,nleafparts,ncloseleaf)
- use io,  only:fatal
+ use utils_cmi, only:record_time 
+ use io,        only:fatal
  integer, intent(in)    :: nleafparts,ncloseleaf
  integer, intent(inout) :: ncminode
  integer :: ip,inode,ientry,irepentry,irowafter,ncminode_old
  integer :: n_fromtree,n_toreplace
+
+ call record_time(iruncmi,'before_collectnodes')
+ print*,' Collecting final set of pseduo-particles'
 
  !- Combine outputs from kdtree_cmi and hnode_cmi to fill properties of nodes
  do inode = 1,ncminode
@@ -1280,6 +1286,8 @@ subroutine collect_and_combine_cminodes(ncminode,nleafparts,ncloseleaf)
 
  if (ncminode /= ncminode_old-ncloseleaf+nleafparts) call fatal('photoionize_cmi','final value of &
    & ncminode is inconsistent with inputs from kdtree_cmi')
+
+ call record_time(iruncmi,'after_collectnodes')
 
 end subroutine collect_and_combine_cminodes
 
@@ -1426,6 +1434,7 @@ end subroutine check_cropped_space_ionization
 !+
 !-----------------------------------------------------------------------------
 subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
+ use utils_cmi, only:record_time
  use omp_lib
  integer, intent(in)  :: nsite
  real,    intent(in)  :: x(nsite),y(nsite),z(nsite),h(nsite),m(nsite)
@@ -1435,6 +1444,8 @@ subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
 
  call cpu_time(cputime1)
  walltime1 = omp_get_wtime()
+
+ call record_time(iruncmi,'beforeCMI')
 
  !
  ! Initialize CMI
@@ -1446,6 +1457,7 @@ subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
  numthreads = omp_get_num_threads()
  !$omp end parallel
  call cmi_init("phantom_cmi.param",numthreads,udist_si,umass_si,"Petkova",talk)
+
  !
  ! Run CMI
  !
@@ -1462,10 +1474,7 @@ subroutine run_cmacionize(nsite,x,y,z,h,m,nH)
  write(2060,*) iruncmi, cputime2-cputime1, walltime2-walltime1
  close(2060)
 
- open(2070,file='exclude_CMI_cpu_wall_time_record.txt',position='append')
- write(2070,*) iruncmi, cputime2, walltime2, cputime1, walltime1
- ! get runtime on SPH side with cputime1[istep+1] - cputime2[istep] 
- close(2070)
+ call record_time(iruncmi,'afterCMI')
 
 end subroutine run_cmacionize
 
@@ -1493,7 +1502,7 @@ subroutine write_cmi_infiles(nsite_in,x_in,y_in,z_in,h_in,m_in)
  x = x_in
  y = y_in
  z = z_in
- if (limit_voronoi) call modify_grid(nsite,x,y,z,h_in,hlimit_fac,extradist_fac)
+ if (limit_voronoi) call modify_grid(iruncmi,nsite,x,y,z,h_in,hlimit_fac,extradist_fac)
 
  !- Set boundaries to only around the given sites
  call set_bounds(nsite,x,y,z,h_in,m_in,xmin,xmax,ymin,ymax,zmin,zmax,dx,dy,dz)

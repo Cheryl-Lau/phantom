@@ -49,11 +49,13 @@ contains
 !  Since node masses differ, density is no longer proportional to h
 !+
 !-----------------------------------------------------------------------
-subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
+subroutine hnode_iterate(irun,node,nxyzm_treetocmi,ncminode,h_solvertocmi)
  use dtypekdtree, only:kdnode
  use io,          only:fatal,warning
+ use utils_cmi,   only:record_time 
  use omp_lib
  type(kdnode), intent(in)    :: node(:)
+ integer,      intent(in)    :: irun 
  integer,      intent(in)    :: ncminode
  real,         intent(in)    :: nxyzm_treetocmi(:,:)
  real,         intent(inout) :: h_solvertocmi(:)
@@ -70,6 +72,8 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
  logical :: brute_force,node_failed
 
  write(*,'(2x,a30,i6,a6)') 'Solving smoothing lengths for ',ncminode,' nodes'
+
+ call record_time(irun,'before_hsolve')
 
  if (ncminode < maxnode_bruteforce) then
     print*,'  brute-force activated'
@@ -163,6 +167,8 @@ subroutine hnode_iterate(node,nxyzm_treetocmi,ncminode,h_solvertocmi)
 
  write(*,'(3x,a18,es18.6)') '- neigh-find time ',tottime_neigh
  write(*,'(3x,a15,es21.6)') '- iterate time ',tottime_iterate
+
+ call record_time(irun,'after_hsolve')
 
 end subroutine hnode_iterate
 

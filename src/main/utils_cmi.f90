@@ -21,6 +21,7 @@ module utils_cmi
  public :: modify_grid,set_bounds
  public :: mag2,quick_sort,gen_filename
  public :: imf_constant,cluster_totflux
+ public :: record_time 
 
  private
 
@@ -32,8 +33,9 @@ contains
 ! done to avoid seg-fault in CMI grid initialization stage 
 !+
 !-----------------------------------------------------------------------
-subroutine modify_grid(npart,x,y,z,h,hlimit_fac,extradist_fac)
+subroutine modify_grid(irun,npart,x,y,z,h,hlimit_fac,extradist_fac)
  use io,   only:warning,fatal
+ integer, intent(in)    :: irun 
  integer, intent(inout) :: npart
  real,    intent(inout) :: x(npart),y(npart),z(npart)
  real,    intent(in)    :: h(npart)
@@ -47,6 +49,8 @@ subroutine modify_grid(npart,x,y,z,h,hlimit_fac,extradist_fac)
  logical :: flag_particle(npart)
  logical :: check_modgrid = .false.
  
+ call record_time(irun,'before_merging')
+
  ! testing 
  if (check_modgrid) then 
     open(2050,file='before_mod_grid.txt')
@@ -127,8 +131,8 @@ subroutine modify_grid(npart,x,y,z,h,hlimit_fac,extradist_fac)
  if (npart_mod == npart) then
     call warning('utils_cmi','no cells merged')
  else 
-    write(*,'(2x,i6,a38,i5)') npart_merged,' Voronoi generation sites merged into ',ngroup
-    write(*,'(2x,a20,i7,a4,i7)') 'Changing nsite from ',npart,' to ',npart_mod
+    write(*,'(2x,i8,a38,i5)') npart_merged,' Voronoi generation sites merged into ',ngroup
+    write(*,'(2x,a20,i8,a4,i8)') 'Changing nsite from ',npart,' to ',npart_mod
  endif 
  if ((npart-npart_mod)/npart > 0.05) call fatal('utils_cmi','merged too many small cells!') 
 
@@ -150,6 +154,8 @@ subroutine modify_grid(npart,x,y,z,h,hlimit_fac,extradist_fac)
     enddo 
     close(2070)
  endif 
+
+ call record_time(irun,'after_merging')
 
 end subroutine modify_grid 
 
@@ -365,5 +371,26 @@ subroutine gen_filename(photoionize_tree,ifile,filename)
  endif
 
 end subroutine gen_filename
+
+
+!-----------------------------------------------------------------------
+!+
+! Routine to record current CPU time and wall time 
+!+
+!-----------------------------------------------------------------------
+subroutine record_time(irun,label)
+ use omp_lib
+ integer , intent(in) :: irun 
+ character(len=*), intent(in) :: label 
+ real :: cputime,walltime
+
+ call cpu_time(cputime)
+ walltime = omp_get_wtime()
+
+ open(2070,file='cpu_wall_time_indv_process.txt',position='append')
+ write(2070,'(i5,a30,2f20.10)') irun, trim(label), cputime, walltime
+ close(2070)
+
+end subroutine record_time
 
 end module utils_cmi

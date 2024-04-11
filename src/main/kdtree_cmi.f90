@@ -32,7 +32,7 @@ contains
 ! Includes additional opening criteria that come from CMI outputs.
 !+
 !-----------------------------------------------------------------------
-subroutine extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
+subroutine extract_cminodes_from_tree(irun,xyz_photosrc,nphotosrc,&
                                       node,ifirstincell,xyzh,&
                                       nxyzm_treetocmi,ixyzhm_leafparts,nnode_toreplace,&
                                       ncminode,nleafparts,ncloseleaf,&
@@ -44,12 +44,13 @@ subroutine extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
  use dtypekdtree, only:kdnode
  use kdtree,      only:irootnode,inodeparts,inoderange
  use kdtree,      only:maxlevel,maxlevel_indexed
- use utils_cmi,   only:mag2
+ use utils_cmi,   only:mag2,record_time 
  use io,          only:fatal
  type(kdnode), intent(in)    :: node(:)
  integer,      intent(in)    :: ifirstincell(:)
  real,         intent(in)    :: xyzh(:,:)
  integer,      intent(in)    :: nphotosrc
+ integer,      intent(in)    :: irun 
  real,         intent(in)    :: xyz_photosrc(:,:)
  real,         intent(in)    :: tree_accuracy_cmi,rcut_opennode,rcut_leafpart
  integer,      intent(in)    :: nnode_needopen(:)
@@ -78,6 +79,8 @@ subroutine extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
 !              &Recompile with larger MAXP/NCELLSMAX or use individual particles instead by &
 !              &setting the variable photoionize_tree (in module photoionize_cmi) to false.')
 ! endif
+
+ call record_time(irun,'before_treewalk')
 
  rcut_opennode2 = rcut_opennode**2.
  rcut_leafpart2 = rcut_leafpart**2.
@@ -205,6 +208,8 @@ subroutine extract_cminodes_from_tree(xyz_photosrc,nphotosrc,&
  enddo over_stack
 
  mintheta = sqrt(mintheta2)
+
+ call record_time(irun,'after_treewalk')
 
 end subroutine extract_cminodes_from_tree
 
