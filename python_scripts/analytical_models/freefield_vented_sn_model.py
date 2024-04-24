@@ -217,7 +217,7 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
         if (expand_cav):
             m_shellpswept = m_inshell * (M_i/m_inshell*(r_cav**3/r_cavi**3-1) + 1)           # shell mass + swept-up mass
             dvdt_cav = (1/m_shellpswept) * 4*np.pi*r_cav**2 * (p_cav - rho_cloud*vel_cav**2) # shell EOM
-            dvdt_cav = dvdt_cav - 4/3*np.pi*G*r_cav*rho_hii                                 # take gravity into account
+            dvdt_cav = dvdt_cav - 4/3*np.pi*G*r_cav*rho_vent                                 # take gravity into account
             # Update cavity radius 
             vel_cav = vel_cav + dvdt_cav*dt 
             r_cav = r_cav + vel_cav*dt 
