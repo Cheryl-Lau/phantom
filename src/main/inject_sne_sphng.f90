@@ -42,6 +42,7 @@ module inject
  real,    public :: fractherm = 0.5
  real,    public :: pmsncrit_cgs = 1.59E34  ! 8 solarm
  logical, public :: sink_progenitor = .false.
+ logical, public :: delay_sn_injection = .true.
 
  private
 
@@ -417,10 +418,14 @@ subroutine check_sink(xyzmh_ptmass,vxyz_ptmass,nptmass,pmsncrit,time)
        !
        ! Time to inject sn - estimated using star MS lifetime (obtained by fitting Table 25.6, P.628, Maeder 2009)
        !
-       mptmass_solarm = mptmass*umass/solarm
-       t_ms_cgs = (1.165E8/(mptmass_solarm-4.242) + 1.143E6) *365*24*3600
-       write(*,'(1x,a5,i4,a38,f5.2,a4)') 'Sink ',ip,' set as progenitor - detonating after ',t_ms_cgs/(1E6*365*24*3600),' Myr'
-       t_sn = time + t_ms_cgs/utime
+       if (delay_sn_injection) then 
+          mptmass_solarm = mptmass*umass/solarm
+          t_ms_cgs = (1.165E8/(mptmass_solarm-4.242) + 1.143E6) *365*24*3600
+          write(*,'(1x,a5,i4,a38,f5.2,a4)') 'Sink ',ip,' set as progenitor - detonating after ',t_ms_cgs/(1E6*365*24*3600),' Myr'
+          t_sn = time + t_ms_cgs/utime
+       else 
+       t_sn = time
+       endif 
        !
        ! Store sn into queue
        !
@@ -629,6 +634,7 @@ subroutine write_options_inject(iunit)
  call write_inopt(r_sn_cgs,'r_sn_cgs','blast radius of supernova',iunit)
  call write_inopt(maxsn,'maxsn','maximum number of supernovae at a time',iunit)
  call write_inopt(pmsncrit_cgs,'pmsncrit_cgs','critical mass of sinks',iunit)
+ call write_inopt(delay_sn_injection,'delay_sn_injection','delay injection by MS lifetime',iunit)
 
 end subroutine write_options_inject
 
@@ -680,12 +686,15 @@ subroutine read_options_inject(name,valstring,imatch,igotall,ierr)
     read(valstring,*,iostat=ierr) pmsncrit_cgs
     ngot = ngot + 1
     if (pmsncrit_cgs < 0.) call fatal(label,'invalid setting for pmsncrit_cgs (<0)')
+ case('delay_sn_injection')
+    read(valstring,*,iostat=ierr) delay_sn_injection
+    ngot = ngot + 1
 
  case default
     imatch = .false.
  end select
 
- noptions = 8
+ noptions = 9
  igotall  = (ngot >= noptions)
 
 end subroutine read_options_inject
