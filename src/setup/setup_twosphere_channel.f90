@@ -85,8 +85,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use photoionize_cmi, only:monochrom_source,fix_temp_hii,treat_Rtype_phase
  use photoionize_cmi, only:photoionize_tree,tree_accuracy_cmi,nHlimit_fac
  use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
- use photoionize_cmi, only:sink_ionsrc,inject_rad
- use inject,          only:inject_sn,sink_progenitor
+ use photoionize_cmi, only:sink_ionsrc,sink_as_cluster,inject_rad,one_sink_ionsrc,isink_ionsrc
+ use inject,          only:inject_sn,sink_progenitor,frackin,fractherm 
+ use inject,          only:delay_sn_injection
  integer,           intent(in)    :: id
  integer,           intent(inout) :: npart
  integer,           intent(out)   :: npartoftype(:)
@@ -123,7 +124,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  logical            :: remove_cloud1       = .false. ! temporarily removing objects to check virial ratio
  logical            :: remove_cloud2       = .true.
  logical            :: remove_envelope     = .false.
- logical            :: place_sink_in_setup = .false.
+ logical            :: place_sink_in_setup = .true.
  character(len=120) :: filex,filey,filez
  character(len=100) :: filename,infilename
  character(len=40)  :: fmt,lattice_cloud1,lattice_cloud2,lattice_envelope
@@ -190,7 +191,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     np_envelope = 9E5
     npmax_env = npmax - np_cloud1 - np_cloud2
     call prompt('Enter the approximate number of particles within the envelope boundaries',np_envelope,0,npmax_env)
-    rho_envelope_cgs = 3E-24  ! for 100K  ! 4E-25 for 1000K
+    rho_envelope_cgs = 4E-25  ! for 1000K   ! 3E-24  ! for 100K    
     call prompt('Enter the density of the envelope in g/cm^3',rho_envelope_cgs,0.)
 
     !- Ratio of semi-axes of ellipsoidal envelope
@@ -315,7 +316,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !- Pressure
     p_cloud1     = cs_cloud1**2*rho_cloud1/gamma
     p_cloud1_cgs = p_cloud1*unit_pressure
-    print*,'pressure cloud1 g/cm/s^2 ',p_cloud1_cgs
 
     !- Apply turbulence
     vxyzu = 0.
@@ -542,7 +542,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !- Pressure
     p_envelope     = cs_envelope**2*(rho_envelope_cgs/unit_density)/gamma
     p_envelope_cgs = p_envelope*unit_pressure
-    print*,'pressure envelope g/cm/s^2 ',p_envelope_cgs
 
     npart_diff = npart_cloud1 + npart_cloud2 + npart_tmp_outer - npart
     if (npart_diff > 0) then
@@ -572,9 +571,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     nptmass                      = 1
     xyzmh_ptmass(:,:)            = 0.
     xyzmh_ptmass(1:3,nptmass)    = 0.
-    xyzmh_ptmass(4,nptmass)      = 40.*solarm/umass
-    xyzmh_ptmass(ihacc,nptmass)  = 0.005*pc/udist
-    xyzmh_ptmass(ihsoft,nptmass) = 0.005*pc/udist
+    xyzmh_ptmass(4,nptmass)      = 100*solarm/umass
+    xyzmh_ptmass(ihacc,nptmass)  = 0.25*pc/udist
+    xyzmh_ptmass(ihsoft,nptmass) = 0.25*pc/udist
     vxyz_ptmass                  = 0.
  endif
 
@@ -638,7 +637,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Photoionization settings
     !
     inject_rad  = .true.
-    sink_ionsrc = .false.
+    sink_ionsrc = .true.
+    one_sink_ionsrc = .true. 
+    isink_ionsrc    = 1
+    sink_as_cluster = .false. 
 
     monochrom_source  = .false.
     fix_temp_hii      = .false.
@@ -647,15 +649,18 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     photoionize_tree  = .true.
     tree_accuracy_cmi = 0.3
     nHlimit_fac       = 100.
-    rcut_opennode_cgs = 10.*pc
-    rcut_leafpart_cgs = 9.5*pc
+    rcut_opennode_cgs = 3.5*pc
+    rcut_leafpart_cgs = 3.0*pc
     delta_rcut_cgs    = 0.5*pc
 
     !
     ! Supernova settings
     !
     inject_sn = .false.
-    sink_progenitor = .false.
+    sink_progenitor = .true.
+    delay_sn_injection = .false. 
+    frackin = 0.
+    fractherm = 1.
 
  endif
 
@@ -671,6 +676,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     print*,'radius            ',r_cloud1,dist_unit
     print*,'free-fall time    ',t_ff_cloud1*utime/(1E6*years),'Myr'
     print*,'temperature       ',temp_cloud1,'K'
+    print*,'pressure          ',p_cloud1_cgs*0.1,'Pa'
     print*,'sound speed       ',cs_cloud1_cgs*1E-5,'km/s'
     print*,'v_rms             ',v_rms_kms_cloud1,'km/s'
     print*,'expected R_stag   ',rad_stag,dist_unit
@@ -690,6 +696,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  if (.not.remove_envelope) then
     print*,'-Envelope-'
     print*,'temperature       ',temp_envelope,'K'
+    print*,'pressure          ',p_envelope_cgs*0.1,'Pa'  ! g/cm/s^2
     print*,'sound speed       ',cs_envelope_cgs*1E-5,'km/s'
  endif
 

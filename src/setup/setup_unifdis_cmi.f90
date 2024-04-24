@@ -67,7 +67,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use timestep,     only:nout
  use prompting,    only:prompt
  use photoionize_cmi, only:monochrom_source,fix_temp_hii,treat_Rtype_phase
- use photoionize_cmi, only:photoionize_tree,nHlimit_fac,limit_voronoi 
+ use photoionize_cmi, only:photoionize_tree,nHlimit_fac
+ use photoionize_cmi, only:limit_voronoi,hlimit_fac,extradist_fac
  use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
  use photoionize_cmi, only:nsetphotosrc,xyztq_setphotosrc_cgs
  integer,           intent(in)    :: id
@@ -131,7 +132,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        ! Set number of particles (to be updated after set_unifdis)
        !
        npmax = int(size(xyzh(1,:)))
-       np_req = 1E7
+       np_req = 1E5
        call prompt('Enter total number of particles',np_req,1)
        if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
     else
@@ -164,7 +165,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set timestep and end-time
     !
     dtmax_cgs = 3.15360E9   ! 1E-4 Myr
-    tmax_cgs  = 5.*dtmax_cgs  ! 4.41504E12  ! 0.14 Myr
+    tmax_cgs  = 10.*dtmax_cgs  ! 4.41504E12  ! 0.14 Myr
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)
@@ -212,7 +213,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     npart = 0
     deltax = (xmaxi-xmini)/np_req**(1./3.)
-    call set_unifdis('closepacked',id,master,xmini,xmaxi,ymini,ymaxi,zmini,zmaxi,deltax,hfact,&
+    call set_unifdis('cubic',id,master,xmini,xmaxi,ymini,ymaxi,zmini,zmaxi,deltax,hfact,&
                      npart,xyzh_raw,periodic)
     !
     ! Update totmass with the new npart
@@ -433,6 +434,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  rcut_leafpart_cgs = rcut_leafpart*udist 
  delta_rcut_cgs    = 0.1*pc
 
+ limit_voronoi = .true. 
+ hlimit_fac = 1E-3
+ extradist_fac = 1.0
 
  !- Print summary - for checking
  print*,' -SUMMARY- '

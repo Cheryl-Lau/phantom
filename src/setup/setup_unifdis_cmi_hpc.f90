@@ -433,6 +433,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  rcut_leafpart_cgs = rcut_leafpart*udist 
  delta_rcut_cgs    = 0.1*pc
 
+ limit_voronoi = .false. 
+
 
  !- Print summary - for checking
  print*,' -SUMMARY- '
