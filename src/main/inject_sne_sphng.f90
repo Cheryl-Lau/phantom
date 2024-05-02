@@ -256,7 +256,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        enddo
        if (nkilled == 0) then
           if (sink_progenitor) then
-             call fatal('inject_sne_sphng','no particles found within blast radius')
+             call warning('inject_sne_sphng','no particles found within blast radius')
           else
              call warning('inject_sne_sphng','no particles found within blast radius')
           endif

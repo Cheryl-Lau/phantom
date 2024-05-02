@@ -168,7 +168,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call prompt('Enter the mass of particles in solarm units',mpart_solarm,0.)
 
     !- Settings for the cloud to inject feedback (cloud1)
-    np_cloud1 = 9E6
+    np_cloud1 = 9.5E6
     call prompt('Enter the approximate number of particles in cloud1 (with feedback injected)',np_cloud1,0,npmax)
     rho_cloud1_cgs = 1E-21
     call prompt('Enter the density of cloud1 in g/cm^3',rho_cloud1_cgs,0.)
@@ -188,10 +188,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call prompt('Enter the separation between the centre of clouds in pc',cloud_sep_pc,0.)
 
     !- Settings for the envelope
-    np_envelope = 9E5
+    np_envelope = 3E5
     npmax_env = npmax - np_cloud1 - np_cloud2
     call prompt('Enter the approximate number of particles within the envelope boundaries',np_envelope,0,npmax_env)
-    rho_envelope_cgs = 4E-25  ! for 1000K   ! 3E-24  ! for 100K    
+    rho_envelope_cgs = 4E-25  ! for 1000K   ! 3E-24  ! for 100K  
     call prompt('Enter the density of the envelope in g/cm^3',rho_envelope_cgs,0.)
 
     !- Ratio of semi-axes of ellipsoidal envelope
@@ -636,7 +636,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Photoionization settings
     !
-    inject_rad  = .true.
+    inject_rad  = .false.
     sink_ionsrc = .true.
     one_sink_ionsrc = .true. 
     isink_ionsrc    = 1
@@ -648,15 +648,15 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
     photoionize_tree  = .true.
     tree_accuracy_cmi = 0.3
-    nHlimit_fac       = 100.
-    rcut_opennode_cgs = 3.5*pc
-    rcut_leafpart_cgs = 3.0*pc
+    nHlimit_fac       = 300.
+    rcut_opennode_cgs = 5.5*pc
+    rcut_leafpart_cgs = 5.0*pc
     delta_rcut_cgs    = 0.5*pc
 
     !
     ! Supernova settings
     !
-    inject_sn = .false.
+    inject_sn = .true.
     sink_progenitor = .true.
     delay_sn_injection = .false. 
     frackin = 0.
