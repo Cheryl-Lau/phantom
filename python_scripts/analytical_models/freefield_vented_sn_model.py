@@ -20,7 +20,7 @@ G = 6.67e-11                    # gravitational constant
 t_end = 1.5E13                  # sim end time 
 dt = 1E8                        # timestep 
 
-r_detect = 30. *3.086e+16       # location of detector 
+r_detect = 25. *3.086e+16       # location of detector 
 
 r_sn = 0.1 *3.086e+16           # SN ejecta radius 
 E_sn = 0.7*1e51 *1e-7           # SN energy 
@@ -33,15 +33,23 @@ p_cloud = 6.36e-13 *1e-1        # pressure of cloud around HII region/cavity
 
 r_stag = 10. *3.086e+16         # HII region stagnation radius 
 p_hii = p_cloud * 10**(-3*gamma/(1-gamma))          # pressure of HII region from adiabatic relations 
-rho_hii = rho_cloud * (p_cloud/p_hii)**(1/gamma)    # density of HII region from adiabatic relations 
+rho_hii = rho_cloud * (p_hii/p_cloud) * 10**(-3)    # density of HII region from ideal gas law  
+# rho_hii = 3.16e-17 *1e+3  
+# p_hii = 2.01e-05 *1e-1
+rho_hii = 1e-19 *1e+3
+p_hii = 6.41e-8 *1e-1
 
 rho_inshell = 1.5e-19           # density within swept-up shell 
 dr_inshell = 2.0 *3.086e+16     # thickness of shell 
 
 rho_env = 4e-25 *1e+3           # density of envelope 
 p_env = 2.54e-14 *1e-1          # pressure of envelope 
+#rho_env = 3e-24 *1e+3           # density of envelope 
+#p_env = 8.86e-15 *1e-1          # pressure of envelope 
 
-omega = 4*np.pi*0.1             # solid angle of channell in Sr
+omega = 4*np.pi*0.2             # solid angle of channell in Sr
+expand_sout = False
+
 
 # NOTE: p - thermal pressure; ramp - ram pressure 
 #       if assuming SN energy is completely thermalized by the time it reaches the shell,
@@ -57,7 +65,7 @@ omega = 4*np.pi*0.1             # solid angle of channell in Sr
 def free_field_sn(ax1,ax2,ax3):
 
     place_in_HIIregion = False
-    place_in_cloud = True 
+    place_in_cloud = True
 
     s_out = omega*r_detect**2   # to compare with confined case 
     
@@ -97,8 +105,8 @@ def free_field_sn(ax1,ax2,ax3):
         
         # Properties immediately behind shock according to Sedov equations
         v_shell = 2/5 * (1.17)**(5/2) * (E_sn/rho_env)**(1/2) * r_shell**(-3/2)
-        p_shell = 4/25 * (1.17)**5 * E_sn * r_shell**(-3)
-        rho_shell = (1.17/r_shell)**5 * E_sn * t**2
+#        p_shell = 3/25 * (1.17)**5 * E_sn * r_shell**(-3)
+#        rho_shell = (1.17/r_shell)**5 * E_sn * t**2
         cs = np.sqrt(gamma*p_env/rho_env)
         mach = v_shell/cs
         
@@ -213,11 +221,11 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
         # Update mass contained within cavity 
         dmdt = rho_vent * v_out * s_out 
         m_cav = m_cav - dmdt*dt 
-        
+
         if (expand_cav):
             m_shellpswept = m_inshell * (M_i/m_inshell*(r_cav**3/r_cavi**3-1) + 1)           # shell mass + swept-up mass
             dvdt_cav = (1/m_shellpswept) * 4*np.pi*r_cav**2 * (p_cav - rho_cloud*vel_cav**2) # shell EOM
-            dvdt_cav = dvdt_cav - 4/3*np.pi*G*r_cav*rho_vent                                 # take gravity into account
+            #dvdt_cav = dvdt_cav - 4/3*np.pi*G*r_cav*rho_vent                                 # take gravity into account
             # Update cavity radius 
             vel_cav = vel_cav + dvdt_cav*dt 
             r_cav = r_cav + vel_cav*dt 
@@ -233,6 +241,9 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
         e_box = m_box * e_mload 
         etot = etot + e_box 
         mtot = mtot + m_box 
+
+        if (expand_sout):
+            s_out = s_out*1.00001
 
         t = t + dt 
         time.append(t)
@@ -266,6 +277,7 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
         fig4 = plt.figure(figsize=[7,5])
         ax4 = fig4.add_subplot(111)
         ax4.scatter(time,r_cav_evol,s=0.1)
+        ax4.set_yscale('log')
         ax4.set_xlabel('time [s]')
         ax4.set_ylabel('cavity shell radius [m]')
 
