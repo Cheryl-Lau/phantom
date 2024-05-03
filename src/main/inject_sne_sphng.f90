@@ -48,7 +48,7 @@ module inject
 
  ! Set sne properties if not using sinks as progenitors
  integer, parameter :: maxsn_insert = 1
- real    :: mstar_cgs = 3.98E34  ! 20 solarm
+ real    :: mstar_cgs = 1.9891d35  ! 100 solarm
  real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 0., 0., 0., 3.3506E+13 /), &
                                                            shape=(/4,maxsn_insert/))
 
