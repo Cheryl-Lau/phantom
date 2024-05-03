@@ -24,7 +24,7 @@ module analysis
 
  private
 
- real    :: xyz_target(3) = (/ 15., 0., 0. /)  ! Position of detector
+ real    :: xyz_target(3) = (/ 25., 0., 0. /)  ! Position of detector
 
 contains
 
@@ -33,7 +33,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  use kdtree,   only:getneigh
  use dim,      only:maxneigh
  use kernel,   only:get_kernel,cnormk,radkern2
- use units,    only:udist,utime,unit_velocity,unit_density,unit_pressure
+ use units,    only:udist,utime,unit_velocity,unit_density,unit_pressure,unit_ergg
  use io,       only:fatal
  use part,     only:hfact,rhoh,massoftype,igas
  use eos,      only:gamma
@@ -42,14 +42,15 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  real,             intent(in) :: xyzh(:,:),vxyzu(:,:)
  real,             intent(in) :: particlemass,time
  integer, parameter :: neighcachesize = 1E5
- integer :: i,ip,iclosest,ineigh,nneigh,ixyzcachesize
+ integer :: i,ip,iclosest,ineigh,nneigh,ixyzcachesize,ran_ip 
  real    :: xyzcache(3,neighcachesize)
  real    :: pmass,hmean,dist2,dist2_min,rad_neigh
- real    :: vx_sum,rho_sum,thermpr_sum,rampr_sum
+ real    :: vx_sum,u_sum,rho_sum,thermpr_sum,rampr_sum
  real    :: dr2,q2,q,wkern,wkern_norm,grkern
- real    :: xyz_b(3),h_b,vx_b,rho_b,rampr_b,thermpr_b
- real    :: rho_target,vx_target,thermpr_target,rampr_target
- real    :: time_si,xyz_target_si(3)
+ real    :: xyz_b(3),h_b,vx_b,u_b,rho_b,rampr_b,thermpr_b
+ real    :: rho_target,vx_target,u_target,thermpr_target,rampr_target
+ real    :: time_cgs,xyz_target_cgs(3)
+ real    :: ran 
  real,   allocatable :: dumxyzh(:,:)
  character(len=70) :: filename
 
@@ -70,14 +71,23 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
        iclosest  = ip
     endif 
  enddo 
- rad_neigh = xyzh(4,iclosest) * 2. 
+ rad_neigh = xyzh(4,iclosest) * 2.0
+ do while (rad_neigh < 0.05) 
+    call random_number(ran)
+    ran_ip = nint(ran*npart) 
+    rad_neigh = xyzh(4,ran_ip) * 2.0  ! try another random one 
+ enddo 
 
  !- Get list of neighbours around detector point 
  call getneigh(node,xyz_target,0.,rad_neigh,3,listneigh,nneigh,xyzh,xyzcache,neighcachesize,ifirstincell,.false.)
- if (nneigh < 50) call fatal('analysis_detector_near_sn','not enough trial neighbours')
+ if (nneigh < 50) then 
+    print*,'nneigh',nneigh
+    call fatal('analysis_detector_near_sn','not enough trial neighbours')
+ endif 
 
  !- Compute properties by interpolating from true neighbours 
  vx_sum  = 0.
+ u_sum   = 0. 
  rho_sum = 0.
  thermpr_sum = 0.
  rampr_sum   = 0.
@@ -92,12 +102,14 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
        call get_kernel(q2,q,wkern,grkern)
        ! get neigh particle properties 
        vx_b  = vxyzu(1,ip)
+       u_b   = vxyzu(4,ip)
        rho_b = rhoh(h_b,pmass)
        rampr_b   = rho_b*mag2(vxyzu(1:3,ip))    ! rho*v2 
        thermpr_b = rho_b*(gamma-1.)*vxyzu(4,ip) ! rho*(gamma-1)*u
        ! Compute SPH sum
        wkern_norm = cnormk/(h_b**3)*wkern 
        vx_sum  = vx_sum + vx_b*pmass/rho_b*wkern_norm 
+       u_sum   = u_sum + u_b*pmass/rho_b*wkern_norm 
        rho_sum = rho_sum + pmass*wkern_norm
        rampr_sum   = rampr_sum + rampr_b*pmass/rho_b*wkern_norm 
        thermpr_sum = thermpr_sum + thermpr_b*pmass/rho_b*wkern_norm 
@@ -105,21 +117,22 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  enddo over_neigh
 
  ! Convert to SI units 
- rho_target = rho_sum*unit_density*1000.
- vx_target  = vx_sum*unit_velocity*0.01
- rampr_target = rampr_sum*unit_pressure*0.1
- thermpr_target = thermpr_sum*unit_pressure*0.1
+ rho_target = rho_sum*unit_density
+ vx_target  = vx_sum*unit_velocity
+ u_target   = u_sum*unit_ergg 
+ rampr_target = rampr_sum*unit_pressure
+ thermpr_target = thermpr_sum*unit_pressure
  do i = 1,3
-    xyz_target_si(i) = xyz_target(i)*udist*0.01
+    xyz_target_cgs(i) = xyz_target(i)*udist
  enddo 
- time_si  = time*utime
+ time_cgs  = time*utime
 
  filename = 'gasflow_'//TRIM(dumpfile)//'.dat'
  open(unit=2206,file=filename)
- write(2206,'(4a20)') 'time [s]','x [m]','y [m]','z [m]'
- write(2206,'(4e20.10)') time_si, xyz_target_si(1:3)
- write(2206,'(4a25)') 'rho [kg m^-3]','v_x [m s^-1]','therm pr [kg m^-1 s^-2]','ram pr [kg m^-1 s^-2]'
- write(2206,'(4e25.10)') rho_target, vx_target, thermpr_target, rampr_target 
+ write(2206,'(4a20)') 'time [s]','x [cm]','y [cm]','z [cm]'
+ write(2206,'(4e20.10)') time_cgs, xyz_target_cgs(1:3)
+ write(2206,'(5a25)') 'rho [g cm^-3]','v_x [cm s^-1]','u [erg g^-1]','therm pr [g cm^-1 s^-2]','ram pr [g cm^-1 s^-2]'
+ write(2206,'(5e25.10)') rho_target, vx_target, u_target, thermpr_target, rampr_target 
 
  close(2206)
 
