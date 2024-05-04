@@ -35,7 +35,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  use dim,      only:maxneigh
  use kernel,   only:get_kernel,cnormk,radkern2
  use units,    only:udist,utime,unit_velocity,unit_density,unit_pressure,unit_ergg
- use io,       only:fatal
+ use io,       only:fatal,warning 
  use part,     only:hfact,rhoh,massoftype,igas
  use eos,      only:gamma
  character(len=*), intent(in) :: dumpfile
@@ -50,7 +50,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  real    :: dr2,q2,q,wkern,wkern_norm,grkern
  real    :: xyz_b(3),h_b,vx_b,u_b,rho_b,rampr_b,thermpr_b
  real    :: rho_target,vx_target,u_target,thermpr_target,rampr_target
- real    :: time_cgs,xyz_target_cgs(3)
+ real    :: time_cgs,xyz_target_cgs(3),xyz_target(3)
  real    :: xloc
  real,   allocatable :: dumxyzh(:,:)
  character(len=70) :: filename
@@ -78,17 +78,23 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
    !- Estimate the compact support radius at target point 
    dist2_min = huge(dist2_min)
    do ip = 1,npart 
-      dist2 = mag2(xyzh(1:3,ip)-xyz_target(1:3))
-      if (dist2 < dist2_min) then 
-         dist2_min = dist2 
-         iclosest  = ip
+      if (xyzh(4,ip) > tiny(dist2)) then  ! nearest alive particle 
+         dist2 = mag2(xyzh(1:3,ip)-xyz_target(1:3))
+         if (dist2 < dist2_min) then 
+            dist2_min = dist2 
+            iclosest  = ip
+         endif 
       endif 
    enddo 
    rad_neigh = xyzh(4,iclosest) * 2. 
+   if (rad_neigh < tiny(dist2)) call fatal('analysis_1d_shock','rad_neigh = 0')
 
    !- Get list of neighbours around detector point 
    call getneigh(node,xyz_target,0.,rad_neigh,3,listneigh,nneigh,xyzh,xyzcache,neighcachesize,ifirstincell,.false.)
-   if (nneigh < 50) call fatal('analysis_detector_near_sn','not enough trial neighbours')
+   if (nneigh < 50) then 
+      print*,'rad_neigh,nneigh',rad_neigh,nneigh
+      call warning('analysis_1d_shock','not enough trial neighbours')
+   endif 
 
    !- Compute properties by interpolating from true neighbours 
    vx_sum  = 0.

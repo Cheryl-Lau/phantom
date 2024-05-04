@@ -34,7 +34,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  use dim,      only:maxneigh
  use kernel,   only:get_kernel,cnormk,radkern2
  use units,    only:udist,utime,unit_velocity,unit_density,unit_pressure,unit_ergg
- use io,       only:fatal
+ use io,       only:fatal,warning 
  use part,     only:hfact,rhoh,massoftype,igas
  use eos,      only:gamma
  character(len=*), intent(in) :: dumpfile
@@ -65,24 +65,22 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  !- Estimate the compact support radius at target point 
  dist2_min = huge(dist2_min)
  do ip = 1,npart 
-    dist2 = mag2(xyzh(1:3,ip)-xyz_target(1:3))
-    if (dist2 < dist2_min) then 
-       dist2_min = dist2 
-       iclosest  = ip
+    if (xyzh(4,ip) > tiny(dist2)) then  ! nearest alive particle 
+       dist2 = mag2(xyzh(1:3,ip)-xyz_target(1:3))
+       if (dist2 < dist2_min) then 
+          dist2_min = dist2 
+          iclosest  = ip
+       endif 
     endif 
  enddo 
  rad_neigh = xyzh(4,iclosest) * 2.0
- do while (rad_neigh < 0.05) 
-    call random_number(ran)
-    ran_ip = nint(ran*npart) 
-    rad_neigh = xyzh(4,ran_ip) * 2.0  ! try another random one 
- enddo 
+ if (rad_neigh < tiny(dist2)) call fatal('analysis_detector_near_sn','rad_neigh = 0')
 
  !- Get list of neighbours around detector point 
  call getneigh(node,xyz_target,0.,rad_neigh,3,listneigh,nneigh,xyzh,xyzcache,neighcachesize,ifirstincell,.false.)
  if (nneigh < 50) then 
-    print*,'nneigh',nneigh
-    call fatal('analysis_detector_near_sn','not enough trial neighbours')
+    print*,'rad_neigh,nneigh',rad_neigh,nneigh
+    call warning('analysis_detector_near_sn','not enough trial neighbours')
  endif 
 
  !- Compute properties by interpolating from true neighbours 
