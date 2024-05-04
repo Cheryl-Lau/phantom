@@ -7,9 +7,11 @@ import os
 import re
 
 dump_prefix = "sphere_"
+idump_firstdumptocheck = 0
 idump_lastdumptocheck = 20
 
 print('dump prefix:          ',dump_prefix)
+print('first idump to delete: ',idump_firstdumptocheck)
 print('last idump to delete: ',idump_lastdumptocheck)
 
 proceed = input('Proceed [y/n]? ')
@@ -24,7 +26,7 @@ for file in os.listdir(pwd):
             continue 
         idump = int(idump[0])
 
-        if (idump < idump_lastdumptocheck):
+        if ((idump > idump_firstdumptocheck) and (idump < idump_lastdumptocheck)):
 
             ends = ( "1","2","3","4","5","6","7","8","9")
 
