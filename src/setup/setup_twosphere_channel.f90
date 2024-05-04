@@ -659,8 +659,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     inject_sn = .true.
     sink_progenitor = .false.
     delay_sn_injection = .false. 
-    frackin = 0.
-    fractherm = 1.
+    frackin = 0.5
+    fractherm = 0.5
 
  endif
 
