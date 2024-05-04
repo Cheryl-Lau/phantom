@@ -56,11 +56,11 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  character(len=70) :: filename
 
  filename = 'shock1d_'//TRIM(dumpfile)//'.dat'
- open(unit=2206,file=filename,position='append')
+ open(unit=2206,file=filename,status='replace')
 
- write(2206,'(4a20)') 'time [s]'
- write(2206,'(4e20.10)') time_cgs
- write(2206,'(5a25)') 'x [cm]','rho [g cm^-3]','v_x [cm s^-1]','u [erg g^-1]','therm pr [g cm^-1 s^-2]','ram pr [g cm^-1 s^-2]'
+ write(2206,'(1a20)') 'time [s]'
+ write(2206,'(1e20.10)') time_cgs
+ write(2206,'(6a25)') 'x [cm]','rho [g cm^-3]','v_x [cm s^-1]','u [erg g^-1]','therm pr [g cm^-1 s^-2]','ram pr [g cm^-1 s^-2]'
  close(2206)
 
  !- Particle mass
@@ -139,7 +139,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
    time_cgs  = time*utime
 
    open(unit=2206,file=filename,position='append')
-   write(2206,'(5e25.10)') xyz_target_cgs(1), rho_target, vx_target, u_target, thermpr_target, rampr_target 
+   write(2206,'(6e25.10)') xyz_target_cgs(1), rho_target, vx_target, u_target, thermpr_target, rampr_target 
    close(2206)
 
  enddo over_points 
