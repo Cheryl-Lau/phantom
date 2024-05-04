@@ -585,15 +585,15 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  if (.not.in_iexist) then
     tmax      = 2.0*min(t_ff_cloud1,t_ff_cloud2)
     dtmax     = 0.001*min(t_ff_cloud1,t_ff_cloud2)
-    nout      = 1
+    nout      = 10
     nfulldump = 1
-    nmaxdumps = 1000
+    nmaxdumps = 500
     dtwallmax = 1800.  ! s
     iverbose  = 0
 
     ieos      = 2    ! adiabatic eos with P = (gamma-1)*rho*u
     gmw       = gmw_in
-    icooling  = 0
+    icooling  = 7
     Tfloor    = 3.
     ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
     ipdv_heating   = 1
