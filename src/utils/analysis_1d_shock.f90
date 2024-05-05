@@ -24,8 +24,8 @@ module analysis
 
  private
 
- integer :: npoint = 100
- real    :: maxr = 50. 
+ integer :: npoint = 200
+ real    :: maxr = 70. 
 
 contains
 
@@ -57,6 +57,8 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
  filename = 'shock1d_'//TRIM(dumpfile)//'.dat'
  open(unit=2206,file=filename,status='replace')
+
+ time_cgs  = time*utime
 
  write(2206,'(1a20)') 'time [s]'
  write(2206,'(1e20.10)') time_cgs
@@ -136,7 +138,6 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
    do i = 1,3
       xyz_target_cgs(i) = xyz_target(i)*udist
    enddo 
-   time_cgs  = time*utime
 
    open(unit=2206,file=filename,position='append')
    write(2206,'(6e25.10)') xyz_target_cgs(1), rho_target, vx_target, u_target, thermpr_target, rampr_target 
