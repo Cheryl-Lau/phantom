@@ -12,42 +12,43 @@ plot_velocity = True
 plot_thermp = True 
 plot_ramp = True 
 
-# Sedov is a self-similar solution, here we'll put everything in SI units 
+# Sedov is a self-similar solution, here we'll put everything in cgs units 
 
 gamma = 5/3                     # adiabatic index 
-G = 6.67e-11                    # gravitational constant 
+G = 6.672041e-8                 # gravitational constant 
 
-t_end = 1.5E13                  # sim end time 
+t_end = 1.0E+14                 # sim end time 
 dt = 1E8                        # timestep 
 
-r_detect = 25. *3.086e+16       # location of detector 
+r_detect = 25. *3.086e+18       # location of detector 
 
-r_sn = 0.1 *3.086e+16           # SN ejecta radius 
-E_sn = 0.7*1e51 *1e-7           # SN energy 
-m_sn = 1e8 *1.989e+30           # SN ejecta mass 
+r_sn = 0.1 *3.086e+18           # SN ejecta radius 
+E_sn = 1e51                     # SN energy 
+m_sn = 25.0 *1.989e+33          # SN ejecta mass 
 vol_sn = 4/3*np.pi*r_sn**3      # volume occupied by SN ejecta 
 
-r_cloud = 24.41 *3.086e+16      # Cloud radius 
-rho_cloud = 1e-21 *1e+3         # density of cloud around HII region/cavity
-p_cloud = 6.36e-13 *1e-1        # pressure of cloud around HII region/cavity
+r_cloud = 24.41 *3.086e+18      # Cloud radius 
+rho_cloud = 1e-21               # density of cloud around HII region/cavity
+p_cloud = 3.34E-12              # pressure of cloud around HII region/cavity
 
-r_stag = 10. *3.086e+16         # HII region stagnation radius 
+r_stag = 10. *3.086e+18         # HII region stagnation radius 
 p_hii = p_cloud * 10**(-3*gamma/(1-gamma))          # pressure of HII region from adiabatic relations 
 rho_hii = rho_cloud * (p_hii/p_cloud) * 10**(-3)    # density of HII region from ideal gas law  
-# rho_hii = 3.16e-17 *1e+3  
-# p_hii = 2.01e-05 *1e-1
-rho_hii = 1e-19 *1e+3
-p_hii = 6.41e-8 *1e-1
+#rho_hii = 3.16e-17   # from adiabatic relation
+#p_hii = 2.01e-5      # from ideal gas law
+rho_hii = 1e-19 
+p_hii = 6.40e-8 
 
 rho_inshell = 1.5e-19           # density within swept-up shell 
-dr_inshell = 2.0 *3.086e+16     # thickness of shell 
+dr_inshell = 2.0 *3.086e+18     # thickness of shell 
 
-rho_env = 4e-25 *1e+3           # density of envelope 
-p_env = 2.54e-14 *1e-1          # pressure of envelope 
-#rho_env = 3e-24 *1e+3           # density of envelope 
-#p_env = 8.86e-15 *1e-1          # pressure of envelope 
+rho_env = 4e-25                 # density of envelope 
+p_env = 2.54e-14                # pressure of envelope
 
-omega = 4*np.pi*0.2             # solid angle of channell in Sr
+#rho_env = 4e-24                # testing
+#p_env = 2.54e-13               # testing 
+
+omega = 4*np.pi*0.3             # solid angle of channell in Sr
 expand_sout = False
 
 
@@ -64,10 +65,12 @@ expand_sout = False
 '''
 def free_field_sn(ax1,ax2,ax3):
 
-    place_in_HIIregion = False
-    place_in_cloud = True
+    global rho_env, p_env
 
-    s_out = omega*r_detect**2   # to compare with confined case 
+    place_in_HIIregion = False
+    place_in_cloud = False
+
+    s_out = omega*r_stag**2   # to compare with confined case 
     
     time = []
     v_detect_evol = []          # velocity at detector
@@ -78,9 +81,11 @@ def free_field_sn(ax1,ax2,ax3):
     etot = 0.                   # accumulated energy passing through s_out 
     r_shell = r_detect          # initial radius of shell 
 
-    while (t < t_end): 
+    # initial momentum before entering snowplough phase (if doing snowplough)
+    m_inshell = 4*np.pi*r_shell**2*dr_inshell*rho_inshell 
+    momen_shell = m_inshell * 2/5 * (1.17)**(5/2) * (E_sn/rho_env)**(1/2) * r_shell**(-3/2)
 
-        global rho_env, p_env
+    while (t < t_end): 
 
         if (place_in_HIIregion == True):
             if (r_shell < r_stag):
@@ -101,10 +106,12 @@ def free_field_sn(ax1,ax2,ax3):
 
         # Update shell radius as it expands 
         v_shell = 2/5 * (1.17)**(5/2) * (E_sn/rho_env)**(1/2) * r_shell**(-3/2)  # sedov sol 
+#        v_shell = 1/4 * (1.17)**(-2) * (momen_shell/rho_env) * r_shell**(-3)   # snowplough
         r_shell = r_shell + v_shell*dt 
         
         # Properties immediately behind shock according to Sedov equations
         v_shell = 2/5 * (1.17)**(5/2) * (E_sn/rho_env)**(1/2) * r_shell**(-3/2)
+#        v_shell = 1/4* (1.17)**(-2) * (momen_shell/rho_env) * r_shell**(-3)
 #        p_shell = 3/25 * (1.17)**5 * E_sn * r_shell**(-3)
 #        rho_shell = (1.17/r_shell)**5 * E_sn * t**2
         cs = np.sqrt(gamma*p_env/rho_env)
@@ -135,26 +142,20 @@ def free_field_sn(ax1,ax2,ax3):
         
     if (plot_velocity):
         ax1.scatter(time,v_detect_evol,s=0.1,color='blue',label='free-field')
-        ax1.set_yscale('log')
-        ax1.set_xlabel('time [s]')
-        ax1.set_ylabel('velocity [m/s]')
         
     if (plot_thermp):
         ax2.scatter(time,p_detect_evol,s=0.1,color='blue',label='free-field')
-        ax2.set_yscale('log')
-        ax2.set_xlabel('time [s]')
-        ax2.set_ylabel('thermal pressure [kg/m/s^2]')
 
     if (plot_ramp):
         ax3.scatter(time,ramp_detect_evol,s=0.1,color='blue',label='free-field')
-        ax3.set_yscale('log')
-        ax3.set_xlabel('time [s]')
-        ax3.set_ylabel('ram pressure [kg/m/s^2]')
+
+    free_field_model = np.column_stack((time,v_detect_evol,p_detect_evol,ramp_detect_evol))
+    np.savetxt('free_field_model.txt',free_field_model)
 
     print('- Free-field SN -')
     print('Supernova energy: ',E_sn)
     print('Supernova energy in direction of detector: ',E_sn*omega/(4*np.pi))
-    print('Accumulated energy in direction of detector: ',etot,' J')
+    print('Accumulated energy in direction of detector: ',etot,' erg')
 
 
 
@@ -172,7 +173,7 @@ def free_field_sn(ax1,ax2,ax3):
 '''
 def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
     
-    s_out = omega*r_detect**2
+    s_out = omega*r_stag**2
 
     # Initial properties of the cavity before being hit by SN shock 
     vol_cav = 4/3*np.pi*r_stag**3
@@ -198,10 +199,6 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
     r_cavi = r_cav 
     m_cavi = m_cav 
     vol_cavi = vol_cav
-
-    # Init ram pressure at vent to aid the escape 
-    v_shell = 2/5 * (1.17)**(5/2) * (E_sn/rho_env)**(1/2) * r_cav**(-3/2)
-    ramp_vent = rho_vent * v_shell**2
 
     time = []
     v_vent_evol = []        # velocity at vent / detector
@@ -229,7 +226,7 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
             # Update cavity radius 
             vel_cav = vel_cav + dvdt_cav*dt 
             r_cav = r_cav + vel_cav*dt 
-        
+ 
         vol_cav = 4/3*np.pi*r_cav**3 
         
         rho_vent = m_cav/vol_cav 
@@ -257,21 +254,13 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
     
     if (plot_velocity):
         ax1.scatter(time,v_vent_evol,s=0.1,color='red',label='partially-confined')
-        ax1.set_yscale('log')
-        ax1.set_xlabel('time [s]')
-        ax1.set_ylabel('velocity [m/s]')   
 
     if (plot_thermp):
         ax2.scatter(time,p_vent_evol,s=0.1,color='red',label='partially-confined')
-        ax2.set_yscale('log')
-        ax2.set_xlabel('time [s]')
-        ax2.set_ylabel('thermal pressure [kg/m/s^2]')  
         
     if (plot_ramp):
         ax3.scatter(time,ramp_vent_evol,s=0.1,color='red',label='partially-confined')
-        ax3.set_yscale('log')
-        ax3.set_xlabel('time [s]')
-        ax3.set_ylabel('ram pressure [kg/m/s^2]')
+
     
     if (expand_cav):
         fig4 = plt.figure(figsize=[7,5])
@@ -279,25 +268,28 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
         ax4.scatter(time,r_cav_evol,s=0.1)
         ax4.set_yscale('log')
         ax4.set_xlabel('time [s]')
-        ax4.set_ylabel('cavity shell radius [m]')
+        ax4.set_ylabel('cavity shell radius [cm]')
 
         fig5 = plt.figure(figsize=[7,5])
         ax5 = fig5.add_subplot(111)
         ax5.scatter(time,vel_cav_evol,s=0.1)
         ax5.set_yscale('log')
         ax5.set_xlabel('time [s]')
-        ax5.set_ylabel('cavity shell velocity [m/s]')
+        ax5.set_ylabel('cavity shell velocity [cm/s]')
+
+    semi_confined_model = np.column_stack((time,v_vent_evol,p_vent_evol,ramp_vent_evol))
+    np.savetxt('semi_confined_model.txt',semi_confined_model)
 
     print('')
     print('- Partially-confined SN -')
     print('Supernova energy: ',E_sn)
     if (with_HII):
         print('HII region energy: ',p_hii/(gamma-1)*(vol_cavi-vol_sn))
-    print('Accumulated escaped energy: ',etot,' J')
-    print('Initial mass: ',m_cavi,' kg')
-    print('Accumulated mass: ',mtot,' kg')    
-    print('Initial cavity radius',r_cavi,'m')
-    print('Final cavity radius',r_cav,'m')
+    print('Accumulated escaped energy: ',etot,' erg')
+    print('Initial mass: ',m_cavi,' g')
+    print('Accumulated mass: ',mtot,' g')    
+    print('Initial cavity radius',r_cavi,'cm')
+    print('Final cavity radius',r_cav,'cm')
     
     
 def main():
@@ -307,15 +299,24 @@ def main():
 
     fig1 = plt.figure(figsize=[7,5])    # vx
     ax1 = fig1.add_subplot(111)
-#    ax1.set_ylim([5E3,6E5])
+#    ax1.set_ylim([1E5,6E7])
+    ax1.set_yscale('log')
+    ax1.set_xlabel('time [s]')
+    ax1.set_ylabel('velocity [cm/s]')   
 
     fig2 = plt.figure(figsize=[7,5])    # thermp
     ax2 = fig2.add_subplot(111)
-#    ax2.set_ylim([2E-13,6E-6])
+#    ax2.set_ylim([2E-13,1E-8])
+    ax2.set_yscale('log')
+    ax2.set_xlabel('time [s]')
+    ax2.set_ylabel('thermal pressure [g/cm/s^2]')  
 
     fig3 = plt.figure(figsize=[7,5])    # ramp
     ax3 = fig3.add_subplot(111)
-#    ax3.set_ylim([3E-15,5E-5])
+#    ax3.set_ylim([1E-19,5E-5])
+    ax3.set_yscale('log')
+    ax3.set_xlabel('time [s]')
+    ax3.set_ylabel('ram pressure [g/cm/s^2]')
     
     free_field_sn(ax1,ax2,ax3)
     part_confined_sn(with_HII_region,expanding_cavity,ax1,ax2,ax3)
