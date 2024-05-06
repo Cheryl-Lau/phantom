@@ -73,12 +73,12 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
        endif 
     endif 
  enddo 
- rad_neigh = xyzh(4,iclosest) * 2.0
+ rad_neigh = xyzh(4,iclosest) !* 2.0
  if (rad_neigh < tiny(dist2)) call fatal('analysis_detector_near_sn','rad_neigh = 0')
 
  !- Get list of neighbours around detector point 
  call getneigh(node,xyz_target,0.,rad_neigh,3,listneigh,nneigh,xyzh,xyzcache,neighcachesize,ifirstincell,.false.)
- if (nneigh < 50) then 
+ if (nneigh < 20) then 
     print*,'rad_neigh,nneigh',rad_neigh,nneigh
     call warning('analysis_detector_near_sn','not enough trial neighbours')
  endif 
