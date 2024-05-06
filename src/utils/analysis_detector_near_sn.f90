@@ -42,7 +42,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  real,             intent(in) :: xyzh(:,:),vxyzu(:,:)
  real,             intent(in) :: particlemass,time
  integer, parameter :: neighcachesize = 1E5
- integer :: i,ip,iclosest,ineigh,nneigh,ixyzcachesize,ran_ip 
+ integer :: i,ip,iclosest,ineigh,nneigh,ixyzcachesize,ran_ip,n 
  real    :: xyzcache(3,neighcachesize)
  real    :: pmass,hmean,dist2,dist2_min,rad_neigh
  real    :: vx_sum,u_sum,rho_sum,thermpr_sum,rampr_sum
@@ -76,12 +76,19 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  rad_neigh = xyzh(4,iclosest) * 2.0
  if (rad_neigh < tiny(dist2)) call fatal('analysis_detector_near_sn','rad_neigh = 0')
 
- !- Get list of neighbours around detector point 
- call getneigh(node,xyz_target,0.,rad_neigh,3,listneigh,nneigh,xyzh,xyzcache,neighcachesize,ifirstincell,.false.)
- if (nneigh < 50) then 
-    print*,'rad_neigh,nneigh',rad_neigh,nneigh
-    call warning('analysis_detector_near_sn','not enough trial neighbours')
- endif 
+ nneigh = 0 
+ n = 0
+ do while (nneigh < 10)
+    rad_neigh = rad_neigh * 1.1  ! try increase 
+    !- Get list of neighbours around detector point 
+    call getneigh(node,xyz_target,0.,rad_neigh,3,listneigh,nneigh,xyzh,xyzcache,neighcachesize,ifirstincell,.false.)
+    if (nneigh < 50) then 
+       print*,'rad_neigh,nneigh',rad_neigh,nneigh
+       call warning('analysis_1d_shock','not enough trial neighbours')
+    endif 
+    n = n + 1 
+    if (n > 20) call fatal('analysis_1d_shock','cannot find neighbours')
+ enddo  
 
  !- Compute properties by interpolating from true neighbours 
  vx_sum  = 0.
