@@ -121,7 +121,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real               :: r_sn_cgs,engsn_cgs,pmsncrit_cgs
  real               :: h_acc_cgs,h_soft_sinksink_cgs,h_soft_sinkgas_cgs,rho_crit_cgs_recomm
  logical            :: iexist,in_iexist,add_particle
- logical            :: remove_cloud1       = .true. ! temporarily removing objects to check virial ratio
+ logical            :: remove_cloud1       = .false. ! temporarily removing objects to check virial ratio
  logical            :: remove_cloud2       = .true.
  logical            :: remove_envelope     = .false.
  logical            :: place_sink_in_setup = .true.
@@ -188,7 +188,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call prompt('Enter the separation between the centre of clouds in pc',cloud_sep_pc,0.)
 
     !- Settings for the envelope
-    np_envelope = 3E5
+    np_envelope = 5E6 !3E5
     npmax_env = npmax - np_cloud1 - np_cloud2
     call prompt('Enter the approximate number of particles within the envelope boundaries',np_envelope,0,npmax_env)
     rho_envelope_cgs = 4E-25  ! for 1000K   ! 3E-24  ! for 100K  
@@ -585,7 +585,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  if (.not.in_iexist) then
     tmax      = 2.0*min(t_ff_cloud1,t_ff_cloud2)
     dtmax     = 0.001*min(t_ff_cloud1,t_ff_cloud2)
-    nout      = 10
+    nout      = 1
     nfulldump = 1
     nmaxdumps = 500
     dtwallmax = 1800.  ! s
