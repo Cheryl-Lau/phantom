@@ -55,7 +55,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  real    :: rho_target,v_target,u_target,thermpr_target,rampr_target
  real    :: time_cgs,xyz_target(3)
  real    :: xmin_map,xmax_map,dx_map,ymin_map,ymax_map,dy_map,x_map,y_map,x_map_cgs,y_map_cgs
- real    :: lambda_long,phi_lat,x,y,z
+ real    :: lambda_long,lambda_long0,phi_lat,x,y,z
  real,   allocatable :: dumxyzh(:,:)
  character(len=70) :: filename
 
@@ -78,14 +78,17 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  dumxyzh = xyzh
  call set_linklist(npart,npart,dumxyzh,vxyzu)
 
+ !- Set meridian 
+ lambda_long0 = pi
+
  !- Set 2D map limits 
- xmin_map = 0.
- xmax_map = 2.*pi*radius 
+ xmin_map = -radius*lambda_long0
+ xmax_map = radius*(2.*pi-lambda_long0)
  dx_map   = (xmax_map-xmin_map)/npointx_map  
- ymin_map = -3.*radius 
- ymax_map = 3.*radius   ! for phi_lat from pi/2+epsilon to pi/2-epsilon with epsilon=0.1 
+ ymin_map = -2.3*radius 
+ ymax_map = 2.3*radius   ! for phi_lat from pi/2+epsilon to pi/2-epsilon with epsilon=0.2
  dy_map   = (ymax_map-ymin_map)/npointy_map 
- 
+
  !- Loop over each point on 2D map 
  over_mapx: do ix_map = 1,npointx_map+1
     over_mapy: do iy_map = 1,npointy_map+1  
