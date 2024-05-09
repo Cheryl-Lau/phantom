@@ -26,10 +26,10 @@ module analysis
 
  private
 
- integer :: npointx_map = 200
- integer :: npointy_map = 200
- real    :: xyz_src(3)  = (/ 0., 0., 0. /)  ! Position of feedback source 
- real    :: radius      = 50.               ! radius of spherical surface 
+ integer :: npointx_map = 500
+ integer :: npointy_map = 500
+ real    :: xyz_src(3)  = (/ 0., 0., 0. /)  ! Position of feedback source in code units 
+ real    :: radius      = 80.               ! radius of spherical surface in code units 
 
 contains
 
@@ -55,8 +55,8 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  real    :: dr2,q2,q,wkern,wkern_norm,grkern
  real    :: xyz_b(3),h_b,v_b,u_b,rho_b,rampr_b,thermpr_b
  real    :: rho_target,v_target,u_target,thermpr_target,rampr_target
- real    :: time_cgs,xyz_target(3),xyz_target_cgs(3)
- real    :: xmin_map,xmax_map,dx_map,ymin_map,ymax_map,dy_map,x_map,y_map 
+ real    :: time_cgs,xyz_target(3)
+ real    :: xmin_map,xmax_map,dx_map,ymin_map,ymax_map,dy_map,x_map,y_map,x_map_cgs,y_map_cgs
  real    :: lambda_long,phi_lat,x,y,z
  real,   allocatable :: dumxyzh(:,:)
  character(len=70) :: filename
@@ -68,7 +68,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
  write(2206,'(1a20)') 'time [s]'
  write(2206,'(1e20.10)') time_cgs
- write(2206,'(8a25)') 'x [cm]','y [cm]','z [cm]','rho [g cm^-3]','v [cm s^-1]','u [erg g^-1]',&
+ write(2206,'(7a25)') 'x_map [cm]','y_map [cm]','rho [g cm^-3]','v [cm s^-1]','u [erg g^-1]',&
                     & 'therm pr [g cm^-1 s^-2]','ram pr [g cm^-1 s^-2]'
  close(2206)
 
@@ -89,14 +89,14 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  dy_map   = (ymax_map-ymin_map)/npointy_map 
  
  !- Loop over each point on 2D map 
- over_mapx: do ix_map = 1,npointx_map
-    over_mapy: do iy_map = 1,npointy_map 
+ over_mapx: do ix_map = 1,npointx_map+1
+    over_mapy: do iy_map = 1,npointy_map+1  
 
-       !- Set measurement point 
+       !- Set measurement point on map
        x_map = xmin_map + (ix_map-1)*dx_map 
        y_map = ymin_map + (iy_map-1)*dy_map 
 
-       ! inverse mapping 
+       ! inverse mapping for actual location 
        lambda_long = x_map/radius 
        phi_lat = pi/2. - 2.*atan(exp(-y_map/radius))
 
@@ -173,12 +173,11 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
        u_target   = u_sum*unit_ergg
        rampr_target = rampr_sum*unit_pressure
        thermpr_target = thermpr_sum*unit_pressure
-       do i = 1,3
-         xyz_target_cgs(i) = xyz_target(i)*udist
-       enddo 
+       x_map_cgs = x_map*udist 
+       y_map_cgs = y_map*udist 
 
        open(unit=2206,file=filename,position='append')
-       write(2206,'(8e25.10)') xyz_target_cgs(1:3), rho_target, v_target, u_target, thermpr_target, rampr_target 
+       write(2206,'(7e25.10)') x_map_cgs, y_map_cgs, rho_target, v_target, u_target, thermpr_target, rampr_target 
        close(2206)
 
     enddo over_mapy
