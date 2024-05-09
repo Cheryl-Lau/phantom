@@ -8,8 +8,6 @@ module analysis
 !
 ! Analysis routine for measuring the energy on a spherical surface around a source 
 ! with the Mercator projection method 
-! Option 1: Gives the total energy & momentum on surface at current time 
-! Option 2: Plots distribution of energy & momentum on whole surface 
 !
 ! :References: None
 !
@@ -26,8 +24,8 @@ module analysis
 
  private
 
- integer :: npointx_map = 500
- integer :: npointy_map = 500
+ integer :: npointx_map = 100
+ integer :: npointy_map = 100
  real    :: xyz_src(3)  = (/ 0., 0., 0. /)  ! Position of feedback source in code units 
  real    :: radius      = 80.               ! radius of spherical surface in code units 
 
