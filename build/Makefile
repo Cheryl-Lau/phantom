@@ -884,6 +884,7 @@ ifeq ($(SETUP), elongcloud_env)
 #	 Injecting supernova and radiation into an elongated cloud with envelope
     SETUPFILE=velfield_fromcubes.f90 setup_elongated_envelope.f90
     SRCINJECT=inject_sne_sphng.f90
+    ANALYSIS=analysis_get_hiiregion_density.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE=yes
@@ -918,7 +919,7 @@ ifeq ($(SETUP), sncavity)
     SETUPFILE=velfield_fromcubes.f90 setup_twosphere_channel.f90
     SRCINJECT=inject_sne_sphng.f90
     ANALYSIS=analysis_energy_insphere.f90
-    MODFILE=moddump_rmv_shock.f90
+    MODFILE=moddump_clear_channel.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE=yes
