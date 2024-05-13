@@ -191,7 +191,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     np_envelope = 5E6 !3E5
     npmax_env = npmax - np_cloud1 - np_cloud2
     call prompt('Enter the approximate number of particles within the envelope boundaries',np_envelope,0,npmax_env)
-    rho_envelope_cgs = 4E-25  ! for 1000K   ! 3E-24  ! for 100K  
+    rho_envelope_cgs = 4E-25  ! for 1000K  
     call prompt('Enter the density of the envelope in g/cm^3',rho_envelope_cgs,0.)
 
     !- Ratio of semi-axes of ellipsoidal envelope
@@ -636,8 +636,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Photoionization settings
     !
-    inject_rad  = .false.
-    sink_ionsrc = .true.
+    inject_rad  = .true.
+    sink_ionsrc = .false. 
     one_sink_ionsrc = .true. 
     isink_ionsrc    = 1
     sink_as_cluster = .false. 
