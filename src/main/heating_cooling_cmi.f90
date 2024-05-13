@@ -433,6 +433,7 @@ subroutine get_ueq(rho,gammaheat,u,numroots,ueq_final)
 !       print*,'u is greater than ueq2! Teq2 is ',ueqs(2)/kboltz*(gmw*mass_proton_cgs*(gamma-1))*unit_ergg
        if (numroots == 2) then
           ueq_final = kboltz*Tmax / (gmw*mass_proton_cgs*(gamma-1)) / unit_ergg
+          print*,'going to Tmax',rho*unit_density,gammaheat*unit_energ/utime 
        elseif (numroots == 3) then
           ueq_final = ueqs(3)
           print*,'going to Teq3',rho*unit_density,gammaheat*unit_energ/utime 
