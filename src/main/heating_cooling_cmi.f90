@@ -58,7 +58,7 @@ module heatcool_cmi
  real   :: rhomin_cgs   = 1E-27
  real   :: rhomax_cgs   = 1E-12
  real   :: gammamin_cgs = 1E-27
- real   :: gammamax_cgs = 1E-20
+ real   :: gammamax_cgs = 1E-16
  real   :: Tmin  = 1E0
  real   :: Tmax  = 1E9
 
