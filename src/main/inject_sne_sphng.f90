@@ -40,8 +40,12 @@ module inject
  real,    public :: engsn_cgs = 1E51        ! 1E51 erg
  real,    public :: frackin   = 0.5
  real,    public :: fractherm = 0.5
+
  real,    public :: pmsncrit_cgs = 1.59E34  ! 8 solarm
  logical, public :: sink_progenitor = .false.
+ logical, public :: one_sink_progenitor = .false.
+ integer, public :: isink_progenitor = 5
+
  logical, public :: delay_sn_injection = .true.
 
  private
@@ -267,7 +271,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        if (sink_progenitor) then
           mradsn = mradsn + 0.25*m_sn(isn)
           progindex = iprog_sn(isn)
-          xyzmh_ptmass(4,progindex) = 0.75*xyzmh_ptmass(4,progindex)
+!          xyzmh_ptmass(4,progindex) = 0.75*xyzmh_ptmass(4,progindex)
        else
           mradsn = mradsn + 0.25*mstar
        endif
@@ -412,6 +416,9 @@ subroutine check_sink(xyzmh_ptmass,vxyz_ptmass,nptmass,pmsncrit,time)
  logical  :: snflag_sinkip
 
  over_sinks: do ip = 1,nptmass
+
+    if (one_sink_progenitor .and. ip /= isink_progenitor) cycle over_sinks 
+
     mptmass = xyzmh_ptmass(4,ip)
     snflag_sinkip = snflag_sink(ip)
     if (mptmass >= pmsncrit .and. .not.snflag_sinkip) then
@@ -424,7 +431,7 @@ subroutine check_sink(xyzmh_ptmass,vxyz_ptmass,nptmass,pmsncrit,time)
           write(*,'(1x,a5,i4,a38,f5.2,a4)') 'Sink ',ip,' set as progenitor - detonating after ',t_ms_cgs/(1E6*365*24*3600),' Myr'
           t_sn = time + t_ms_cgs/utime
        else 
-       t_sn = time
+          t_sn = time
        endif 
        !
        ! Store sn into queue
@@ -628,6 +635,8 @@ subroutine write_options_inject(iunit)
  write(iunit,"(/,a)") '# options for injecting supernova'
  call write_inopt(inject_sn,'inject_sn','inject SNe',iunit)
  call write_inopt(sink_progenitor,'sink_progenitor','init sne with sinks',iunit)
+ call write_inopt(one_sink_progenitor,'one_sink_progenitor','only set one sink to be progenitor',iunit)
+ call write_inopt(isink_progenitor,'isink_progenitor','sink label to detonate',iunit)
  call write_inopt(engsn_cgs,'engsn_cgs','total energy released from sn',iunit)
  call write_inopt(frackin,'frackin','fraction of kinetic energy',iunit)
  call write_inopt(fractherm,'fractherm','fraction of thermal energy',iunit)
@@ -662,6 +671,12 @@ subroutine read_options_inject(name,valstring,imatch,igotall,ierr)
  case('sink_progenitor')
     read(valstring,*,iostat=ierr) sink_progenitor
     ngot = ngot + 1
+ case('one_sink_progenitor')
+    read(valstring,*,iostat=ierr) one_sink_progenitor
+    ngot = ngot + 1
+ case('isink_progenitor')
+    read(valstring,*,iostat=ierr) isink_progenitor
+    ngot = ngot + 1
  case('engsn_cgs')
     read(valstring,*,iostat=ierr) engsn_cgs
     ngot = ngot + 1
@@ -694,7 +709,7 @@ subroutine read_options_inject(name,valstring,imatch,igotall,ierr)
     imatch = .false.
  end select
 
- noptions = 9
+ noptions = 11
  igotall  = (ngot >= noptions)
 
 end subroutine read_options_inject
