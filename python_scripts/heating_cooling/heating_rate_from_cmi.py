@@ -23,7 +23,6 @@ for f in sorted(glob.glob("snapshot010.hdf5")):
     file = h5py.File(f, "r")
     
     datasetnames = file.keys()
-    #print(datasetnames)
     
     print(file['/Units'].attrs.keys())
 
@@ -45,15 +44,7 @@ for f in sorted(glob.glob("snapshot010.hdf5")):
     coords = np.array(file["/PartType0/Coordinates"])
     neutfracH = np.array(file["/PartType0/NeutralFractionH"])
 
-    nHmin = min(neutfracH)
-    print(nHmin)
-
     gamma = np.array(file["/PartType0/HeatingRateH"])
-
-    #plt.scatter(neutfracH,gamma*neutfracH*unit_gamma)
-    
-    gamma = gamma * neutfracH
-    
 
     if get_mean_gamma == True:
         gamma_ion = []
@@ -72,10 +63,8 @@ for f in sorted(glob.glob("snapshot010.hdf5")):
         
         for ip in range(len(neutfracH)):
             nH = neutfracH[ip]
-            if nH == nHmin:
-                print('gamma of min nH',gamma[ip]*unit_gamma)
             icell = np.abs(nH_cells - nH).argmin()
-            gamma_cells[icell] += gamma[ip]*unit_gamma  # to cgs
+            gamma_cells[icell] += gamma[ip]*unit_gamma * neutfracH[ip]  # to cgs
             num_cells[icell] += 1
             
         for icell in range(ncell):
@@ -84,13 +73,8 @@ for f in sorted(glob.glob("snapshot010.hdf5")):
             else:
                 gamma_cells[icell] = 0
         
-        #gamma_cells = gamma_cells * nH_cells
-        
         plt.plot(nH_cells,gamma_cells)
         plt.xlabel('nH')
-        plt.xscale('log')
-        plt.xlim([5E-8,1E0])
-#        plt.xlim([1E-5,1])
         plt.ylabel('gamma [erg/s]')
         plt.yscale('log')
         plt.show()

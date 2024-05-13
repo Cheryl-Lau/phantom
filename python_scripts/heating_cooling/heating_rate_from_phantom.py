@@ -16,9 +16,6 @@ gamma = data[:,1]
 
 plt.plot(nH,gamma)
 plt.xlabel('nH')
-plt.xscale('log')
-plt.xlim([5E-8,1E0])
-#plt.xlim([1E-5,1])
 plt.ylabel('gamma [erg/s]')
 plt.yscale('log')
 plt.show()

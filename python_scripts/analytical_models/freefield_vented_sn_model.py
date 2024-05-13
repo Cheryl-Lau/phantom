@@ -39,6 +39,9 @@ rho_hii = rho_cloud * (p_hii/p_cloud) * 10**(-3)    # density of HII region from
 rho_hii = 1e-19 
 p_hii = 6.40e-8 
 
+#rho_hii = 1e-22     # slightly emptied cavity
+#p_hii = 6.4e-7      # HII region at 1E8 K (2nd equil temp)
+
 rho_inshell = 1.5e-19           # density within swept-up shell 
 dr_inshell = 2.0 *3.086e+18     # thickness of shell 
 
@@ -48,7 +51,8 @@ p_env = 2.54e-14                # pressure of envelope
 #rho_env = 4e-24                # testing
 #p_env = 2.54e-13               # testing 
 
-omega = 4*np.pi*0.3             # solid angle of channell in Sr
+omega = 4*np.pi*0.2             # solid angle of channell in Sr
+sout_fac = 1 #2
 expand_sout = False
 
 
@@ -71,6 +75,7 @@ def free_field_sn(ax1,ax2,ax3):
     place_in_cloud = False
 
     s_out = omega*r_stag**2   # to compare with confined case 
+    s_out = s_out *sout_fac
     
     time = []
     v_detect_evol = []          # velocity at detector
@@ -174,6 +179,7 @@ def free_field_sn(ax1,ax2,ax3):
 def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
     
     s_out = omega*r_stag**2
+    s_out = s_out *sout_fac
 
     # Initial properties of the cavity before being hit by SN shock 
     vol_cav = 4/3*np.pi*r_stag**3
