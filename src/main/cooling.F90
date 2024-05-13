@@ -94,8 +94,8 @@ module cooling
  real    :: KI02_rho_min,KI02_rho_max
  real    :: rhov4_KI02(2,maxt)
 
- real    :: rhominJML_cgs = 1E-25   ! density range of which JML06 cooling curve has equilibium solution(s)
- real    :: rhomaxJML_cgs = 1E-13   !  -Note: rhominJML_cgs is hard limit; rhomaxJML_cgs can be increased by lowering TminJML
+ real    :: rhominJML_cgs = 1E-27   ! density range of which JML06 cooling curve has equilibium solution(s)
+ real    :: rhomaxJML_cgs = 1E-12   !  -Note: rhominJML_cgs is hard limit; rhomaxJML_cgs can be increased by lowering TminJML
  real    :: TminJML = 1E0           ! temperature range of JML06 cooling curve
  real    :: TmaxJML = 1E9
  real    :: rhoueqJML_table(5,maxt)
@@ -786,7 +786,7 @@ subroutine cooling_JoungMacLow_implicit(eni,rhoi,dt,dudti)
  use io,      only:fatal
  use physcon, only:kboltz,mass_proton_cgs
  use eos,     only:gamma,gmw
- use units,   only:unit_ergg
+ use units,   only:unit_ergg,unit_density 
  real, intent(in)  :: rhoi,eni,dt
  real, intent(out) :: dudti
  integer :: i,j,r,numroots
@@ -850,6 +850,7 @@ subroutine cooling_JoungMacLow_implicit(eni,rhoi,dt,dudti)
           ueq_final = kboltz*TmaxJML / (gmw*mass_proton_cgs*(gamma-1)) / unit_ergg
        elseif (numroots == 3) then
           ueq_final = ueqs(3)
+          print*,'going to Teq3',rhoi*unit_density 
        endif
     endif
  endif

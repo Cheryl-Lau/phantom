@@ -58,7 +58,7 @@ module heatcool_cmi
  real   :: rhomin_cgs   = 1E-27
  real   :: rhomax_cgs   = 1E-12
  real   :: gammamin_cgs = 1E-27
- real   :: gammamax_cgs = 1E-10
+ real   :: gammamax_cgs = 1E-20
  real   :: Tmin  = 1E0
  real   :: Tmax  = 1E9
 
@@ -343,7 +343,7 @@ end subroutine cooling_term
 !
 subroutine get_ueq(rho,gammaheat,u,numroots,ueq_final)
  use physcon, only:kboltz,mass_proton_cgs
- use units,   only:unit_ergg
+ use units,   only:unit_ergg,unit_density,utime,unit_energ 
  use eos,     only:gmw,gamma
  use io,      only:fatal,warning
  real,    intent(in)  :: rho,gammaheat,u
@@ -435,6 +435,7 @@ subroutine get_ueq(rho,gammaheat,u,numroots,ueq_final)
           ueq_final = kboltz*Tmax / (gmw*mass_proton_cgs*(gamma-1)) / unit_ergg
        elseif (numroots == 3) then
           ueq_final = ueqs(3)
+          print*,'going to Teq3',rho*unit_density,gammaheat*unit_energ/utime 
        endif
     endif
  endif
