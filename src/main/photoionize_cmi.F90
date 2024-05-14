@@ -587,8 +587,8 @@ real function get_ionflux_star(mass_star)
     print*,'mass of ionizing star',mass_star_solarm
     get_ionflux_star = 10**(48.1 + 0.02*(mass_star_solarm - 20.d0))
 
-!    print*,'forcefully set flux to 1E51'
-!    get_ionflux_star = 1E51 ! testing 
+    print*,'forcefully set flux to 1E51'
+    get_ionflux_star = 1E51 ! testing 
 
    ! if (mass_star_cgs > 3.65E34) then
    !    get_ionflux_star = 10**(2.817*log10(mass_star_cgs) - 49.561)
