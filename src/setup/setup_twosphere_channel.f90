@@ -87,6 +87,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
  use photoionize_cmi, only:sink_ionsrc,sink_as_cluster,inject_rad,one_sink_ionsrc,isink_ionsrc
  use inject,          only:inject_sn,sink_progenitor,frackin,fractherm 
+ use inject,          only:one_sink_progenitor,isink_progenitor 
  use inject,          only:delay_sn_injection
  integer,           intent(in)    :: id
  integer,           intent(inout) :: npart
@@ -637,7 +638,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Photoionization settings
     !
     inject_rad  = .true.
-    sink_ionsrc = .false. 
+    sink_ionsrc = .true. 
     one_sink_ionsrc = .true. 
     isink_ionsrc    = 1
     sink_as_cluster = .false. 
@@ -657,7 +658,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Supernova settings
     !
     inject_sn = .true.
-    sink_progenitor = .false.
+    sink_progenitor = .true.
+    one_sink_progenitor = .true.
+    isink_progenitor = 1
     delay_sn_injection = .false. 
     frackin = 1.
     fractherm = 0.
