@@ -34,7 +34,7 @@ subroutine modify_dump(npart,npartoftype,massoftype,xyzh,vxyzu)
  nptmass = 1
  isink = 1
  xyzmh_ptmass(1:3,isink) = (/0.,0.,0./)
- xyzmh_ptmass(4,isink)   = 150. 
+ xyzmh_ptmass(4,isink)   = 80. 
  xyzmh_ptmass(ihsoft,isink) = 0.005
  xyzmh_ptmass(ihacc,isink) = 0.005 
 
