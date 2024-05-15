@@ -321,7 +321,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
           ipartsn = iadd
           call gen_refpoints(xyz_ref,r_ref)
           r_vrad = 2*r_ref   ! 2*r_dist/r_sn; scaling max=r_sn to max=2 of vrad func
-          vrad = vrfunc(a_vrad,r_vrad)
+          vrad = vrfunc(a_vrad,r_vrad) *3.
           over_partsn: do ia = 1,6
              xyz_partsn  = xyz_sn(1:3,isn) + xyz_ref(1:3,ia)*r_sn
              vxyz_partsn = vxyz_sn(1:3,isn) + vrad*xyz_ref(1:3,ia)/r_ref
