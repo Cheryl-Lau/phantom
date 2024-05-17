@@ -162,7 +162,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call set_units(dist=udist,mass=umass,G=1.d0)
 
     !- Limit the total number of particles
-    npmax = int(0.4*size(xyzh(1,:))) ! approx max number allowed in sphere given size(xyzh(1,:))
+    npmax = int(size(xyzh(1,:))) ! approx max number allowed in sphere given size(xyzh(1,:))
 
     !- Mass of particles
     mpart_solarm = 1E-2
@@ -190,8 +190,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
     !- Settings for the envelope
     np_envelope = 5E3 !3E5
-    npmax_env = npmax - np_cloud1 - np_cloud2
-    call prompt('Enter the approximate number of particles within the envelope boundaries',np_envelope,0,npmax_env)
+    call prompt('Enter the approximate number of particles within the envelope boundaries',np_envelope,0,npmax)
     rho_envelope_cgs = 4E-25  ! for 1000K  
     call prompt('Enter the density of the envelope in g/cm^3',rho_envelope_cgs,0.)
 
