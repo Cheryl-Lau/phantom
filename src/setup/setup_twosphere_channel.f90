@@ -165,11 +165,11 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     npmax = int(0.4*size(xyzh(1,:))) ! approx max number allowed in sphere given size(xyzh(1,:))
 
     !- Mass of particles
-    mpart_solarm = 1E-1
+    mpart_solarm = 1E-2
     call prompt('Enter the mass of particles in solarm units',mpart_solarm,0.)
 
     !- Settings for the cloud to inject feedback (cloud1)
-    np_cloud1 = 9.5E6
+    np_cloud1 = 7E6
     call prompt('Enter the approximate number of particles in cloud1 (with feedback injected)',np_cloud1,0,npmax)
     rho_cloud1_cgs = 1E-21
     call prompt('Enter the density of cloud1 in g/cm^3',rho_cloud1_cgs,0.)
@@ -177,7 +177,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call prompt('Enter the Mach number of the cloud1 turbulence',rms_mach_cloud1,0.)
 
     !- Settings for the neighbouring cloud (cloud2)
-    np_cloud2 = 8E5
+    np_cloud2 = 1E5
     call prompt('Enter the approximate number of particles in cloud2',np_cloud2,0,npmax)
     rho_cloud2_cgs = 1E-21
     call prompt('Enter the density of cloud2 in g/cm^3',rho_cloud2_cgs,0.)
@@ -189,7 +189,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call prompt('Enter the separation between the centre of clouds in pc',cloud_sep_pc,0.)
 
     !- Settings for the envelope
-    np_envelope = 5E6 !3E5
+    np_envelope = 5E3 !3E5
     npmax_env = npmax - np_cloud1 - np_cloud2
     call prompt('Enter the approximate number of particles within the envelope boundaries',np_envelope,0,npmax_env)
     rho_envelope_cgs = 4E-25  ! for 1000K  
@@ -573,8 +573,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     xyzmh_ptmass(:,:)            = 0.
     xyzmh_ptmass(1:3,nptmass)    = 0.
     xyzmh_ptmass(4,nptmass)      = 100*solarm/umass
-    xyzmh_ptmass(ihacc,nptmass)  = 0.25*pc/udist
-    xyzmh_ptmass(ihsoft,nptmass) = 0.25*pc/udist
+    xyzmh_ptmass(ihacc,nptmass)  = 0.005*pc/udist
+    xyzmh_ptmass(ihsoft,nptmass) = 0.005*pc/udist
     vxyz_ptmass                  = 0.
  endif
 
@@ -650,14 +650,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     photoionize_tree  = .true.
     tree_accuracy_cmi = 0.3
     nHlimit_fac       = 300.
-    rcut_opennode_cgs = 11.0*pc
-    rcut_leafpart_cgs = 10.0*pc
+    rcut_opennode_cgs = 3.*pc
+    rcut_leafpart_cgs = 2.*pc
     delta_rcut_cgs    = 0.5*pc
 
     !
     ! Supernova settings
     !
-    inject_sn = .true.
+    inject_sn = .false.
     sink_progenitor = .true.
     one_sink_progenitor = .true.
     isink_progenitor = 1
