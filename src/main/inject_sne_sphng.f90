@@ -53,7 +53,7 @@ module inject
  ! Set sne properties if not using sinks as progenitors
  integer, parameter :: maxsn_insert = 1
  real    :: mstar_cgs = 1.9891d35  ! 100 solarm
- real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 0., 0., 0., 0. /), &
+ real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 0., 0., 0., 1.317E+12 /), &
                                                            shape=(/4,maxsn_insert/))
 
  ! Global storage for all sne (also used for switching-off cooling)
