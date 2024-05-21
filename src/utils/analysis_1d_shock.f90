@@ -102,7 +102,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
          call warning('analysis_1d_shock','not enough trial neighbours')
       endif 
       n = n + 1 
-      if (n > 20) call fatal('analysis_1d_shock','cannot find neighbours')
+      if (n > 50) call fatal('analysis_1d_shock','cannot find neighbours')
    enddo 
 
    !- Compute properties by interpolating from true neighbours 
