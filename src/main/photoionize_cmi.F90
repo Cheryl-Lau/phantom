@@ -98,6 +98,7 @@ module photoionize_cmi
  real,    public :: tol_vsite  = 1E-4
  logical, public :: lloyd      = .true.
  logical, public :: monochrom_source = .false.   ! else blackbody spec
+ logical, public :: force_large_Q = .false. 
 
  ! Move particles up the tree
  logical, public :: photoionize_tree = .true.
@@ -589,6 +590,7 @@ real function get_ionflux_star(mass_star)
 
 !    print*,'forcefully set flux to 1E51'
 !   get_ionflux_star = 1E51 ! testing 
+   if (force_large_Q) get_ionflux_star = 1E51
 
    ! if (mass_star_cgs > 3.65E34) then
    !    get_ionflux_star = 10**(2.817*log10(mass_star_cgs) - 49.561)
@@ -1858,6 +1860,7 @@ subroutine write_options_photoionize(iunit)
  call write_inopt(niter_mcrt,'niter_mcrt','Number of photon-release iterations',iunit)
  call write_inopt(nphoton,'nphoton','Number of photons per iteration',iunit)
  call write_inopt(photon_eV,'photon_eV','Energy of ionizing photons in eV',iunit)
+ call write_inopt(force_large_Q,'force_large_Q','Forcefully set a bigger Q',iunit)
  call write_inopt(tol_vsite,'tol_vsite','Threshold to update Voronoi gen-sites',iunit)
  call write_inopt(lloyd,'lloyd','Apply Lloyd iteration to construct Voronoi grid',iunit)
  call write_inopt(limit_voronoi,'limit_voronoi','Merge tightly packed cells in Voronoi grid',iunit)
@@ -1931,6 +1934,9 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
     read(valstring,*,iostat=ierr) photon_eV
     ngot = ngot + 1
     if (photon_eV <= 0.) call fatal(label,'invalid setting for photon_eV (<=0)')
+ case('force_large_Q')
+    read(valstring,*,iostat=ierr) force_large_Q
+    ngot = ngot + 1
  case('tol_vsite')
     read(valstring,*,iostat=ierr) tol_vsite
     ngot = ngot + 1
@@ -2008,7 +2014,7 @@ subroutine read_options_photoionize(name,valstring,imatch,igotall,ierr)
  case default
     imatch = .false.
  end select
- igotall = ( ngot >= 30 )
+ igotall = ( ngot >= 31 )
 
 end subroutine read_options_photoionize
 
