@@ -150,6 +150,14 @@ subroutine init_inject(ierr)
     xyzt_sn_insert(4,:)   = xyzt_sn_insert_cgs(4,:)  /utime
  endif
 
+ !
+ ! Remove threshold requirement if specifying sink 
+ !
+ if (sink_progenitor .and. one_sink_progenitor) then 
+     print*,' Setting sink',isink_progenitor,'to detonate; ignore mass threshold'
+     pmsncrit = tiny(pmsncrit)  
+ endif 
+
 end subroutine init_inject
 
 !-----------------------------------------------------------------------
@@ -420,7 +428,6 @@ subroutine check_sink(xyzmh_ptmass,vxyz_ptmass,nptmass,pmsncrit,time)
  over_sinks: do ip = 1,nptmass
 
     if (one_sink_progenitor .and. ip /= isink_progenitor) cycle over_sinks 
-    if (ip == isink_progenitor) pmsncrit = tiny(pmsncrit)   ! remove threshold requirement 
 
     mptmass = xyzmh_ptmass(4,ip)
     snflag_sinkip = snflag_sink(ip)
