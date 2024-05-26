@@ -230,7 +230,9 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  ! Inject supernovae from temp-storage
  !
  if (inject_sn .and. nsn >= 1) then
+    print*,' *****************'
     write(*,'(1x,a10,i3,a17)') 'Injecting ',nsn,' supernova(e) at:'
+    print*,' *****************'
     do isn = 1,nsn
        print*, xyz_sn(1:3,isn)
     enddo
@@ -431,6 +433,7 @@ subroutine check_sink(xyzmh_ptmass,vxyz_ptmass,nptmass,pmsncrit,time)
           write(*,'(1x,a5,i4,a38,f5.2,a4)') 'Sink ',ip,' set as progenitor - detonating after ',t_ms_cgs/(1E6*365*24*3600),' Myr'
           t_sn = time + t_ms_cgs/utime
        else 
+          write(*,'(1x,a5,i4,a35)') 'Sink ',ip,' set as progenitor - detonating now'
           t_sn = time
        endif 
        !
