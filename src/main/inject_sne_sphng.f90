@@ -420,6 +420,7 @@ subroutine check_sink(xyzmh_ptmass,vxyz_ptmass,nptmass,pmsncrit,time)
  over_sinks: do ip = 1,nptmass
 
     if (one_sink_progenitor .and. ip /= isink_progenitor) cycle over_sinks 
+    if (ip == isink_progenitor) pmsncrit = tiny(pmsncrit)   ! remove threshold requirement 
 
     mptmass = xyzmh_ptmass(4,ip)
     snflag_sinkip = snflag_sink(ip)
