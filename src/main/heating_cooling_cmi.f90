@@ -55,8 +55,8 @@ module heatcool_cmi
  integer, parameter :: maxgamma = 1000
  real   :: rho_gamma_ueq_table(maxrho,maxgamma,6)  ! stores: rho,gamma,numroots,ueq1,ueq2,ueq3
 
- real   :: rhomin_cgs   = 1E-27
- real   :: rhomax_cgs   = 1E-15
+ real   :: rhomin_cgs   = 1E-28
+ real   :: rhomax_cgs   = 1E-14
  real   :: gammamin_cgs = 1E-27
  real   :: gammamax_cgs = 1E-12
  real   :: Tmin  = 1E0
@@ -283,7 +283,7 @@ subroutine heating_term(nH,rho,u,temp_star,gammaheat)
     if (rho_cgs > rhomax_cgs) rho_cgs = rhomax_cgs
     if (rho_cgs < rhomin_cgs .or. rho_cgs > rhomax_cgs) then
        print*,'rho_cgs',rho_cgs
-       call warning('heating_cooling_cmi','rho_cgs exceeded range')
+       call fatal('heating_cooling_cmi','rho_cgs exceeded range')
     endif
     nrho_cgs = rho_cgs*one_over_mH_cgs
 
@@ -308,15 +308,10 @@ subroutine heating_term(nH,rho,u,temp_star,gammaheat)
  !- Include background heating
  gamma_cgs = gamma_cgs + gamma_background_cgs
 
- if (gamma_cgs < gammamin_cgs) then
+ if (gamma_cgs < gammamin_cgs .or. gamma_cgs > gammamax_cgs) then
     print*,'nH; gamma_cgs',nH,gamma_cgs
-    gamma_cgs = gammamin_cgs 
-    call warning('heating_cooling_cmi','gamma_cgs smaller than range')
- elseif (gamma_cgs > gammamax_cgs) then 
-    print*,'nH; gamma_cgs',nH,gamma_cgs
-    gamma_cgs = gammamax_cgs 
-    call warning('heating_cooling_cmi','gamma_cgs bigger than range') 
- endif
+    call fatal('heating_cooling_cmi','gamma_cgs exceeded range')
+ endif 
 
  !- convert to code units
  gammaheat = gamma_cgs*one_over_unit_gamma
