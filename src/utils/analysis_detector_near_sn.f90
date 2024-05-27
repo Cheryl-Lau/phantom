@@ -73,7 +73,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
        endif 
     endif 
  enddo 
- rad_neigh = xyzh(4,iclosest) * 2.0
+ rad_neigh = xyzh(4,iclosest) / 2.0
  if (rad_neigh < tiny(dist2)) call fatal('analysis_detector_near_sn','rad_neigh = 0')
 
  nneigh = 0 
@@ -106,7 +106,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
        q = sqrt(q2) 
        call get_kernel(q2,q,wkern,grkern)
        ! get neigh particle properties 
-       vx_b  = sqrt(mag2(vxyzu(1:3,ip))) !vxyzu(1,ip)
+       vx_b  = vxyzu(1,ip) ! sqrt(mag2(vxyzu(1:3,ip))) !
        u_b   = vxyzu(4,ip)
        rho_b = rhoh(h_b,pmass)
        rampr_b   = rho_b*mag2(vxyzu(1:3,ip))    ! rho*v2 
