@@ -24,7 +24,7 @@ module analysis
 
  private
 
- real    :: xyz_target(3) = (/ 10., 0., 0. /)  ! Position of detector
+ real    :: xyz_target(3) = (/ 7., 0., 0. /)  ! Position of detector
 
 contains
 
