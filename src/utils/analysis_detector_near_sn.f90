@@ -73,7 +73,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
        endif 
     endif 
  enddo 
- rad_neigh = xyzh(4,iclosest) / 2.0
+ rad_neigh = xyzh(4,iclosest) * 2.0
  if (rad_neigh < tiny(dist2)) call fatal('analysis_detector_near_sn','rad_neigh = 0')
 
  nneigh = 0 
