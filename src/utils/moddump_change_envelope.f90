@@ -18,9 +18,9 @@ module moddump
 !
  implicit none
 
- real :: r_cloud = 24.5 
- integer :: npart_envelope = 3E5
- real :: rho_envelope_cgs = 4e-25
+ real :: r_cloud = 10.05
+ integer :: npart_envelope = 5E5
+ real :: rho_envelope_cgs = 1e-25
  real :: u_envelope_cgs = 9.6087E+10
 
 contains

@@ -122,7 +122,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real               :: r_sn_cgs,engsn_cgs,pmsncrit_cgs
  real               :: h_acc_cgs,h_soft_sinksink_cgs,h_soft_sinkgas_cgs,rho_crit_cgs_recomm
  logical            :: iexist,in_iexist,add_particle
- logical            :: remove_cloud1       = .false. ! temporarily removing objects to check virial ratio
+ logical            :: remove_cloud1       = .true. ! temporarily removing objects to check virial ratio
  logical            :: remove_cloud2       = .true.
  logical            :: remove_envelope     = .false.
  logical            :: place_sink_in_setup = .true.
@@ -189,7 +189,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call prompt('Enter the separation between the centre of clouds in pc',cloud_sep_pc,0.)
 
     !- Settings for the envelope
-    np_envelope = 5E3 !3E5
+    np_envelope = 1E5 !3E5
     call prompt('Enter the approximate number of particles within the envelope boundaries',np_envelope,0,npmax)
     rho_envelope_cgs = 4E-25  ! for 1000K  
     call prompt('Enter the density of the envelope in g/cm^3',rho_envelope_cgs,0.)

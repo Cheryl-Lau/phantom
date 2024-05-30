@@ -16,15 +16,15 @@ module moddump
 ! :Runtime parameters: 
 !   - rad_chnl          : *maximum radius of the channell to clear*
 !   - omegafrac_chnl    : *size of channell as a fraction of sphere's total solid angle*
-!   - pfrac_chnl        : *fraction of particles to remove within channell*
+!   - pfrac_chnl        : *fraction of particles to remove within channel*
 !
 ! :Dependencies: None
 !
  implicit none
 
- real   :: rad_chnl = 25.
- real   :: omegafrac_chnl = 0.2
- real   :: pfrac_chnl = 0.9
+ real   :: rad_chnl = 10.05
+ real   :: omegafrac_chnl = 0.1
+ real   :: pfrac_chnl = 0.9999
 
 contains
 
