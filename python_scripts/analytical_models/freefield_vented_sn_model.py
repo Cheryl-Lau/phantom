@@ -12,47 +12,54 @@ plot_velocity = True
 plot_thermp = True 
 plot_ramp = True 
 
-# Sedov is a self-similar solution, here we'll put everything in cgs units 
-
 gamma = 5/3                     # adiabatic index 
 G = 6.672041e-8                 # gravitational constant 
+gmw = 1.29                      # mean molecular weight 
+kboltz = 1.38066e-16            # boltzmann constant 
+mass_proton_cgs = 1.6726e-24    # proton mass 
 
-t_end = 1.0E+14                 # sim end time 
-dt = 1E8                        # timestep 
 
-r_detect = 25. *3.086e+18       # location of detector 
+def get_pressure(rho,temp):
+    u = kboltz * temp / (gmw*mass_proton_cgs*(gamma-1))
+    p = rho*(gamma-1)*u
+    return p 
+
+
+# Sedov is a self-similar solution, here we'll put everything in cgs units 
+
+t_end = 8.0E12                  # sim end time 
+dt = 1E7                        # timestep 
+
+r_detect = 8. *3.086e+18        # location of detector 
 
 r_sn = 0.1 *3.086e+18           # SN ejecta radius 
 E_sn = 1e51                     # SN energy 
 m_sn = 25.0 *1.989e+33          # SN ejecta mass 
 vol_sn = 4/3*np.pi*r_sn**3      # volume occupied by SN ejecta 
 
-r_cloud = 24.41 *3.086e+18      # Cloud radius 
+r_cloud = 10. *3.086e+18        # Cloud radius 
 rho_cloud = 1e-21               # density of cloud around HII region/cavity
-p_cloud = 3.34E-12              # pressure of cloud around HII region/cavity
+p_cloud = get_pressure(rho_cloud,1e1)
 
-r_stag = 10. *3.086e+18         # HII region stagnation radius 
+r_stag = 4. *3.086e+18          # HII region stagnation radius 
 p_hii = p_cloud * 10**(-3*gamma/(1-gamma))          # pressure of HII region from adiabatic relations 
 rho_hii = rho_cloud * (p_hii/p_cloud) * 10**(-3)    # density of HII region from ideal gas law  
 #rho_hii = 3.16e-17   # from adiabatic relation
 #p_hii = 2.01e-5      # from ideal gas law
-rho_hii = 1e-19 
-p_hii = 6.40e-8 
+rho_hii = 1e-23
+p_hii = get_pressure(rho_hii,1e4)
 
-#rho_hii = 1e-22     # slightly emptied cavity
-#p_hii = 6.4e-7      # HII region at 1E8 K (2nd equil temp)
-
-rho_inshell = 1.5e-19           # density within swept-up shell 
-dr_inshell = 2.0 *3.086e+18     # thickness of shell 
+rho_inshell = 1e-19             # density within swept-up shell 
+dr_inshell = 0.6 *3.086e+18     # thickness of shell 
 
 rho_env = 4e-25                 # density of envelope 
-p_env = 2.54e-14                # pressure of envelope
+p_env = get_pressure(rho_env,1e3)
 
-#rho_env = 4e-24                # testing
-#p_env = 2.54e-13               # testing 
+rho_ffbg = 1e-23                # Medium density for free-field case 
+p_ffbg = get_pressure(rho_ffbg,1e3)
 
-omega = 4*np.pi*0.2             # solid angle of channell in Sr
-sout_fac = 1 #2
+omega = 4*np.pi*0.1             # solid angle of channell in Sr
+sout_fac = 1 
 expand_sout = False
 
 
@@ -68,8 +75,6 @@ expand_sout = False
  Suppose SN shock shell already reached r_detect. 
 '''
 def free_field_sn(ax1,ax2,ax3):
-
-    global rho_env, p_env
 
     place_in_HIIregion = False
     place_in_cloud = False
@@ -92,34 +97,34 @@ def free_field_sn(ax1,ax2,ax3):
 
     while (t < t_end): 
 
+        global rho_ffbg, p_ffbg
+
         if (place_in_HIIregion == True):
             if (r_shell < r_stag):
-                rho_env = rho_hii
-                p_env = p_hii
+                rho_ffbg = rho_hii
+                p_ffbg = p_hii
                 print('in HII') 
             elif (r_shell < r_stag+dr_inshell): 
-                rho_env = rho_inshell 
-                p_env = p_inshell
+                rho_ffbg = rho_inshell 
+                p_ffbg = p_inshell
                 print('in shell')
             elif (r_shell < r_cloud):
-                rho_env = rho_cloud
-                p_env = p_cloud 
+                rho_ffbg = rho_cloud
+                p_ffbg = p_cloud 
         elif (place_in_cloud == True):
             if (r_shell < r_cloud):
-                rho_env = rho_cloud 
-                p_env = p_cloud 
+                rho_ffbg = rho_cloud 
+                p_ffbg = p_cloud 
 
         # Update shell radius as it expands 
-        v_shell = 2/5 * (1.17)**(5/2) * (E_sn/rho_env)**(1/2) * r_shell**(-3/2)  # sedov sol 
-#        v_shell = 1/4 * (1.17)**(-2) * (momen_shell/rho_env) * r_shell**(-3)   # snowplough
+        v_shell = 2/5 * (1.17)**(5/2) * (E_sn/rho_ffbg)**(1/2) * r_shell**(-3/2)  # sedov sol 
+#        v_shell = 1/4 * (1.17)**(-2) * (momen_shell/rho_ffbg) * r_shell**(-3)   # snowplough
         r_shell = r_shell + v_shell*dt 
         
         # Properties immediately behind shock according to Sedov equations
-        v_shell = 2/5 * (1.17)**(5/2) * (E_sn/rho_env)**(1/2) * r_shell**(-3/2)
-#        v_shell = 1/4* (1.17)**(-2) * (momen_shell/rho_env) * r_shell**(-3)
-#        p_shell = 3/25 * (1.17)**5 * E_sn * r_shell**(-3)
-#        rho_shell = (1.17/r_shell)**5 * E_sn * t**2
-        cs = np.sqrt(gamma*p_env/rho_env)
+        v_shell = 2/5 * (1.17)**(5/2) * (E_sn/rho_ffbg)**(1/2) * r_shell**(-3/2)
+#        v_shell = 1/4* (1.17)**(-2) * (momen_shell/rho_ffbg) * r_shell**(-3)
+        cs = np.sqrt(gamma*p_ffbg/rho_ffbg)
         mach = v_shell/cs
         
         # Properties within shocked region 
@@ -129,8 +134,8 @@ def free_field_sn(ax1,ax2,ax3):
         c = (2*gamma+10)/(gamma-7)
         d = (2*gamma**2+7*gamma-3)/(gamma-7)
         v_detect = v_shell * (r_fac/gamma + ((gamma-1)/(gamma**2+gamma)) * r_fac**a)
-        rho_detect = rho_env * (gamma+1)/(gamma-1)*r_fac**b/gamma**c*(gamma+1-r_fac**(a-1))**c
-        p_detect = p_env * mach**2 * (2*gamma**(1-d))/(gamma+1) * (gamma+1-r_fac**(a-1))**d
+        rho_detect = rho_ffbg * (gamma+1)/(gamma-1)*r_fac**b/gamma**c*(gamma+1-r_fac**(a-1))**c
+        p_detect = p_ffbg * mach**2 * (2*gamma**(1-d))/(gamma+1) * (gamma+1-r_fac**(a-1))**d
         ramp_detect = rho_detect * v_detect**2
         
         # Energy passing through area s_out at r_detect within dt 
@@ -189,7 +194,7 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
     
     if (with_HII):
         p_cav = (p_hii/(gamma-1)*(vol_cav-vol_sn) + E_sn) * (gamma-1)/vol_cav
-        m_cav = m_sn + rho_hii*(vol_cav-vol_sn)
+        m_cav = m_sn + rho_hii*(vol_cav-vol_sn)   
         E_cav = E_sn + p_hii/(gamma-1)*(vol_cav-vol_sn)
     else: 
         p_cav = E_sn * (gamma-1)/vol_cav
@@ -200,6 +205,10 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
     vel_cav = (6*p_cav/rho_inshell)**(1/2)      # velocity by dimension analysis 
     rho_vent = rho_env*(p_cav/p_env)**(1/gamma) # poisson adiabate 
     e_mload = E_cav/m_cav                       # mass loading 
+
+    print('e_mload',e_mload)
+    print('initial rho p cav',rho_vent,p_cav)
+    print('initial m_cav r_cav vol_cav',m_cav,r_cav,vol_cav)
 
     # Store 
     r_cavi = r_cav 
@@ -216,13 +225,17 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
     t = 0.
     etot = 0.               # accumulated energy passing through s_out 
     mtot = 0.               # accumulated mass
+    niter = 0
+
+    method_1 = True
+    method_2 = False 
 
     while(t < t_end): 
         # Update velocity of escaping gas
         v_out = np.sqrt(2*gamma/(gamma-1)*p_env/rho_env*(((p_cav)/p_env)**((gamma-1)/gamma)-1))  # bernoulli
 
         # Update mass contained within cavity 
-        dmdt = rho_vent * v_out * s_out 
+        dmdt = rho_env * v_out * s_out 
         m_cav = m_cav - dmdt*dt 
 
         if (expand_cav):
@@ -234,11 +247,20 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
             r_cav = r_cav + vel_cav*dt 
  
         vol_cav = 4/3*np.pi*r_cav**3 
-        
-        rho_vent = m_cav/vol_cav 
-        p_cav = p_env*(rho_vent/rho_env)**gamma  # poisson adiabate 
+
+        if (method_1):                                                     ##### GO ON WITH TRYING THIS ##### 
+            p_cav = e_mload * (gamma-1) * m_cav/vol_cav
+            rho_vent = rho_env*(p_cav/p_env)**(1/gamma)
+        elif (method_2):
+            rho_vent = m_cav/vol_cav 
+            p_cav = p_env*(rho_vent/rho_env)**gamma  # poisson adiabate 
+
         ramp_vent = rho_vent * v_out**2
     
+        if (niter == 0):
+            print('first rho p cav',rho_vent,p_cav)
+            print('first m_cav r_cav vol_cav',m_cav,r_cav,vol_cav)
+
         # Energy passing through the vent of area s_out within dt
         m_box = rho_vent * s_out * v_out * dt 
         e_box = m_box * e_mload 
@@ -257,7 +279,8 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
             vel_cav_evol.append(vel_cav)
             r_cav_evol.append(r_cav)
         
-    
+        niter += 1
+
     if (plot_velocity):
         ax1.scatter(time,v_vent_evol,s=0.1,color='red',label='partially-confined')
 
