@@ -27,7 +27,7 @@ def get_pressure(rho,temp):
 
 # Sedov is a self-similar solution, here we'll put everything in cgs units 
 
-t_end = 8.0E12                  # sim end time 
+t_end = 8.0E13                  # sim end time 
 dt = 1E7                        # timestep 
 
 r_detect = 8. *3.086e+18        # location of detector 
@@ -56,7 +56,7 @@ rho_env = 4e-25                 # density of envelope
 p_env = get_pressure(rho_env,1e3)
 
 rho_ffbg = 1e-23                # Medium density for free-field case 
-p_ffbg = get_pressure(rho_ffbg,1e3)
+p_ffbg = get_pressure(rho_ffbg,1e2)
 
 omega = 4*np.pi*0.1             # solid angle of channell in Sr
 sout_fac = 1 
@@ -232,6 +232,8 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
 
     while(t < t_end): 
         # Update velocity of escaping gas
+        if (niter == 0):
+            print('calc v: p_env,rho_env,p_cav',p_env,rho_env,p_cav)
         v_out = np.sqrt(2*gamma/(gamma-1)*p_env/rho_env*(((p_cav)/p_env)**((gamma-1)/gamma)-1))  # bernoulli
 
         # Update mass contained within cavity 
@@ -258,6 +260,7 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
         ramp_vent = rho_vent * v_out**2
     
         if (niter == 0):
+            print('first vout',v_out)
             print('first rho p cav',rho_vent,p_cav)
             print('first m_cav r_cav vol_cav',m_cav,r_cav,vol_cav)
 
@@ -270,11 +273,16 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
         if (expand_sout):
             s_out = s_out*1.00001
 
+        # Detector is at the middle of the channel 
+        rho_mid = (rho_vent+rho_env)/2
+        p_mid = p_env*(rho_mid/rho_env)**gamma
+        ramp_mid = rho_mid * v_out**2
+
         t = t + dt 
         time.append(t)
         v_vent_evol.append(v_out)
-        p_vent_evol.append(p_cav)
-        ramp_vent_evol.append(ramp_vent)
+        p_vent_evol.append(p_mid)
+        ramp_vent_evol.append(ramp_mid)
         if (expand_cav):
             vel_cav_evol.append(vel_cav)
             r_cav_evol.append(r_cav)
