@@ -43,7 +43,7 @@ module heatcool_cmi
 
  ! Options for controlling heating/cooling physics
  logical, public :: use_const_alpha   = .true.
- logical, public :: get_ueq_by_interp = .true.
+ logical, public :: get_ueq_by_interp = .false.
 
  ! Heating from cosmic rays, X-rays, H2 formation and destruction etc. (as of KI02)
  real,    public :: gamma_background_cgs = 2E-26
