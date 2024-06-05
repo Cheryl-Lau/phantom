@@ -174,6 +174,8 @@ def compute_tke_spectrum(u,v,w,lx,ly,lz,smooth):
     The domain size in the z-direction.
     smooth: boolean
     A boolean to smooth the computed spectrum for nice visualization.
+
+    source: https://turbulence.utah.edu/code/
     """
     nx = len(u[:,0,0])
     ny = len(v[0,:,0])
