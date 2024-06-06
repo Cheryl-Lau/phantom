@@ -50,6 +50,8 @@ if (colour_mass == True):
 else:
     plt.scatter(x,y,s=1,c=nH)
     
+plt.xlabel('x [pc]')
+plt.ylabel('y [pc]')
 plt.axis('scaled')
 plt.show() 
 
