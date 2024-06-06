@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 plot_slice = True
 colour_mass = False  # else nH
 
-data = np.loadtxt('nixyzhmf_cminode.txt',skiprows=1)
-imfilename = 'nixyzhmf_cminode.png'
+data = np.loadtxt('nixyzhmf_00000.txt',skiprows=3)
+imfilename = 'nixyzhmf_00000.png'
 
 radius = 5
 centre = [0,0,0]
@@ -54,9 +54,9 @@ else:
 plt.xlabel('x [pc]')
 plt.ylabel('y [pc]')
 plt.axis('scaled')
-plt.show() 
-
 plt.savefig(imfilename.strip())
+
+plt.show() 
 
 
 

@@ -7,19 +7,19 @@ import matplotlib.pyplot as plt
 plot_slice = True
 colour_mass = False  # else nH
 
-data = np.loadtxt('nixyzhmf_cminode.txt',skiprows=1)
-imfilename = 'nixyzhmf_cminode.png'
+data = np.loadtxt('xyzhmf_00000.txt',skiprows=3)
+imfilename = 'xyzhmf_00000.png'
 
 radius = 5
 centre = [0,0,0]
 zmin = -0.1 
 zmax = 0.2 
 
-x = data[:,2]
-y = data[:,3]
-z = data[:,4]
-m = data[:,6]
-nH = data[:,7]
+x = data[:,0]
+y = data[:,1]
+z = data[:,2]
+m = data[:,4]
+nH = data[:,5]
 
 print(np.sum(m))
 
@@ -54,9 +54,9 @@ else:
 plt.xlabel('x [pc]')
 plt.ylabel('y [pc]')
 plt.axis('scaled')
-plt.show() 
-
 plt.savefig(imfilename.strip())
+
+plt.show() 
 
 
 
