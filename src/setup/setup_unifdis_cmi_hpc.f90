@@ -131,7 +131,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        ! Set number of particles (to be updated after set_unifdis)
        !
        npmax = int(size(xyzh(1,:)))
-       np_req = 1E7
+       np_req = 1E5
        call prompt('Enter total number of particles',np_req,1)
        if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
     else
@@ -164,7 +164,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set timestep and end-time
     !
     dtmax_cgs = 3.15360E9    ! 1E-4 Myr
-    tmax_cgs  = 5.*dtmax_cgs ! run only 5 steps for runtime measure 
+    tmax_cgs  = 20.*dtmax_cgs ! run only 20 steps for runtime measure 
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)
@@ -433,7 +433,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  rcut_leafpart_cgs = rcut_leafpart*udist 
  delta_rcut_cgs    = 0.1*pc
 
- limit_voronoi = .false. 
+ limit_voronoi = .true. 
 
 
  !- Print summary - for checking

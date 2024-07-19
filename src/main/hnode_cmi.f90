@@ -38,7 +38,7 @@ module hnode_cmi
  integer, public :: maxnode_bruteforce = 1E4   ! based on runtime test results 
 
  private
- integer, parameter :: maxnodeneigh   = 1E7
+ integer, parameter :: maxnodeneigh   = 1E5
  integer, parameter :: neighcachesize = 5000
  integer, parameter :: maxkmid = 1024
 
@@ -159,7 +159,7 @@ subroutine hnode_iterate(irun,node,nxyzm_treetocmi,ncminode,h_solvertocmi)
        write(2052,*) pos_node_nosol(1:3,i)
     enddo
     close(2052)
-    if (inosol >= 10) call warning('hnode_cmi','Many nodes have smoothing lengths not converging')
+    if (inosol >= ncminode*0.2) call warning('hnode_cmi','Many nodes have smoothing lengths not converging')
  endif
 
  avgneigh = nint(real(avgneigh)/real(ncminode))
