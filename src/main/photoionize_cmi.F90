@@ -88,7 +88,7 @@ module photoionize_cmi
  !- or
  ! Manually set location, starting/ending time and ionizing photon flux [cgs units] of sources
  integer, public, parameter :: nsetphotosrc = 1
- real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 1.08e+19, 1.481e+19, -6.48e+18, 0.,1E60,1E51 /),&
+ real,    public :: xyztq_setphotosrc_cgs(6,nsetphotosrc) = reshape((/ 0.,0.,0. , 0.,1E60,1E49 /),&
                                                                     shape=(/6,nsetphotosrc/))
 
  ! Monte Carlo simulation settings
