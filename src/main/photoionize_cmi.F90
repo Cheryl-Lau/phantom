@@ -1238,11 +1238,15 @@ subroutine collect_and_combine_cminodes(ncminode,nleafparts,ncloseleaf)
  use io,        only:fatal
  integer, intent(in)    :: nleafparts,ncloseleaf
  integer, intent(inout) :: ncminode
- integer :: ip,inode,ientry,irepentry,irowafter,ncminode_old
- integer :: n_fromtree,n_toreplace
+ integer, parameter :: maxstore = 1E6
+ integer :: ip,inode,istore,inode_toreplace
+ integer :: n_fromtree,n_toreplace,ncminode_old
+ real    :: nixyzhmf_cminode_store(7,maxstore)
 
  call record_time(iruncmi,'before_collectnodes')
  print*,' Collecting final set of pseduo-particles'
+
+ ncminode_old = ncminode
 
  !- Combine outputs from kdtree_cmi and hnode_cmi to fill properties of nodes
  do inode = 1,ncminode
@@ -1255,26 +1259,26 @@ subroutine collect_and_combine_cminodes(ncminode,nleafparts,ncloseleaf)
     nixyzhmf_cminode(7,inode) = nxyzm_treetocmi(5,inode)
  enddo
 
- !- Match n against those in nnode_toreplace and remove entries by shifting up the table
- !  (assumes both arrays are sorted in the same order, which should be.)
- ncminode_old = ncminode
- ientry = 1
- irepentry = 1
- over_entries: do while (ncminode > ncminode_old-ncloseleaf)
-    n_fromtree  = int(nixyzhmf_cminode(1,ientry))
-    n_toreplace = nnode_toreplace(irepentry)
-    if (n_fromtree == n_toreplace) then
-       do irowafter = ientry,ncminode-1
-          nixyzhmf_cminode(1:7,irowafter) = nixyzhmf_cminode(1:7,irowafter+1)
-       enddo
-       ncminode = ncminode - 1
-       irepentry = irepentry + 1
-       if (irepentry > ncloseleaf+1) call fatal('photoionize_cmi','erroneous irepentry')
-    else
-       ientry = ientry + 1
-    endif
-    if (ientry > ncminode_old) call fatal('photoionize_cmi','erroneous ientry')
- enddo over_entries
+ !- Move entries into new array nixyzhmf_cminode_store if n is in nnode_toreplace
+ istore = 0
+ inode_toreplace = 1 
+ do inode = 1,ncminode 
+    n_fromtree  = int(nixyzhmf_cminode(1,inode))
+    n_toreplace = nnode_toreplace(inode_toreplace)
+    if (n_fromtree /= n_toreplace) then 
+       istore = istore + 1 
+       nixyzhmf_cminode_store(1:7,istore) = nixyzhmf_cminode(1:7,inode)
+    else 
+       inode_toreplace = inode_toreplace + 1 
+    endif 
+ enddo 
+ ! check that istore = ncminode - ncloseleaf
+ if (istore /= ncminode-ncloseleaf) call fatal('photoionize_cmi','wrong entries')
+ 
+ !- Replace nixyzhmf_cminode with nixyzhmf_cminode_store
+ nixyzhmf_cminode = 0. 
+ ncminode = istore
+ nixyzhmf_cminode(1:7,1:ncminode) = nixyzhmf_cminode_store(1:7,1:ncminode)
 
  !- Add leaf-particles onto the list and extend ncminode
  over_parts: do ip = 1,nleafparts
