@@ -62,7 +62,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use eos,          only:gmw,ieos
  use part,         only:periodic
  use unifdis,      only:set_unifdis
- use options,      only:alphau,nfulldump,icooling,ipdv_heating,ishock_heating
+ use options,      only:alphau,nfulldump,nmaxdumps,icooling,ipdv_heating,ishock_heating
  use cooling,      only:ufloor,Tfloor
  use timestep,     only:nout
  use prompting,    only:prompt
@@ -172,7 +172,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set timestep and end-time
     !
     dtmax_cgs = 3.15360E9   ! 1E-4 Myr
-    tmax_cgs  = 13.*dtmax_cgs
+    tmax_cgs  = 1e5*dtmax_cgs
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)
@@ -457,6 +457,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  ieos      = 2     ! adiabatic eos
  nout      = 1
+ nmaxdumps = 10
  nfulldump = 1
  Tfloor    = 3.
  ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
