@@ -798,6 +798,7 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
        du = 0.
        if (fix_temp_hii) then
           if (nH < 0.5 .and. ui < u_hii) then
+             npart_heated = npart_heated + 1
              du = u_hii - ui     !- instantly heat particle to 10^4 K
           endif
        else
@@ -844,11 +845,12 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
  enddo
  !$omp end parallel do
 
- if (.not.fix_temp_hii) then
-    if (npart_heated == 0) then
-       call warning('photoionize_cmi','no ionized particles')
-    else
-       print*,'Number of particles heated:   ',npart_heated
+ if (npart_heated == 0) then
+    print*,' no ionized particles'
+    call warning('photoionize_cmi','no ionized particles')
+ else 
+    print*,'Number of particles heated:   ',npart_heated
+    if (.not.fix_temp_hii) then
        ueq_mean = ueq_mean/npart_heated
        temp_ueq = ueq_mean/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
        print*,'Drifting HII region to temp [K]:   ',temp_ueq
@@ -857,8 +859,8 @@ subroutine energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
        print*,'Current temp of HII region  [K]:   ',temp_u
        tau_mean = tau_mean/npart_heated
        print*,'Time remaining to reach Teq [Myr]: ',tau_mean*utime/(1E6*years)
-    endif
- endif
+    endif 
+ endif 
 
  if (write_gamma) then
     do ibuc = 1,nbuc
