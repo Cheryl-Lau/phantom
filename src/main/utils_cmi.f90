@@ -25,6 +25,9 @@ module utils_cmi
 
  private
 
+ real    :: walltime0 
+ logical :: firstcall = .true. 
+
 contains
 
 !-----------------------------------------------------------------------
@@ -384,8 +387,13 @@ subroutine record_time(irun,label)
  character(len=*), intent(in) :: label 
  real :: cputime,walltime
 
+ if (firstcall) then 
+    walltime0 = omp_get_wtime()
+    firstcall = .false. 
+ endif 
+
  call cpu_time(cputime)
- walltime = omp_get_wtime()
+ walltime = omp_get_wtime() - walltime0 
 
  open(2070,file='cpu_wall_time_indv_process.txt',position='append')
  write(2070,'(i5,a30,2f20.10)') irun, trim(label), cputime, walltime
