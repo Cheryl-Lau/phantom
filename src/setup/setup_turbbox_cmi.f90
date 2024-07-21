@@ -139,7 +139,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        ! Set number of particles (to be updated after set_unifdis)
        !
        npmax = int(size(xyzh(1,:)))
-       np_req = 1E7
+       np_req = 1E5
        call prompt('Enter total number of particles',np_req,1)
        if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
     else
@@ -172,7 +172,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set timestep and end-time
     !
     dtmax_cgs = 3.15360E9   ! 1E-4 Myr
-    tmax_cgs  = 1e4*dtmax_cgs  ! 13
+    tmax_cgs  = 13.*dtmax_cgs
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)
@@ -456,7 +456,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  ! Set runtime parameters
  !
  ieos      = 2     ! adiabatic eos
- nout      = 100
+ nout      = 1
  nfulldump = 1
  Tfloor    = 3.
  ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
@@ -468,7 +468,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  ! Photoionization settings
  !
- inject_rad        = .false. 
+ inject_rad        = .true. 
 
  monochrom_source  = .true.
  fix_temp_hii      = .true.
