@@ -38,7 +38,7 @@ module hnode_cmi
  integer, public :: maxnode_bruteforce = 1E4   ! based on runtime test results 
 
  private
- integer, parameter :: maxnodeneigh   = 1E5
+ integer, parameter :: maxnodeneigh   = 1E7
  integer, parameter :: neighcachesize = 5000
  integer, parameter :: maxkmid = 1024
 
