@@ -139,7 +139,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        ! Set number of particles (to be updated after set_unifdis)
        !
        npmax = int(size(xyzh(1,:)))
-       np_req = 1E5
+       np_req = 1E6
        call prompt('Enter total number of particles',np_req,1)
        if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
     else
