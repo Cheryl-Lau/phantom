@@ -171,8 +171,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Set timestep and end-time
     !
-    dtmax_cgs = 3.15360E6 ! 3.15360E9   ! 1E-4 Myr
-    tmax_cgs  = 1e8*dtmax_cgs
+    dtmax_cgs = 3.15360E2 ! 3.15360E9   ! 1E-4 Myr
+    tmax_cgs  = 1e20*dtmax_cgs
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)
