@@ -171,7 +171,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Set timestep and end-time
     !
-    dtmax_cgs = 3.15360E9   ! 1E-4 Myr
+    dtmax_cgs = 3.15360E6 ! 3.15360E9   ! 1E-4 Myr
     tmax_cgs  = 1e5*dtmax_cgs
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
@@ -457,7 +457,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  ieos      = 2     ! adiabatic eos
  nout      = 1
- nmaxdumps = 10
+ nmaxdumps = 20
  nfulldump = 1
  Tfloor    = 3.
  ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
