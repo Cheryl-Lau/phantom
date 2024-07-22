@@ -4,11 +4,14 @@ import pandas as pd
 import glob 
 from scipy.optimize import curve_fit
 
+import warnings
+warnings.filterwarnings('ignore')
 
-partnumsets = ['ten5particles'] #,'ten6particles','ten7particles']
-totpart = [97336] #,999999,9938375]
-colours = ['red'] #,'blue','black']
-labels = [r'$0.97\times10^5$'+' particles'] #, r'$1.43\times10^6$'+' particles',r'$0.99\times10^7$'+' particles']
+
+partnumsets = ['ten5particles','ten6particles'] #,'ten7particles']
+totpart = [97336,1000000] #,9938375]
+colours = ['red','blue'] #,'black']
+labels = [r'$0.97\times10^5$'+' particles', r'$1.00\times10^6$'+' particles'] #,r'$0.99\times10^7$'+' particles']
 
 
 def linear_func(x,k,c):
@@ -29,7 +32,7 @@ def get_avg_cputime_for_step(df,process):
     except: # for allparts runs 
         cputime = 0
 
-    return np.mean(cputime), np.std(cputime)
+    return np.median(cputime), np.std(cputime)
 
 
 def sort_array(array_ref,array_in):
@@ -80,7 +83,7 @@ def main():
             # read runtime file for individual processes 
             indruntimefile = setname+"/cpu_wall_time_indv_process.txt"
             # put into dataframe 
-            df = pd.read_fwf(indruntimefile, sep=" ", header=None)
+            df = pd.read_fwf(indruntimefile, widths = [5,30,20,20], header=None)
             df.columns = ["irun", "description", "cpu_elapsed", "wall_elapsed"]
 
             # CPU time for tree-walk  
@@ -112,7 +115,6 @@ def main():
         stdcpu_cmi_set = sort_array(nppart_set,stdcpu_cmi_set)
         nppart_set = sort_array(nppart_set,nppart_set)
 
-
         ax1.errorbar(nppart_set,meancpu_set,yerr=stdcpu_set,marker='s',markersize=1,elinewidth=1,color=colours[c], label=labels[c])
         ax2.errorbar(nppart_set,meancpu_tree_set,yerr=stdcpu_tree_set,marker='s',markersize=1,elinewidth=1,color=colours[c], label=labels[c])
         ax3.errorbar(nppart_set,meancpu_hsol_set,yerr=stdcpu_hsol_set,marker='s',markersize=1,elinewidth=1,color=colours[c], label=labels[c])
@@ -128,7 +130,7 @@ def main():
     ax2.set_xscale('log')
     ax2.set_yscale('log')
 
-    ax3.set_ylabel('h_solve CPU time')
+    ax3.set_ylabel('h-solve CPU time')
     ax3.set_xscale('log')
     ax3.set_yscale('log')
 
