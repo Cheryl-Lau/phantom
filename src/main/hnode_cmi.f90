@@ -39,7 +39,7 @@ module hnode_cmi
 
  private
  integer, parameter :: maxnodeneigh   = 1E7
- integer, parameter :: neighcachesize = 5000
+ integer, parameter :: neighcachesize = 1E7 ! 5000
  integer, parameter :: maxkmid = 1024
 
 contains
@@ -71,7 +71,7 @@ subroutine hnode_iterate(irun,node,nxyzm_treetocmi,ncminode,h_solvertocmi)
  real    :: pos_node_nosol(3,10000)
  logical :: brute_force,node_failed
 
- write(*,'(2x,a30,i6,a6)') 'Solving smoothing lengths for ',ncminode,' nodes'
+ write(*,'(2x,a30,i7,a6)') 'Solving smoothing lengths for ',ncminode,' nodes'
 
  call record_time(irun,'before_hsolve')
 
