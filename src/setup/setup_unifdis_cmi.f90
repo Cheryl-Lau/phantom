@@ -38,13 +38,13 @@ module setup
  private
 
  integer :: np_req
- real    :: pmass,cs0
+ real    :: pmass,cs0,rhozero_cgs 
  real    :: rcut_opennode,rcut_leafpart
  real(kind=8)       :: udist,umass
  character(len=20)  :: dist_unit,mass_unit
  character(len=100) :: glass_filename
 
- logical :: use_glass = .false.
+ logical :: use_glass = .true.
 
 contains
 !----------------------------------------------------------------
@@ -66,7 +66,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use cooling,      only:ufloor,Tfloor
  use timestep,     only:nout
  use prompting,    only:prompt
- use photoionize_cmi, only:monochrom_source,fix_temp_hii,treat_Rtype_phase
+ use photoionize_cmi, only:monochrom_source,fix_temp_hii,implicit_cmi,treat_Rtype_phase
  use photoionize_cmi, only:photoionize_tree,nHlimit_fac
  use photoionize_cmi, only:limit_voronoi,hlimit_fac,extradist_fac
  use photoionize_cmi, only:rcut_opennode_cgs,rcut_leafpart_cgs,delta_rcut_cgs
@@ -86,7 +86,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real    :: xyzh_raw(4,maxrow)
  real    :: vol_box,boxlength,boxsize_fromfile,boxsize_toscale,deltax
  real    :: boxsize_setunifdis,boxsize_sample,rho_sample,rho_sample_cgs,rho_fracdiff
- real    :: totmass,totmass_req,temp,pmass_cgs,rhozero_cgs,cs0_cgs,u0,u0_cgs,tmax_cgs,dtmax_cgs
+ real    :: totmass,totmass_req,temp,pmass_cgs,cs0_cgs,u0,u0_cgs,tmax_cgs,dtmax_cgs
  real    :: xmini,xmaxi,ymini,ymaxi,zmini,zmaxi
  integer :: i,ierr,io_file,ix,npmax,npart_sample
  logical :: iexist
@@ -132,14 +132,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        ! Set number of particles (to be updated after set_unifdis)
        !
        npmax = int(size(xyzh(1,:)))
-       np_req = 1E7
+       np_req = 1E6
        call prompt('Enter total number of particles',np_req,1)
        if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
     else
        !
        ! Get glass file
        !
-       glass_filename = 'glassCube_64.dat'
+       glass_filename = 'glassCube_128.dat'
        call prompt('Enter filename of glass cube',glass_filename)
        glass_filename = trim(adjustl(glass_filename))
     endif
@@ -152,9 +152,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Density
     !
-    rhozero_cgs = 5.21E-21
-    rhozero = rhozero_cgs/unit_density
-    call prompt('Enter initial density in code units',rhozero,0.)
+    rhozero_cgs = 1E-20  ! 5.21E-21
+    call prompt('Enter initial density in g/cm^3',rhozero_cgs,0.)
+    print*,'read density:',rhozero_cgs 
     !
     ! set initial sound speed
     !
@@ -165,7 +165,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set timestep and end-time
     !
     dtmax_cgs = 3.15360E9   ! 1E-4 Myr
-    tmax_cgs  = 10.*dtmax_cgs  ! 4.41504E12  ! 0.14 Myr
+    tmax_cgs  = 4.41504E12  ! 0.14 Myr
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)
@@ -174,8 +174,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set tree accuracy parameters 
     ! 
     tree_accuracy_cmi = 0.1 
-    rcut_opennode_cgs = 0.5*pc
-    rcut_leafpart_cgs = 0.4*pc
+    rcut_opennode_cgs = 0.35*pc
+    rcut_leafpart_cgs = 0.25*pc
     rcut_opennode = rcut_opennode_cgs/udist 
     rcut_leafpart = rcut_leafpart_cgs/udist 
     call prompt('Enter the tree accuracy for tree-walk',tree_accuracy_cmi,0.)
@@ -200,6 +200,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Calculate total mass required with npart_requested
     !
     totmass_req = np_req*pmass
+    !
+    ! Box density 
+    !
+    rhozero = rhozero_cgs/unit_density
     !
     ! Calculate volume needed
     !
@@ -292,6 +296,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     totmass = npart * massoftype(igas)
     !
+    ! Box density 
+    ! 
+    rhozero = rhozero_cgs/unit_density
+    !
     ! Calculate box size needed
     !
     vol_box   = totmass/rhozero
@@ -346,7 +354,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
  rho_sample     = npart_sample*massoftype(igas) / boxsize_sample**3.
  rho_sample_cgs = rho_sample*unit_density
- rhozero_cgs    = rhozero*unit_density   !- re-define since it's not written to .setup file
  print*,'required density:  ',rhozero_cgs,'g cm^-3'
  print*,'density from xyzh: ',rho_sample_cgs,'g cm^-3'
 
@@ -408,6 +415,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  else
     polyk = 0.
  endif
+
  !
  ! Set runtime parameters
  !
@@ -424,18 +432,19 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  ! Photoionization settings
  !
- monochrom_source  = .true.
- fix_temp_hii      = .true.
+ monochrom_source  = .false.
+ fix_temp_hii      = .true. 
+ implicit_cmi      = .true. 
  treat_Rtype_phase = .false.
 
  photoionize_tree  = .true.
- nHlimit_fac       = 100
+ nHlimit_fac       = 500
  rcut_opennode_cgs = rcut_opennode*udist 
  rcut_leafpart_cgs = rcut_leafpart*udist 
- delta_rcut_cgs    = 0.1*pc
+ delta_rcut_cgs    = 0.05*pc
 
  limit_voronoi = .true. 
- hlimit_fac = 1E-3
+ hlimit_fac = 1E-4
  extradist_fac = 1.0
 
  !- Print summary - for checking
@@ -482,7 +491,7 @@ subroutine write_setupfile(filename)
     call write_inopt(glass_filename,'glass_filename','filename of glass cube',iunit)
  endif
  call write_inopt(pmass,'pmass','particle mass',iunit)
- call write_inopt(rhozero,'rhozero','initial gas density',iunit)
+ call write_inopt(rhozero_cgs,'rhozero_cgs','initial gas density in g/cm^3',iunit)
  call write_inopt(cs0,'cs0','initial sound speed in code units',iunit)
  call write_inopt(dtmax,'dtmax','timestep in code units',iunit)
  call write_inopt(tmax,'tmax','end-time in code units',iunit)
@@ -528,7 +537,7 @@ subroutine read_setupfile(filename,ierr)
     call read_inopt(glass_filename,'glass_filename',db,errcount=nerr)
  endif
  call read_inopt(pmass,'pmass',db,min=0.,errcount=nerr)
- call read_inopt(rhozero,'rhozero',db,min=0.,errcount=nerr)
+ call read_inopt(rhozero_cgs,'rhozero_cgs',db,min=0.,errcount=nerr)
  call read_inopt(cs0,'cs0',db,min=0.,errcount=nerr)
  call read_inopt(dtmax,'dtmax',db,min=0.,errcount=nerr)
  call read_inopt(tmax,'tmax',db,min=0.,errcount=nerr)
