@@ -8,10 +8,15 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-partnumsets = ['ten5particles','ten6particles'] #,'ten7particles']
-totpart = [97336,1000000] #,9938375]
-colours = ['red','blue'] #,'black']
-labels = [r'$0.97\times10^5$'+' particles', r'$1.00\times10^6$'+' particles'] #,r'$0.99\times10^7$'+' particles']
+partnumsets = ['ten5particles','ten6particles','ten7particles']
+totpart = [97336,1000000,9938375]
+colours = ['red','blue','black']
+labels = [r'$0.97\times10^5$'+' particles', r'$1.00\times10^6$'+' particles',r'$0.99\times10^7$'+' particles']
+
+partnumsets.reverse()  # plot ten5particles curve on top
+totpart.reverse()
+colours.reverse()
+labels.reverse()
 
 
 def linear_func(x,k,c):
@@ -28,11 +33,13 @@ def get_avg_cputime_for_step(df,process):
         df_after = df[df['description'].str.contains(afterprocess)]
 
         cputime = df_after['cpu_elapsed'].to_numpy() - df_before['cpu_elapsed'].to_numpy()
+#        if (process=='_treewalk'):
+#            print(cputime)
 
     except: # for allparts runs 
         cputime = 0
 
-    return np.median(cputime), np.std(cputime)
+    return np.mean(cputime), np.std(cputime)
 
 
 def sort_array(array_ref,array_in):
@@ -44,7 +51,8 @@ def sort_array(array_ref,array_in):
 
 def main(): 
 
-    fig = plt.figure(figsize=[7,5])
+    fig = plt.figure(figsize=[9,6],dpi=200)
+
     ax1 = fig.add_subplot(221)  # total time 
     ax2 = fig.add_subplot(222)  # tree time 
     ax3 = fig.add_subplot(223)  # hsolve time
@@ -62,13 +70,11 @@ def main():
         # loop through each set 
         path = numpartdir+"/set*"
         for setname in glob.glob(path): 
+#            print(setname)
 
             # number of pseudo-particles 
             nppartfile = setname+"/nppart"
             nppart = np.loadtxt(nppartfile, unpack=True)
-            # number of cells 
-            ncellfile = setname+"/ncell"
-            ncell = np.loadtxt(ncellfile, unpack=True)
 
             # read runtime file 
             runtimefile = setname+"/cpu_wall_time_record.txt"
@@ -115,30 +121,55 @@ def main():
         stdcpu_cmi_set = sort_array(nppart_set,stdcpu_cmi_set)
         nppart_set = sort_array(nppart_set,nppart_set)
 
-        ax1.errorbar(nppart_set,meancpu_set,yerr=stdcpu_set,marker='s',markersize=1,elinewidth=1,color=colours[c], label=labels[c])
-        ax2.errorbar(nppart_set,meancpu_tree_set,yerr=stdcpu_tree_set,marker='s',markersize=1,elinewidth=1,color=colours[c], label=labels[c])
-        ax3.errorbar(nppart_set,meancpu_hsol_set,yerr=stdcpu_hsol_set,marker='s',markersize=1,elinewidth=1,color=colours[c], label=labels[c])
-        ax4.errorbar(nppart_set,meancpu_cmi_set,yerr=stdcpu_cmi_set,marker='s',markersize=1,elinewidth=1,color=colours[c], label=labels[c])
+        ax1.errorbar(nppart_set,meancpu_set,yerr=stdcpu_set,fmt='s',markersize=2,elinewidth=1,color=colours[c],label=labels[c])
+        ax1.scatter(nppart_set[-1],meancpu_set[-1],marker='*',s=20,color=colours[c])
+        ax2.errorbar(nppart_set,meancpu_tree_set,yerr=stdcpu_tree_set,fmt='s',markersize=2,elinewidth=1,color=colours[c],label=labels[c])
+        ax3.errorbar(nppart_set,meancpu_hsol_set,yerr=stdcpu_hsol_set,fmt='s',markersize=2,elinewidth=1,color=colours[c],label=labels[c])
+        ax4.errorbar(nppart_set,meancpu_cmi_set,yerr=stdcpu_cmi_set,fmt='s',markersize=2,elinewidth=1,color=colours[c],label=labels[c])
+        ax4.scatter(nppart_set[-1],meancpu_cmi_set[-1],marker='*',s=20,color=colours[c])
 
         c += 1
 
-    ax1.set_ylabel('Total CPU time')
+    ax1.set_ylabel('CPU time [s]')
+    ax1.set_xlabel('Number of pseudo-particles')
+    ax1.set_xlim([2.7e3,2e7])
+    ax1.set_ylim([5e2,1.5e5])
     ax1.set_xscale('log')
     ax1.set_yscale('log')
+    ax1.text(5e3,6e4,'Total')
+    ax1.legend(loc='lower right',fontsize=8)
 
-    ax2.set_ylabel('Tree-walk CPU time')
+    ax2.set_ylabel('CPU time [s]')
+    ax2.set_xlabel('Number of pseudo-particles')
+    ax2.set_xlim([2.7e3,2e7])
+    ax2.set_ylim([8e-3,2e1])
     ax2.set_xscale('log')
     ax2.set_yscale('log')
+    ax2.text(5e3,6e0,'Tree-walk')
+    ax2.legend(loc='lower right',fontsize=8)
 
-    ax3.set_ylabel('h-solve CPU time')
+    ax3.set_ylabel('CPU time [s]')
+    ax3.set_xlabel('Number of pseudo-particles')
+    ax3.set_xlim([2.7e3,2e7])
+    ax3.set_ylim([2e-1,2e5])
     ax3.set_xscale('log')
     ax3.set_yscale('log')
+    ax3.text(5e3,3e4,'Smoothing length iterate')
+    ax3.text(5e3,8e3,'(with Neighbour-find)')
+    ax3.legend(loc='lower right',fontsize=8)
 
-    ax4.set_ylabel('CMI CPU time')
+    ax4.set_ylabel('CPU time [s]')
+    ax4.set_xlabel('Number of pseudo-particles')
+    ax4.set_xlim([2.7e3,2e7])
+    ax4.set_ylim([5e2,2e5])
     ax4.set_xscale('log')
     ax4.set_yscale('log')
+    ax4.text(5e3,8e4,'Density-mapping + MCRT')
+    ax4.legend(loc='lower right',fontsize=8)
 
 
+    fig.tight_layout()
+    plt.savefig('turbbox_runtimes.png')
     plt.show()
 
 
