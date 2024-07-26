@@ -414,24 +414,16 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
     if (gr) vxyzu = vpred ! May need primitive variables elsewhere?
  endif
 
+
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !
-! Update vxyzu as well using the du_cmi(:) returned from photoionize_cmi
-!- BOTH vpred and vxyzu need to be updated by CMI-call such that the heating is effectively
-!  done at the location of implicit cooling i.e. before predict_sph, but actually computed after
-!  the tree-build and density-iterate since photoionize_cmi routines require so.
-!
-#ifdef PHOTOION
- if (implicit_cmi) then
-    !$omp parallel do default(none) shared(npart,vpred,vxyzu,xyzh,du_cmi) &
-    !$omp private(i)
-    do i = 1,npart
-       if (.not.isdead_or_accreted(xyzh(4,i))) then
-          vxyzu(4,i) = vxyzu(4,i) + du_cmi(i)
-       endif
-    enddo
-    !$omp end parallel do
- endif
-#endif
+!WAS HERE
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+
 
 !
 ! if using super-timestepping, determine what dt will be used on the next loop
@@ -707,6 +699,29 @@ subroutine step(npart,nactive,t,dtsph,dtextforce,dtnew)
 
     endif
  enddo iterations
+
+
+!
+! Update vxyzu as well using the du_cmi(:) returned from photoionize_cmi
+!- BOTH vpred and vxyzu need to be updated by CMI-call such that the heating is effectively
+!  done at the location of implicit cooling i.e. before predict_sph, but actually computed after
+!  the tree-build and density-iterate since photoionize_cmi routines require so.
+!
+#ifdef PHOTOION
+ if (implicit_cmi) then
+    !$omp parallel do default(none) shared(npart,vpred,vxyzu,xyzh,du_cmi) &
+    !$omp private(i)
+    do i = 1,npart
+       if (.not.isdead_or_accreted(xyzh(4,i))) then
+          vxyzu(4,i) = vxyzu(4,i) + du_cmi(i)
+       endif
+    enddo
+    !$omp end parallel do
+ endif
+#endif
+
+
+
  ! Summary statements & crash if velocity is not converged
  if (nwake    > 0) call summary_variable('wake', iowake,    0,real(nwake)    )
  if (nvfloorp > 0) call summary_variable('floor',iosumflrp, 0,real(nvfloorp) )
