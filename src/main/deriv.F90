@@ -189,7 +189,7 @@ subroutine derivs(icall,npart,nactive,xyzh,vxyzu,fxyzu,fext,divcurlv,divcurlB,&
     !- Compute du_cmi and update vxyzu (ie. vpred) if implicit
     if (implicit_cmi) call energ_implicit_cmi(time,npart,xyzh,vxyzu,dt)
  endif
- ! Compute dudt_cmi if explicit (done in both icall=1 and icall=2)
+ ! Compute dudt_cmi if explicit (done in both icall=1 and icall=2) 
  if (.not.implicit_cmi) call energ_explicit_cmi(npart,xyzh,vxyzu,dt)
 
  if (iverbose > 0) then

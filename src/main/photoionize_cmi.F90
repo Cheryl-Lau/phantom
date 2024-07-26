@@ -163,7 +163,7 @@ module photoionize_cmi
 
  integer, parameter :: maxoutfile_ult = 99999
  integer :: maxoutfile = 5000         ! max number of (ni)xyzhmnH output files
- integer :: ncall_writefile = 100     ! interval to write (ni)xyzhmnH output file
+ integer :: ncall_writefile = 1       ! interval to write (ni)xyzhmnH output file
  integer :: icall,iunit,ifile,iruncmi
  integer :: ncall_checktreewalk = 50  ! interval to check for unnecessarily-opened nodes
  integer :: nphotosrc_old
@@ -182,7 +182,7 @@ module photoionize_cmi
  logical :: print_cmi   = .false.          ! show CMI shell outputs
  logical :: write_nH_u_distri  = .false.   ! write u of particles vs nH
  logical :: write_node_prop    = .true.    ! write properties of the current set of cmi-nodes
- logical :: plot_cropped_sites = .true.    ! write properties of the current cropped set of cmi-nodes
+ logical :: plot_cropped_sites = .false.   ! write properties of the current cropped set of cmi-nodes
  logical :: catch_noroot_parts = .false.   ! write particles with no therm-equil roots
 
 contains
@@ -957,8 +957,9 @@ subroutine energ_explicit_cmi(npart,xyzh,vxyzu,dt)
  !$omp end parallel do
 
  if (npart_heated == 0) then
-    call warning('photoionize_cmi','no ionized particles')
+    call warning('photoionize_cmi','No ionized particles')
  else
+    print*,'Number of particles heated:   ',npart_heated
     uhii_mean = uhii_mean/npart_heated
     temp_ionized = uhii_mean/kboltz*(gmw*mass_proton_cgs*(gamma-1.))*unit_ergg
     print*,'Current temp of HII region [K]: ',temp_ionized

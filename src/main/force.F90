@@ -2449,7 +2449,7 @@ subroutine finish_cell_and_store_results(icall,cell,fxyzu,xyzh,vxyzu,poten,dt,dv
  use part,           only:Omega_k
 #endif
 #ifdef PHOTOION
- use photoionize_cmi,only:implicit_cmi,dudt_cmi
+ use photoionize_cmi,only:implicit_cmi,dudt_cmi,nphotosrc
  use heatcool_cmi,   only:stop_cooling
 #endif
  use io,             only:warning
@@ -2816,7 +2816,7 @@ subroutine finish_cell_and_store_results(icall,cell,fxyzu,xyzh,vxyzu,poten,dt,dv
              endif
 #ifdef PHOTOION
              ! Apply photoionization explicit u-update
-             if (.not.implicit_cmi) fxyz4 = fxyz4 + dudt_cmi(i)
+             if (.not.implicit_cmi .and. nphotosrc > 0) fxyz4 = fxyz4 + dudt_cmi(i)
 #endif
           endif
           if (maxvxyzu >= 4) fxyzu(4,i) = fxyz4
