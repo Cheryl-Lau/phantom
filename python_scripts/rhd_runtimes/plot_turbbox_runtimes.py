@@ -122,11 +122,11 @@ def main():
         nppart_set = sort_array(nppart_set,nppart_set)
 
         ax1.errorbar(nppart_set,meancpu_set,yerr=stdcpu_set,fmt='s',markersize=2,elinewidth=1,color=colours[c],label=labels[c])
-        ax1.scatter(nppart_set[-1],meancpu_set[-1],marker='*',s=20,color=colours[c])
+        ax1.scatter(nppart_set[-1],meancpu_set[-1],marker='*',s=25,color=colours[c])
         ax2.errorbar(nppart_set,meancpu_tree_set,yerr=stdcpu_tree_set,fmt='s',markersize=2,elinewidth=1,color=colours[c],label=labels[c])
         ax3.errorbar(nppart_set,meancpu_hsol_set,yerr=stdcpu_hsol_set,fmt='s',markersize=2,elinewidth=1,color=colours[c],label=labels[c])
         ax4.errorbar(nppart_set,meancpu_cmi_set,yerr=stdcpu_cmi_set,fmt='s',markersize=2,elinewidth=1,color=colours[c],label=labels[c])
-        ax4.scatter(nppart_set[-1],meancpu_cmi_set[-1],marker='*',s=20,color=colours[c])
+        ax4.scatter(nppart_set[-1],meancpu_cmi_set[-1],marker='*',s=25,color=colours[c])
 
         c += 1
 
@@ -154,17 +154,17 @@ def main():
     ax3.set_ylim([2e-1,2e5])
     ax3.set_xscale('log')
     ax3.set_yscale('log')
-    ax3.text(5e3,3e4,'Smoothing length iterate')
+    ax3.text(5e3,3e4,'Smoothing length solver')
     ax3.text(5e3,8e3,'(with Neighbour-find)')
     ax3.legend(loc='lower right',fontsize=8)
 
     ax4.set_ylabel('CPU time [s]')
     ax4.set_xlabel('Number of pseudo-particles')
     ax4.set_xlim([2.7e3,2e7])
-    ax4.set_ylim([5e2,2e5])
+    ax4.set_ylim([5e2,1.5e5])
     ax4.set_xscale('log')
     ax4.set_yscale('log')
-    ax4.text(5e3,8e4,'Density-mapping + MCRT')
+    ax4.text(5e3,6e4,'Density-mapping + MCRT')
     ax4.legend(loc='lower right',fontsize=8)
 
 
