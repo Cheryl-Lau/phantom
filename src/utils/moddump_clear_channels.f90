@@ -27,12 +27,12 @@ module moddump
  real   :: pfrac_chnl = 0.9999
 
  integer, parameter :: nchnl = 6
- real   :: rchnl_vec(3,nchnl) = reshape((/ 1,0,0,     &
-                                          -1,0,0,     &
+ real   :: rchnl_vec(3,nchnl) = reshape((/ 1,0,0,    &
+                                           -1,0,0,     &
                                            0,0,1,     &
                                            0,0,-1,    &
-                                           0,1,0,     & 
-                                           0,-1,0 /), &
+                                           0,1,0,   & 
+                                           0,-1,0   /), &
                                          shape=(/3,nchnl/))
 
 contains
