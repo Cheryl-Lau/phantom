@@ -39,7 +39,7 @@ module hnode_cmi
 
  private
  integer, parameter :: maxnodeneigh   = 1E7
- integer, parameter :: neighcachesize = 1E7 ! 5000
+ integer, parameter :: neighcachesize = 1E5 ! 5000
  integer, parameter :: maxkmid = 1024
 
 contains
