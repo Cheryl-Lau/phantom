@@ -152,7 +152,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Density
     !
-    rhozero_cgs = 1E-19  ! 5.21E-21
+    rhozero_cgs = 1E-18  ! 5.21E-21
     call prompt('Enter initial density in g/cm^3',rhozero_cgs,0.)
     print*,'read density:',rhozero_cgs 
     !
@@ -173,9 +173,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Set tree accuracy parameters 
     ! 
-    tree_accuracy_cmi = 0.1 
-    rcut_opennode_cgs = 0.1*pc
-    rcut_leafpart_cgs = 0.05*pc
+    tree_accuracy_cmi = 0.2
+    rcut_opennode_cgs = 0.05*pc
+    rcut_leafpart_cgs = 0.02*pc
     rcut_opennode = rcut_opennode_cgs/udist 
     rcut_leafpart = rcut_leafpart_cgs/udist 
     call prompt('Enter the tree accuracy for tree-walk',tree_accuracy_cmi,0.)
