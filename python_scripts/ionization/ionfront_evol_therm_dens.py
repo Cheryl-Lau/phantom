@@ -29,8 +29,9 @@ plot_spitzer = True
 
 def main():
 
-    fig, axs = plt.subplots(nrows=1, ncols=4, figsize=(15, 4))
-    plt.subplots_adjust(hspace=0.5)
+    fig, axs = plt.subplots(nrows=2, ncols=2, figsize=(9, 8))
+#    plt.subplots_adjust(hspace=1.0)
+
 
     # loop through densities 
     t = 0
@@ -41,8 +42,19 @@ def main():
         maxr = 0
         for therm_dir in therm_dirs:
             path = rho_dir+"/"+therm_dir
-            print(path)
-            time, ionrad, spitzrad, hosoinurad = extract_data(path,rhozero)
+
+            filename = rho_dir+"_"+therm_dir+"_radevol.dat"
+            print(filename)
+            file_exist = os.path.isfile("./"+filename)
+            if file_exist == True:
+                # read from file 
+                time, ionrad, spitzrad, hosoinurad = np.loadtxt(filename,unpack=True)
+            else:
+                # compute ion-rad from nixyzhmf_*
+                time, ionrad, spitzrad, hosoinurad = extract_data(path,rhozero)
+                # save to file 
+                ionrad_data = np.column_stack([time, ionrad, spitzrad, hosoinurad])
+                np.savetxt(filename,ionrad_data)
 
             ax.plot(time,ionrad,linewidth=1.0,color=colours[c],label=labels[c])
             c += 1 
@@ -53,6 +65,8 @@ def main():
 
         ax.set_title(texts[t])
         ax.legend(loc = 'upper left')
+        ax.set_xlabel('Time [Myr]')
+        ax.set_ylabel('Ionization front radius [pc]')
         t += 1
 
     plt.savefig('ionrad.png')
@@ -77,7 +91,10 @@ def extract_data(pardir,rhozero):
         
         time_cgs = np.loadtxt(filename,max_rows=1,skiprows=1)
 
-        nixyzhmf = np.loadtxt(filename,skiprows=3)
+        try:
+            nixyzhmf = np.loadtxt(filename,skiprows=3)
+        except ValueError:
+            print('Unable to load: ',filename)
         x = nixyzhmf[:,2]
         y = nixyzhmf[:,3]
         z = nixyzhmf[:,4]
