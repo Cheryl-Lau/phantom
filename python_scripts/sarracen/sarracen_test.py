@@ -6,7 +6,15 @@ import inspect
 
 sdf = sarracen.read_phantom('turbbox_00067')
 
-#info = sdf.describe()
+info = sdf.describe()
+
+# Get dumpfile info 
+params_dict = sdf.params 
+time = params_dict['time']
+npart = params_dict['npartoftype']
+gamma = params_dict['gamma']
+pmass = params_dict['massoftype']
+
 
 # Calculate extra quantities 
 sdf.calc_density()
@@ -24,8 +32,11 @@ unit_density = 6.768e-23
 unit_velocity = 6.558e+3
 unit_ergg = 4.301e+7
 
+time = time*utime
 sdf['rho'] = sdf['rho']*unit_density 
 sdf['u'] = sdf['u']*unit_ergg
+
+time_Myr = time/(1e6*365*24*60*60)
 
 
 
@@ -35,7 +46,7 @@ ax1 = sdf.render('rho', ax=ax1, xlim=(-1, 1), ylim=(-1, 1), log_scale=True, cmap
 
 ax1.set_xlabel('x [pc]')
 ax1.set_ylabel('y [pc]')
-
+ax1.text(-0.9,0.9,'t = '+str(round(time_Myr,3))+' Myr',color='white')
 
 ax2 = sdf.render('u', ax=ax2, xlim=(-1, 1), ylim=(-1, 1), log_scale=True, cmap='plasma', vmin=1e3, vmax=1e19, cbar_kws=dict(label='log col-etherm',orientation='vertical',shrink=0.9,pad=0.03), dens_weight=True)
 
