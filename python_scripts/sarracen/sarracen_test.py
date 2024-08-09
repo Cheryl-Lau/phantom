@@ -16,17 +16,28 @@ sdf['P'] = sdf['u'] * sdf['rho'] * (sdf.params['gamma'] - 1.0)
 print(sdf.columns.tolist())
 
 
+# Convert to cgs units (pc;solarm)
+utime = 4.706e14
+udist = 3.086e+19
+umass = 1.989e+33
+unit_density = 6.768e-23
+unit_velocity = 6.558e+3
+unit_ergg = 4.301e+7
+
+sdf['rho'] = sdf['rho']*unit_density 
+sdf['u'] = sdf['u']*unit_ergg
+
 
 
 fig, (ax1,ax2) = plt.subplots(ncols=2, figsize=(12,5))
 
-ax1 = sdf.render('rho', ax=ax1, xlim=(-1, 1), ylim=(-1, 1), log_scale=True, cmap='gist_heat', vmin=1e-1, vmax=1e4, cbar_kws=dict(label='log col-dens',orientation='vertical',shrink=0.9,pad=0.03))
+ax1 = sdf.render('rho', ax=ax1, xlim=(-1, 1), ylim=(-1, 1), log_scale=True, cmap='gist_heat', vmin=1e-12, vmax=1e5, cbar_kws=dict(label='log col-dens',orientation='vertical',shrink=0.9,pad=0.03))
 
 ax1.set_xlabel('x [pc]')
 ax1.set_ylabel('y [pc]')
 
 
-ax2 = sdf.render('u', ax=ax2, xlim=(-1, 1), ylim=(-1, 1), log_scale=True, cmap='plasma', vmin=1e-1, vmax=1e10, cbar_kws=dict(label='log col-etherm',orientation='vertical',shrink=0.9,pad=0.03), dens_weight=True)
+ax2 = sdf.render('u', ax=ax2, xlim=(-1, 1), ylim=(-1, 1), log_scale=True, cmap='plasma', vmin=1e3, vmax=1e19, cbar_kws=dict(label='log col-etherm',orientation='vertical',shrink=0.9,pad=0.03), dens_weight=True)
 
 ax2.set_xlabel('x [pc]')
 ax2.set_ylabel(' ')
