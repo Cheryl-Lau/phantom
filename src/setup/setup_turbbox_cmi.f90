@@ -139,7 +139,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        ! Set number of particles (to be updated after set_unifdis)
        !
        npmax = int(size(xyzh(1,:)))
-       np_req = 1E7
+       np_req = 1E6
        call prompt('Enter total number of particles',np_req,1)
        if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
     else
@@ -159,7 +159,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Density
     !
-    rhozero_cgs = 5.21E-21
+    rhozero_cgs = 1E-19  !5.21E-21
     rhozero = rhozero_cgs/unit_density
     call prompt('Enter initial density in code units',rhozero,0.)
     !
@@ -171,8 +171,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Set timestep and end-time
     !
-    dtmax_cgs = 3.15360E-1 ! 3.15360E9   ! 1E-4 Myr
-    tmax_cgs  = 1e20*dtmax_cgs
+    dtmax_cgs = 3.15360E9   ! 1E-4 Myr
+    tmax_cgs  = 1e3*dtmax_cgs
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)
@@ -181,8 +181,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set tree accuracy parameters 
     ! 
     tree_accuracy_cmi = 0.1 
-    rcut_opennode_cgs = 0.5*pc
-    rcut_leafpart_cgs = 0.4*pc
+    rcut_opennode_cgs = 0.1*pc
+    rcut_leafpart_cgs = 0.05*pc
     rcut_opennode = rcut_opennode_cgs/udist 
     rcut_leafpart = rcut_leafpart_cgs/udist 
     call prompt('Enter the tree accuracy for tree-walk',tree_accuracy_cmi,0.)
@@ -457,7 +457,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  ieos      = 2     ! adiabatic eos
  nout      = 1
- nmaxdumps = 20
+ nmaxdumps = 100
  nfulldump = 1
  Tfloor    = 3.
  ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
@@ -479,8 +479,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  nHlimit_fac       = 100
  rcut_opennode_cgs = rcut_opennode*udist 
  rcut_leafpart_cgs = rcut_leafpart*udist 
- delta_rcut_cgs    = 0.1*pc
- auto_opennode     = .false. 
+ delta_rcut_cgs    = 0.01*pc
+ auto_opennode     = .true. 
 
  limit_voronoi = .true. 
  hlimit_fac = 1E-3

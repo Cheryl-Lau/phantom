@@ -117,7 +117,7 @@ module photoionize_cmi
  real,    public :: crop_fac     = 1.2          ! bounds = crop_fac*rcut_opennode (>1)
  logical, public :: crop_domain  = .false.
 
- ! Options for modifying the voronoi grid to merge the smallest cells
+ ! Options for modifying the voronoi grid to merge the smallest cells (to avoid segfault; use with caution)
  logical, public :: limit_voronoi = .true.
  real,    public :: hlimit_fac    = 1E-3    ! threshold in h to merge 
  real,    public :: extradist_fac = 2.0     ! merging distance factor (>= 1.)

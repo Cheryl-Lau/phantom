@@ -846,7 +846,7 @@ endif
 ifeq ($(SETUP), rhdturbbox)
 #	 starbench but with turbulence 
     SETUPFILE=velfield_fromcubes.f90 setup_turbbox_cmi.f90
-    ANALYSIS=analysis_partinfo.f90
+    ANALYSIS=analysis_ionizedmass.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE=yes
