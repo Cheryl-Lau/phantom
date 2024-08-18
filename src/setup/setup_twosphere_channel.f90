@@ -593,7 +593,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
     ieos      = 2    ! adiabatic eos with P = (gamma-1)*rho*u
     gmw       = gmw_in
-    icooling  = 7
+    icooling  = 0
     Tfloor    = 3.
     ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
     ipdv_heating   = 1
@@ -636,7 +636,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Photoionization settings
     !
-    inject_rad  = .true.
+    inject_rad  = .false.
     sink_ionsrc = .true. 
     one_sink_ionsrc = .true. 
     isink_ionsrc    = 1
@@ -661,8 +661,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     one_sink_progenitor = .true.
     isink_progenitor = 1
     delay_sn_injection = .false. 
-    frackin = 1.
-    fractherm = 0.
+    frackin = 0.
+    fractherm = 1.
 
  endif
 
