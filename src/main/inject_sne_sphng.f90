@@ -46,8 +46,8 @@ module inject
  logical, public :: one_sink_progenitor = .false.
  integer, public :: isink_progenitor = 5
 
- logical, public :: delay_sn_injection = .true.
- logical, public :: delay_tensteps = .false.    ! force inject SN 10 steps later - testing
+ logical, public :: delay_sn_injection  = .true.
+ logical, public :: delay_by_mslifetime = .false.   ! delay SN inject by MS lifetime, else 10 dtmax
 
  private
 
@@ -438,11 +438,11 @@ subroutine check_sink(xyzmh_ptmass,vxyz_ptmass,nptmass,pmsncrit,time)
        ! Time to inject sn - estimated using star MS lifetime (obtained by fitting Table 25.6, P.628, Maeder 2009)
        !
        if (delay_sn_injection) then 
-          if (delay_tensteps) then 
-             t_ms_cgs = (10.*dtmax)*utime
-          else 
+          if (delay_by_mslifetime) then 
              mptmass_solarm = mptmass*umass/solarm
              t_ms_cgs = (1.165E8/(mptmass_solarm-4.242) + 1.143E6) *365*24*3600
+          else 
+             t_ms_cgs = (10.*dtmax)*utime   ! any number of dtmax
           endif 
           write(*,'(1x,a5,i4,a38,f5.2,a4)') 'Sink ',ip,' set as progenitor - detonating after ',t_ms_cgs/(1E6*365*24*3600),' Myr'
           t_sn = time + t_ms_cgs/utime
@@ -660,8 +660,8 @@ subroutine write_options_inject(iunit)
  call write_inopt(r_sn_cgs,'r_sn_cgs','blast radius of supernova',iunit)
  call write_inopt(maxsn,'maxsn','maximum number of supernovae at a time',iunit)
  call write_inopt(pmsncrit_cgs,'pmsncrit_cgs','critical mass of sinks',iunit)
- call write_inopt(delay_sn_injection,'delay_sn_injection','delay injection by MS lifetime',iunit)
- call write_inopt(delay_tensteps,'delay_tensteps','delay injection by 10 dtmax',iunit)
+ call write_inopt(delay_sn_injection,'delay_sn_injection','delay injection',iunit)
+ call write_inopt(delay_by_mslifetime,'delay_by_mslifetime','delay injection by MS lifetime',iunit)
 
 end subroutine write_options_inject
 
@@ -722,8 +722,8 @@ subroutine read_options_inject(name,valstring,imatch,igotall,ierr)
  case('delay_sn_injection')
     read(valstring,*,iostat=ierr) delay_sn_injection
     ngot = ngot + 1
- case('delay_tensteps')
-    read(valstring,*,iostat=ierr) delay_tensteps
+ case('delay_by_mslifetime')
+    read(valstring,*,iostat=ierr) delay_by_mslifetime
     ngot = ngot + 1
 
  case default
