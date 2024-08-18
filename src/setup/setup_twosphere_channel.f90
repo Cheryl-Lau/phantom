@@ -88,7 +88,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use photoionize_cmi, only:sink_ionsrc,sink_as_cluster,inject_rad,one_sink_ionsrc,isink_ionsrc
  use inject,          only:inject_sn,sink_progenitor,frackin,fractherm 
  use inject,          only:one_sink_progenitor,isink_progenitor 
- use inject,          only:delay_sn_injection
+ use inject,          only:delay_sn_injection,delay_tensteps
  integer,           intent(in)    :: id
  integer,           intent(inout) :: npart
  integer,           intent(out)   :: npartoftype(:)
@@ -660,7 +660,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     sink_progenitor = .true.
     one_sink_progenitor = .true.
     isink_progenitor = 1
-    delay_sn_injection = .false. 
+    delay_sn_injection = .true. 
+    delay_tensteps = .true. 
     frackin = 0.
     fractherm = 1.
 

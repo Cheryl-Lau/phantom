@@ -47,6 +47,7 @@ module inject
  integer, public :: isink_progenitor = 5
 
  logical, public :: delay_sn_injection = .true.
+ logical, public :: delay_tensteps = .false.    ! force inject SN 10 steps later - testing
 
  private
 
@@ -415,9 +416,10 @@ end subroutine inject_particles
 !
 ! ----------------------------------------------------------------------------------
 subroutine check_sink(xyzmh_ptmass,vxyz_ptmass,nptmass,pmsncrit,time)
- use units,   only:utime,umass
- use physcon, only:solarm
- use io,      only:fatal
+ use units,    only:utime,umass
+ use physcon,  only:solarm
+ use io,       only:fatal
+ use timestep, only:dtmax
  integer, intent(in) :: nptmass
  real,    intent(in) :: pmsncrit,time
  real,    intent(in) :: xyzmh_ptmass(:,:),vxyz_ptmass(:,:)
@@ -436,8 +438,12 @@ subroutine check_sink(xyzmh_ptmass,vxyz_ptmass,nptmass,pmsncrit,time)
        ! Time to inject sn - estimated using star MS lifetime (obtained by fitting Table 25.6, P.628, Maeder 2009)
        !
        if (delay_sn_injection) then 
-          mptmass_solarm = mptmass*umass/solarm
-          t_ms_cgs = (1.165E8/(mptmass_solarm-4.242) + 1.143E6) *365*24*3600
+          if (delay_tensteps) then 
+             t_ms_cgs = (10.*dtmax)*utime
+          else 
+             mptmass_solarm = mptmass*umass/solarm
+             t_ms_cgs = (1.165E8/(mptmass_solarm-4.242) + 1.143E6) *365*24*3600
+          endif 
           write(*,'(1x,a5,i4,a38,f5.2,a4)') 'Sink ',ip,' set as progenitor - detonating after ',t_ms_cgs/(1E6*365*24*3600),' Myr'
           t_sn = time + t_ms_cgs/utime
        else 
@@ -655,6 +661,7 @@ subroutine write_options_inject(iunit)
  call write_inopt(maxsn,'maxsn','maximum number of supernovae at a time',iunit)
  call write_inopt(pmsncrit_cgs,'pmsncrit_cgs','critical mass of sinks',iunit)
  call write_inopt(delay_sn_injection,'delay_sn_injection','delay injection by MS lifetime',iunit)
+ call write_inopt(delay_tensteps,'delay_tensteps','delay injection by 10 dtmax',iunit)
 
 end subroutine write_options_inject
 
@@ -715,12 +722,15 @@ subroutine read_options_inject(name,valstring,imatch,igotall,ierr)
  case('delay_sn_injection')
     read(valstring,*,iostat=ierr) delay_sn_injection
     ngot = ngot + 1
+ case('delay_tensteps')
+    read(valstring,*,iostat=ierr) delay_tensteps
+    ngot = ngot + 1
 
  case default
     imatch = .false.
  end select
 
- noptions = 11
+ noptions = 12
  igotall  = (ngot >= noptions)
 
 end subroutine read_options_inject
