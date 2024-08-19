@@ -816,7 +816,7 @@ endif
 ifeq ($(SETUP), starbench)
 #	 Benchmark test for the Phantom-CMI RHD scheme
     SETUPFILE=setup_unifdis_cmi.f90
-    ANALYSIS=analysis_partinfo.f90
+    ANALYSIS=analysis_hiiregion_temp.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE=yes
@@ -831,7 +831,7 @@ endif
 ifeq ($(SETUP), starbench_hpc)
 #	 Benchmark test for the Phantom-CMI RHD scheme
     SETUPFILE=setup_unifdis_cmi.f90
-    ANALYSIS=analysis_partinfo.f90
+    ANALYSIS=analysis_hiiregion_temp.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE_KENNEDY=yes
@@ -950,7 +950,7 @@ ifeq ($(SETUP), sncavity)
     SETUPFILE=velfield_fromcubes.f90 setup_twosphere_channel.f90
     SRCINJECT=inject_sne_sphng.f90
     ANALYSIS=analysis_velfield.f90
-    MODFILE=moddump_clear_channels.f90
+    MODFILE=moddump_addsink.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE=yes
