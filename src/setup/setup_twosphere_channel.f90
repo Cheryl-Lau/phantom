@@ -593,7 +593,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
     ieos      = 2    ! adiabatic eos with P = (gamma-1)*rho*u
     gmw       = gmw_in
-    icooling  = 0
+    icooling  = 7
     Tfloor    = 3.
     ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
     ipdv_heating   = 1
@@ -656,14 +656,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Supernova settings
     !
-    inject_sn = .false.
+    inject_sn = .true.
     sink_progenitor = .true.
     one_sink_progenitor = .true.
     isink_progenitor = 1
     delay_sn_injection = .true. 
     delay_by_mslifetime = .false. 
-    frackin = 0.
-    fractherm = 1.
+    frackin = 1.
+    fractherm = 0.
 
  endif
 
