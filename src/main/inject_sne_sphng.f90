@@ -180,7 +180,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  integer, intent(inout) :: npart
  integer, intent(inout) :: npartoftype(:)
  real,    intent(out)   :: dtinject
- integer  :: ipart,isn,iadd,ia,ip,ii,icf,iallsn
+ integer  :: ipart,isn,iadd,ia,ip,ii,icf,iallsn,ip 
  integer  :: npartold,nsn,nkilled,npartsn,ipartsn,progindex,iprog_sn(maxsn),iinsert_sn(maxsn)
  integer  :: i_rightcand,iEk
  integer  :: indexallsn(maxsn)
@@ -341,16 +341,16 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
              ipartsn = ipartsn + 1
           enddo over_partsn
        enddo over_partsngroup
-       !
-       ! Put nearby particles around r_sn to smallest timestep to avoid being 'shocked'
-       !
-       over_nearbyparts: do in = 1,npart
-          dist_nearby = mag(xyzh(1:3,in) - xyz_sn(1:3,isn))
-          if (dist_nearby > r_sn .and. dist_nearby <= r_sn+5.0) then
-             call add_or_update_particle(igas,xyzh(1:3,in),vxyzu(1:3,in),xyzh(4,in),vxyzu(4,in),in,&
-                                         npart,npartoftype,xyzh,vxyzu)
-          endif
-       enddo over_nearbyparts
+ !      !
+ !      ! Put nearby particles around r_sn to smallest timestep to avoid being 'shocked'
+ !      !
+ !      over_nearbyparts: do ip = 1,npart
+ !         dist_nearby = mag(xyzh(1:3,in) - xyz_sn(1:3,isn))
+ !         if (dist_nearby > r_sn .and. dist_nearby <= r_sn+2.0) then
+ !            call add_or_update_particle(igas,xyzh(1:3,in),vxyzu(1:3,in),xyzh(4,in),vxyzu(4,in),in,&
+ !                                        npart,npartoftype,xyzh,vxyzu)
+ !         endif
+ !      enddo over_nearbyparts
        !
        ! Flag to avoid further detonation
        !
