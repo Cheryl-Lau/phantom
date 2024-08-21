@@ -218,15 +218,6 @@ subroutine evol(infile,logfile,evfile,dumpfile)
 !
  timestepping: do while ((time < tmax).and.((nsteps < nmax) .or.  (nmax < 0)).and.(rhomaxnow*rhofinal1 < 1.0))
 
-#ifdef INJECT_PARTICLES
-    !
-    ! injection of new particles into simulation
-    !
-    npart_old=npart
-    call inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,npart,npartoftype,dtinject)
-    call update_injected_particles(npart_old,npart,istepfrac,nbinmax,time,dtmax,dt,dtinject)
-#endif
-
 
     dtmaxold    = dtmax
 #ifdef IND_TIMESTEPS
@@ -290,7 +281,14 @@ subroutine evol(infile,logfile,evfile,dumpfile)
 
 
 
-   !! INJECT WAS MOVED TO HERE
+#ifdef INJECT_PARTICLES
+    !
+    ! injection of new particles into simulation
+    !
+    npart_old=npart
+    call inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,npart,npartoftype,dtinject)
+    call update_injected_particles(npart_old,npart,istepfrac,nbinmax,time,dtmax,dt,dtinject)
+#endif
 
     dtlast = dt
 
