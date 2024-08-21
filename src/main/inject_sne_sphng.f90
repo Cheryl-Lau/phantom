@@ -185,7 +185,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  integer  :: i_rightcand,iEk
  integer  :: indexallsn(maxsn)
  real     :: xyz_sn(3,maxsn),vxyz_sn(3,maxsn),m_sn(maxsn),h_sn(maxsn),mradsn,engkin,engtherm,numden,t_sn
- real     :: xyz_partsn(3),vxyz_partsn(3),xyz_ref(3,6),r_ref,hnew,unew,dist!,dist_nearby
+ real     :: xyz_partsn(3),vxyz_partsn(3),xyz_ref(3,6),r_ref,hnew,unew,dist,dist_nearby
  real     :: vrad,a_vrad,r_vrad,aN_scalefactor
  real     :: ekintot,ethermtot,etot_allparts_old,etot_allparts,endiff_cgs
  logical  :: timematch_inject,queueflag_iallsn
@@ -341,16 +341,16 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
              ipartsn = ipartsn + 1
           enddo over_partsn
        enddo over_partsngroup
-!       !
-!       ! Put nearby particles around r_sn to smallest timestep to avoid being 'shocked'
-!       !
-!       over_nearbyparts: do in = 1,npart
-!          dist_nearby = mag(xyzh(1:3,in) - xyz_sn(1:3,isn))
-!          if (dist_nearby > r_sn .and. dist_nearby <= r_sn+2.0) then
-!             call add_or_update_particle(igas,xyzh(1:3,in),vxyzu(1:3,in),xyzh(4,in),vxyzu(4,in),in,&
-!                                         npart,npartoftype,xyzh,vxyzu)
-!          endif
-!       enddo over_nearbyparts
+       !
+       ! Put nearby particles around r_sn to smallest timestep to avoid being 'shocked'
+       !
+       over_nearbyparts: do in = 1,npart
+          dist_nearby = mag(xyzh(1:3,in) - xyz_sn(1:3,isn))
+          if (dist_nearby > r_sn .and. dist_nearby <= r_sn+5.0) then
+             call add_or_update_particle(igas,xyzh(1:3,in),vxyzu(1:3,in),xyzh(4,in),vxyzu(4,in),in,&
+                                         npart,npartoftype,xyzh,vxyzu)
+          endif
+       enddo over_nearbyparts
        !
        ! Flag to avoid further detonation
        !
