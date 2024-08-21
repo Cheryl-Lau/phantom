@@ -180,7 +180,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  integer, intent(inout) :: npart
  integer, intent(inout) :: npartoftype(:)
  real,    intent(out)   :: dtinject
- integer  :: ipart,isn,iadd,ia,ip,ii,icf,iallsn,ip 
+ integer  :: ipart,isn,iadd,ia,ip,ii,icf,iallsn
  integer  :: npartold,nsn,nkilled,npartsn,ipartsn,progindex,iprog_sn(maxsn),iinsert_sn(maxsn)
  integer  :: i_rightcand,iEk
  integer  :: indexallsn(maxsn)
