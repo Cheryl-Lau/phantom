@@ -282,12 +282,14 @@ subroutine evol(infile,logfile,evfile,dumpfile)
 
 
 #ifdef INJECT_PARTICLES
-    !
-    ! injection of new particles into simulation
-    !
-    npart_old=npart
-    call inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,npart,npartoftype,dtinject)
-    call update_injected_particles(npart_old,npart,istepfrac,nbinmax,time,dtmax,dt,dtinject)
+    if (istepfrac==2**nbinmax) then
+       !
+       ! injection of new particles into simulation
+       !
+       npart_old=npart
+       call inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,npart,npartoftype,dtinject)
+       call update_injected_particles(npart_old,npart,istepfrac,nbinmax,time,dtmax,dt,dtinject)
+    endif 
 #endif
 
     dtlast = dt
