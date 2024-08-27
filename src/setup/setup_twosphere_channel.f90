@@ -587,13 +587,13 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     dtmax     = 0.001*min(t_ff_cloud1,t_ff_cloud2)
     nout      = 1
     nfulldump = 1
-    nmaxdumps = 500
+    nmaxdumps = 1000
     dtwallmax = 1800.  ! s
     iverbose  = 0
 
     ieos      = 2    ! adiabatic eos with P = (gamma-1)*rho*u
     gmw       = gmw_in
-    icooling  = 0
+    icooling  = 7
     Tfloor    = 3.
     ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
     ipdv_heating   = 1
@@ -662,8 +662,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     isink_progenitor = 1
     delay_sn_injection = .false. 
     delay_by_mslifetime = .false. 
-    frackin = 0.
-    fractherm = 1.
+    frackin = 1.
+    fractherm = 0.
 
  endif
 

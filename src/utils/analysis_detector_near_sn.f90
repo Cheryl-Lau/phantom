@@ -24,7 +24,7 @@ module analysis
 
  private
 
- real    :: xyz_target(3) = (/ 25., 0., 0. /)  ! Position of detector 8 for w/cooling
+ real    :: xyz_target(3) = (/ 8., 0., 0. /)  ! Position of detector 8 for w/cooling, 25 for no cooling
 
 contains
 
@@ -84,10 +84,10 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
     call getneigh(node,xyz_target,0.,rad_neigh,3,listneigh,nneigh,xyzh,xyzcache,neighcachesize,ifirstincell,.false.)
     if (nneigh < 50) then 
        print*,'rad_neigh,nneigh',rad_neigh,nneigh
-       call warning('analysis_1d_shock','not enough trial neighbours')
+       call warning('nalysis_detector_near_sn','not enough trial neighbours')
     endif 
     n = n + 1 
-    if (n > 20) call fatal('analysis_1d_shock','cannot find neighbours')
+    if (n > 20) call fatal('nalysis_detector_near_sn','cannot find neighbours')
  enddo  
 
  !- Compute properties by interpolating from true neighbours 
