@@ -861,7 +861,7 @@ endif
 ifeq ($(SETUP), rhdturbbox_hpc)
 #	 starbench but with turbulence 
     SETUPFILE=velfield_fromcubes.f90 setup_turbbox_cmi.f90
-    ANALYSIS=analysis_partinfo.f90
+    ANALYSIS=analysis_ionizedmass.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE_KENNEDY=yes
@@ -949,8 +949,8 @@ ifeq ($(SETUP), sncavity)
 #	 Injecting SN into cloud with cavity and channels
     SETUPFILE=velfield_fromcubes.f90 setup_twosphere_channel.f90
     SRCINJECT=inject_sne_sphng.f90
-    ANALYSIS=analysis_velfield.f90
-    MODFILE=moddump_addsink.f90
+    ANALYSIS=analysis_detector_near_sn.f90
+    MODFILE=moddump_clear_channels.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE=yes
