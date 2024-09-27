@@ -102,7 +102,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !--general parameters
  !
  time = 0.
- gamma = 1.00011  ! polytropic eos index
+ gamma = 1.00011  ! adiabatic eos index
  gmw = 1.         ! Mean molecular weight for pure hydrogen
 
  !

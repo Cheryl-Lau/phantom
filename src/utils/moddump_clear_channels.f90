@@ -22,17 +22,12 @@ module moddump
 !
  implicit none
 
- real   :: rad_chnl = 10.05
+ real   :: rad_chnl = 10.05 !25.0
  real   :: omegafrac_chnl = 0.1
- real   :: pfrac_chnl = 0.9999
+ real   :: pfrac_chnl = 0.9 !0.9999
 
- integer, parameter :: nchnl = 6
- real   :: rchnl_vec(3,nchnl) = reshape((/ 1,0,0,    &
-                                           -1,0,0,     &
-                                           0,0,1,     &
-                                           0,0,-1,    &
-                                           0,1,0,   & 
-                                           0,-1,0   /), &
+ integer, parameter :: nchnl = 1
+ real   :: rchnl_vec(3,nchnl) = reshape((/ 1,0,0  /), &
                                          shape=(/3,nchnl/))
 
 contains
