@@ -29,5 +29,6 @@ print(*popt)
 xsmooth = np.linspace(500,20000,100)
 plt.plot(xsmooth, func(xsmooth,*popt))
 plt.plot(x,y,'.')
+plt.yscale('log')
 
 plt.show()

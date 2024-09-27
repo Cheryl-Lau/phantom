@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 def main():
     mass_proton_cgs = 1.67262158E-24
 
-    data = np.loadtxt('RadLoss_0.00_0.00_0.00_1.00e+00.rates',skiprows=2)
+    data = np.loadtxt('RadLoss_0.00_0.00_11.00_1.00e+00.rates',skiprows=2)
     
     temp = data[:,0]
     print(np.max(temp))
@@ -18,7 +18,7 @@ def main():
     
     rho_cgs = 2.12947615861e-24
     nrho_cgs = rho_cgs/mass_proton_cgs 
-    lambda_cgs = coolrate_cgs / (nrho_cgs**2)  # erg cm^3 s^-1
+    lambda_cgs = coolrate_cgs / nrho_cgs**2  # erg cm^3 s^-1
 
     plt.figure(figsize=[7,5],dpi=200)
 
@@ -28,14 +28,14 @@ def main():
     plt.plot(temp,lambda_cgs,label='DeRijcke et al. 2013',color='black')
     
     plt.xlabel('Temperature [K]')
-    plt.ylabel(" Cooling rate [$ \mathrm{ erg \ cm^{3} \ s^{-1} } $]")
+    plt.ylabel("Lambda [$ \mathrm{ erg \ cm^{3} \ s^{-1} } $]")
     
     plt.xscale('log')
     plt.yscale('log')
     plt.legend()
-
-    plt.savefig('coolcurve_DeRijcke13.png')
     plt.show()
+    plt.savefig('coolcurve_DeRijcke13.png')
+    
     
 
 def coolfunc(temp): 
@@ -112,7 +112,7 @@ def coolfunc_mod_derijcke(temp):
             
     # Highest temp part
     if temp > 10**7.5:
-        lambdagamma = lambdagamma * 10**(-3) * temp**(0.4)
+        lambdagamma = lambdagamma * 10**(-5.25) * temp**(0.7)
      
     # shift down 
     lambdagamma = lambdagamma / 10**(0.35)

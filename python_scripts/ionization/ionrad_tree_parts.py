@@ -35,11 +35,7 @@ def main():
         file_exist = os.path.isfile('./time_rad_spitz_tree.txt')
         if file_exist == True:
             # read existing file
-            data = np.loadtxt('time_rad_spitz_tree.txt')
-            time_tree = data[:,0]
-            ionrad_tree = data[:,1]
-            spitzrad_tree = data[:,2]
-            hosoinurad_tree = data[:,3]
+            time_tree,ionrad_tree,spitzrad_tree,hosoinurad_tree = np.loadtxt('time_rad_spitz_tree.txt',unpack=True)
         else:
             # compute ion-rad
             time_tree,ionrad_tree,spitzrad_tree,hosoinurad_tree = extract_data(True)
@@ -63,11 +59,7 @@ def main():
         file_exist = os.path.isfile('./time_rad_spitz_parts.txt')
         if file_exist == True:
             # read existing file
-            data = np.loadtxt('time_rad_spitz_parts.txt')
-            time_parts = data[:,0]
-            ionrad_parts = data[:,1]
-            spitzrad_parts = data[:,2]
-            hosoinurad_parts = data[:,3]
+            time_parts,ionrad_parts,spitzrad_parts,hosoinurad_parts = np.loadtxt('time_rad_spitz_parts.txt',unpack=True)
         else:
             # compute ion-rad
             time_parts,ionrad_parts,spitzrad_parts,hosoinurad_parts = extract_data(False)
@@ -75,13 +67,13 @@ def main():
             data = np.column_stack([time_parts,ionrad_parts,spitzrad_parts,hosoinurad_parts])
             np.savetxt('time_rad_spitz_parts.txt',data)
         
-        plt.plot(time_parts,ionrad_parts,color='blue',linewidth=1,label='SPH + MCRT with ind. particles')
+        ax1.plot(time_parts,ionrad_parts,color='blue',linewidth=1,label='SPH + MCRT with ind. particles')
         if show_spitzer == True:
-            plt.plot(time_parts,spitzrad_parts,color='black',label='Spitzer solution')
+            ax1.plot(time_parts,spitzrad_parts,color='black',label='Spitzer solution')
             errparts_spitzer = (ionrad_parts-spitzrad_parts)/spitzrad_parts*100
             ax2.plot(time_parts,errparts_spitzer,color='black')
         if show_hosoinu == True: 
-            plt.plot(time_parts,hosoinurad_parts,color='black',label='Hosokawa-Inutsuka solution')
+            ax1.plot(time_parts,hosoinurad_parts,color='black',label='Hosokawa-Inutsuka solution')
             errparts_hosoinu = (ionrad_parts-hosoinurad_parts)/hosoinurad_parts*100
             ax2.plot(time_parts,errparts_hosoinu,color='grey')
 
