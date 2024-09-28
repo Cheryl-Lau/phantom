@@ -19,7 +19,7 @@ module moddump
 
  implicit none
 
- integer :: isink = 168   ! index of target sink 
+ integer :: isink = 6   ! index of target sink 
  real    :: rad_max  = 0.1        ! threshold radius 
  real    :: vel_max_cgs = 3e7     ! stellar wind vel
 
