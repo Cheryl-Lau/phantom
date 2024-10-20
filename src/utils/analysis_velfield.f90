@@ -29,7 +29,7 @@ module analysis
  integer :: npointy = 100   
  integer :: npointz = 100  
  
- real    :: maxr = 100 !30 
+ real    :: maxr = 120 !30 
  logical :: use_whole_box = .false. 
 
 contains
@@ -179,7 +179,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
        endif 
        n = n + 1 
        radneigh = radneigh * 1.1  ! try increase 
-       if (n > 1000) call fatal('analysis_velfield','cannot find neighbours')
+       if (n > 1e4) call fatal('analysis_velfield','cannot find neighbours')
     enddo 
 
     !- Compute a component of velocity by interpolating from true neighbours 
