@@ -24,12 +24,12 @@ module analysis
 
  private
 
- integer, parameter :: nrefpoint = 1E6
- integer :: npointx = 100   ! number of points on x-axis 
- integer :: npointy = 100   
- integer :: npointz = 100  
+ integer, parameter :: nrefpoint = 2.7E7
+ integer :: npointx = 300   ! number of points on x-axis 
+ integer :: npointy = 300   
+ integer :: npointz = 300  
  
- real    :: maxr = 120 !30 
+ real    :: maxr = 80 !30 
  logical :: use_whole_box = .false. 
 
 contains
@@ -178,7 +178,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
           call warning('analysis_velfield','not enough trial neighbours')
        endif 
        n = n + 1 
-       radneigh = radneigh * 1.1  ! try increase 
+       radneigh = radneigh * 1.5  ! try increase 
        if (n > 1e4) call fatal('analysis_velfield','cannot find neighbours')
     enddo 
 
