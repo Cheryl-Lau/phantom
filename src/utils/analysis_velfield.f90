@@ -24,10 +24,10 @@ module analysis
 
  private
 
- integer, parameter :: nrefpoint = 2.7E7
- integer :: npointx = 300   ! number of points on x-axis 
- integer :: npointy = 300   
- integer :: npointz = 300  
+ integer, parameter :: nrefpoint = 1E9
+ integer :: npointx = 1000   ! number of points on x-axis 
+ integer :: npointy = 1000   
+ integer :: npointz = 1000  
  
  real    :: maxr = 80 !30 
  logical :: use_whole_box = .false. 
