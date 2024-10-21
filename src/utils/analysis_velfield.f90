@@ -24,10 +24,10 @@ module analysis
 
  private
 
- integer, parameter :: nrefpoint = 1E9
- integer :: npointx = 1000   ! number of points on x-axis 
- integer :: npointy = 1000   
- integer :: npointz = 1000  
+ integer, parameter :: nrefpoint = 2.16E8
+ integer :: npointx = 600   ! number of points on x-axis 
+ integer :: npointy = 600   
+ integer :: npointz = 600  
  
  real    :: maxr = 80 !30 
  logical :: use_whole_box = .false. 
@@ -159,7 +159,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
     if (percent > percentcount) then
        !$omp critical 
        ithread = omp_get_thread_num()
-       if (ithread == 1) write(*,'(f5.1,a)') percentcount, '% complete'
+       if (ithread == 1) write(*,'(f5.1,a)') percent, '% complete'
        percentcount = percentcount + 1.
        !$omp end critical
     endif
@@ -174,7 +174,6 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
        !- Get list of neighbours around detector point 
        call getneigh(node,xyz_target,0.,radneigh,3,listneigh,nneigh,xyzh,xyzcache,neighcachesize,ifirstincell,.false.)
        if (nneigh < 10) then 
-          print*,'radneigh,nneigh',radneigh,nneigh
           call warning('analysis_velfield','not enough trial neighbours')
        endif 
        n = n + 1 
