@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 plot_velocity = True 
 plot_thermp = True 
 plot_ramp = True 
-plot_cavrad = False 
+plot_cavrad = True
 
 gamma = 5/3                     # adiabatic index 
 G = 6.672041e-8                 # gravitational constant 
@@ -19,6 +19,7 @@ gmw = 1.29                      # mean molecular weight
 kboltz = 1.38066e-16            # boltzmann constant 
 mass_proton_cgs = 1.6726e-24    # proton mass 
 Myr = 1e6*365*24*60*60
+pc = 3.086E18  
 
 
 def get_pressure(rho,temp):
@@ -29,39 +30,35 @@ def get_pressure(rho,temp):
 
 # Sedov is a self-similar solution, here we'll put everything in cgs units 
 
-t_end = 3*Myr                 # sim end time 
+t_end = 0.42*Myr                 # sim end time 
 dt = t_end/1000                  # timestep 
 
-r_detect = 25. *3.086e+18        # location of detector 
+r_detect = 8. *3.086e+18        # location of detector 
 
 r_sn = 0.1 *3.086e+18           # SN ejecta radius 
 E_sn = 1e51                     # SN energy 
 m_sn = 25.0 *1.989e+33          # SN ejecta mass 
 vol_sn = 4/3*np.pi*r_sn**3      # volume occupied by SN ejecta 
 
-r_cloud = 25. *3.086e+18        # Cloud radius 
+r_cloud = 10. *3.086e+18        # Cloud radius 
 rho_cloud = 1e-21               # density of cloud around HII region/cavity
 p_cloud = get_pressure(rho_cloud,1e1)
 
-r_stag = 10. *3.086e+18          # HII region stagnation radius 
-p_hii = p_cloud * 10**(-3*gamma/(1-gamma))          # pressure of HII region from adiabatic relations 
-rho_hii = rho_cloud * (p_hii/p_cloud) * 10**(-3)    # density of HII region from ideal gas law  
-#rho_hii = 3.16e-17   # from adiabatic relation
-#p_hii = 2.01e-5      # from ideal gas law
-rho_hii = 1e-22
+r_stag = 4. *3.086e+18          # HII region stagnation radius 
+rho_hii = 1e-23
 p_hii = get_pressure(rho_hii,1e4)
 
 rho_inshell = 1e-19             # density within swept-up shell 
-dr_inshell = 0.5 *3.086e+18     # thickness of shell 
+dr_inshell = 0.2 *3.086e+18     # thickness of shell 
 
 rho_env = 4e-25                 # density of envelope 
 p_env = get_pressure(rho_env,1e3)
 
-rho_ffbg = 1e-23                # Medium density for free-field case 
-p_ffbg = get_pressure(rho_ffbg,1e2)
+rho_ffbg = 4e-25               # Medium density for free-field case 
+p_ffbg = get_pressure(rho_ffbg,1e3)
 
 nchnl = 1
-omega = nchnl* 4*np.pi*0.2             # solid angle of channell in Sr
+omega = nchnl* 4*np.pi*0.1             # solid angle of channell in Sr
 sout_fac = 1 
 expand_sout = False
 
@@ -303,6 +300,7 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
 
     
     if (expand_cav and plot_cavrad):
+
         fig4 = plt.figure(figsize=[7,5])
         ax4 = fig4.add_subplot(111)
         ax4.scatter(time,r_cav_evol,s=0.1)
@@ -319,6 +317,10 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
 
     semi_confined_model = np.column_stack((time,v_vent_evol,p_vent_evol,ramp_vent_evol))
     np.savetxt('semi_confined_model.txt',semi_confined_model)
+
+    if (expand_cav and plot_cavrad):
+        shell_evol_model = np.column_stack((time,r_cav_evol,vel_cav_evol))
+        np.savetxt('shell_evol_model.txt',shell_evol_model)
 
     print('')
     print('- Partially-confined SN -')
