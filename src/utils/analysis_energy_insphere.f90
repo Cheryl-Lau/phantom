@@ -26,7 +26,7 @@ module analysis
 
  integer, parameter :: nrad = 4
 ! real     :: rad_list(nrad) = (/ 20.,50.,80.,100.,150.,200. /) ! radii of spherical surfaces in code units 
- real     :: rad_list(nrad) = (/ 8.,15.,25.,50. /) 
+ real     :: rad_list(nrad) = (/ 8.,15.,25.,35. /) 
  real     :: xyz_src(3) = (/ 0., 0., 0. /)            ! Position of feedback source in code units 
 
 contains
