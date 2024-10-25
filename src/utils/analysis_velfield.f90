@@ -155,7 +155,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  !$omp schedule(runtime)
  do iref = 1,nref 
 
-    percent = 100.0*real(iref)/(real(nref)/real(numthreads))
+    percent = 100.0*real(percentcount)/(real(nref)/real(numthreads))
     if (percent > percentcount) then
        !$omp critical 
        ithread = omp_get_thread_num()
