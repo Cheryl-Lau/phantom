@@ -147,7 +147,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  percentcount = 1.
  ! Interpolate fluid properties at each ref point 
  !$omp parallel do default(none) shared(nref,ixyz_ref,xyz_ref,vxyz_ref,npart,xyzh,vxyzu,pmass) &
- !$omp shared(radneigh,ifirstincell,node,unit_velocity,radneighfac,sep,numthreads) &
+ !$omp shared(radneigh,ifirstincell,node,unit_velocity,radneighfac,sep) &
  !$omp private(iref,ixyz_target,xyz_target,xyz_target_cgs,nneigh,n,ineigh,ip,xyzcache) &
  !$omp private(vx_sum,vy_sum,vz_sum,vx_b,vy_b,vz_b,vx_target,vy_target,vz_target) &
  !$omp private(xyz_b,h_b,rho_b,dr2,q2,q,wkern,grkern,wkern_norm,percent,ithread) &
@@ -155,7 +155,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  !$omp schedule(runtime)
  do iref = 1,nref 
 
-    percent = 100.0*real(percentcount)/(real(nref)/real(numthreads))
+    percent = 100.0*real(iref)/real(nref)
     if (percent > percentcount) then
        !$omp critical 
        ithread = omp_get_thread_num()
