@@ -7,14 +7,14 @@ import glob
 import os 
 
 
-filename_confsn = 'semi_confined02/shock1d_withhii_chnl02_01400.dat'
-filename_ffsn = 'free_field/shock1d_nocloud_bigenv_01400.dat'
+filename_confsn = 'semi_confined02/shock1d_withhii_chnl02_00200.dat'
+filename_ffsn = 'free_field/shock1d_nocloud_bigenv_00020.dat'
 
 
-# t1: shock1d_withhii_chnl02_00014.dat; shock1d_nocloud_bigenv_00015.dat
-# t2: shock1d_withhii_chnl02_00029.dat; shock1d_nocloud_bigenv_00030.dat
-# t3: shock1d_withhii_chnl02_00200.dat; shock1d_nocloud_bigenv_00200.dat
-# t4: shock1d_withhii_chnl02_01400.dat; shock1d_nocloud_bigenv_01400.dat
+# t1: shock1d_withhii_chnl02_00030.dat; shock1d_nocloud_bigenv_00003.dat
+# t2: shock1d_withhii_chnl02_00050.dat; shock1d_nocloud_bigenv_00005.dat
+# t3: shock1d_withhii_chnl02_00200.dat; shock1d_nocloud_bigenv_00020.dat
+# t4: shock1d_withhii_chnl02_01400.dat; shock1d_nocloud_bigenv_00140.dat
 
 
 #
@@ -122,7 +122,7 @@ ax2.plot(locx_cfshock,u_ffshock,color='gold',label='u x 1E+14')  # u
 ax2.plot(locx_cfshock,thermpr_ffshock,color='magenta',label='P_therm x 1E-9')  # thermpr
 ax2.plot(locx_cfshock,rampr_ffshock,color='darkorange',label='P_ram x 1E-9')  # rampr
 
-fig1.savefig('shock_t4.png')
+fig1.savefig('shock_t3.png')
 
 plt.show()
 

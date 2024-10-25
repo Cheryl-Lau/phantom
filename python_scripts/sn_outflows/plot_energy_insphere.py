@@ -14,6 +14,19 @@ Myr = 1E6*365*24*60*60
 pc = 3.086E+18
 
 
+def plot_line(ax,x,y,colour):
+    '''
+    For connecting the scatter dots 
+    sorts x, then sort y according to x 
+    '''
+    x_sorted = sorted(x)
+    y_sorted = [ydum for _, ydum in sorted(zip(x,y))]
+    x_sorted.pop(0)
+    y_sorted.pop(0)
+    ax.plot(x_sorted,y_sorted,color=colour,linewidth=1)    
+
+    return 
+
 
 def read_input_combineframe():
 
@@ -53,29 +66,46 @@ def plot_energ_in_rad(ax,rad,df):
     iselect = np.where(np.logical_and(df['radius'] == rad,df['chnl']==0.0))[0]
     time_ff00 = df['time'].iloc[iselect].to_numpy()
     etot_ff00 = df['etot'].iloc[iselect].to_numpy()
+    ekin_ff00 = df['ekin'].iloc[iselect].to_numpy()
+    etherm_ff00 = df['etherm'].iloc[iselect].to_numpy()
     iselect = np.where(np.logical_and(df['radius'] == rad,df['chnl']==0.1))[0]
     time_cf01 = df['time'].iloc[iselect].to_numpy()
     etot_cf01 = df['etot'].iloc[iselect].to_numpy()
-    #iselect = np.where(np.logical_and(df['radius'] == rad,df['chnl']==0.2))[0]
-    #time_cf02 = df['time'].iloc[iselect].to_numpy()
-    #etot_cf02 = df['etot'].iloc[iselect].to_numpy()
+    ekin_cf01 = df['ekin'].iloc[iselect].to_numpy()
+    etherm_cf01 = df['etherm'].iloc[iselect].to_numpy()
     iselect = np.where(np.logical_and(df['radius'] == rad,df['chnl']==0.3))[0]
     time_cf03 = df['time'].iloc[iselect].to_numpy()
     etot_cf03 = df['etot'].iloc[iselect].to_numpy()
+    ekin_cf03 = df['ekin'].iloc[iselect].to_numpy()
+    etherm_cf03 = df['etherm'].iloc[iselect].to_numpy()
 
     time0_ff = np.min(time_ff00)   # sync to time when shock arrives rad 
     time0_cf = np.min(time_cf01)  
 
-    ax.scatter(time_ff00-time0_ff,etot_ff00,s=1,color='darkblue',label='free-field')
-    ax.scatter(time_cf01-time0_cf,etot_cf01,s=1,color='salmon',label='confined '+'$\Omega = 0.1 \cdot 4 \pi$')
-    #ax.scatter(time_cf02-time0_cf,etot_cf02,s=1,color='orangered',label='confined '+'$\Omega = 0.2 \cdot 4 \pi$')
-    ax.scatter(time_cf03-time0_cf,etot_cf03,s=1,color='firebrick',label='confined '+'$\Omega = 0.3 \cdot 4 \pi$')
+#    ax.scatter(time_ff00-time0_ff,etot_ff00,s=1,color='darkblue',label='free-field ')
+#    ax.scatter(time_cf01-time0_cf,etot_cf01,s=1,color='salmon',label='confined '+'$\Omega = 0.1 \cdot 4 \pi$')
+#    ax.scatter(time_cf03-time0_cf,etot_cf03,s=1,color='firebrick',label='confined '+'$\Omega = 0.3 \cdot 4 \pi$')
+
+    ax.scatter(time_ff00-time0_ff,ekin_ff00,s=1,color='navy',label='free-field $\mathrm{E_{kin}}$')
+    ax.scatter(time_cf01-time0_cf,ekin_cf01,s=1,color='orangered',label='confined $\mathrm{E_{kin}}$ '+'$\Omega = 0.1 \cdot 4 \pi$')
+    ax.scatter(time_cf03-time0_cf,ekin_cf03,s=1,color='orange',label='confined $\mathrm{E_{kin}}$ '+'$\Omega = 0.3 \cdot 4 \pi$')
+
+    ax.scatter(time_ff00-time0_ff,etherm_ff00,s=1,color='cornflowerblue',label='free-field $\mathrm{E_{therm}}$')
+    ax.scatter(time_cf01-time0_cf,etherm_cf01,s=1,color='coral',label='confined $\mathrm{E_{therm}}$ '+'$\Omega = 0.1 \cdot 4 \pi$')
+    ax.scatter(time_cf03-time0_cf,etherm_cf03,s=1,color='gold',label='confined $\mathrm{E_{therm}}$ '+'$\Omega = 0.3 \cdot 4 \pi$')
+
+    plot_line(ax,time_ff00-time0_ff,ekin_ff00,'navy')
+    plot_line(ax,time_ff00-time0_ff,etherm_ff00,'cornflowerblue')
+    plot_line(ax,time_cf01-time0_cf,ekin_cf01,'orangered')
+    plot_line(ax,time_cf01-time0_cf,etherm_cf01,'coral')
+    plot_line(ax,time_cf03-time0_cf,ekin_cf03,'orange')
+    plot_line(ax,time_cf03-time0_cf,etherm_cf03,'gold')
+
     ax.set_yscale('log')
     ax.set_xlabel('time [Myr]')
     ax.set_xlim([0,3.1])
-    ax.set_ylim([3e46,6e51])
-    ax.legend(loc='lower left',fontsize=9)
-    ax.text(1.8,1.5e51,'r < '+str(int(rad))+' pc')
+    ax.set_ylim([8e45,9e51])
+    ax.text(1.4,2e51,'radius < '+str(int(rad))+' pc')
 
     ax.minorticks_on()
     ax.xaxis.set_tick_params(which='minor')
@@ -85,15 +115,18 @@ def plot_energ_in_rad(ax,rad,df):
 
 df = read_input_combineframe()
 
-fig, (ax1,ax2,ax3,ax4) = plt.subplots(ncols=4, sharey=True, subplot_kw=dict(frameon=True), figsize=(10,3), dpi=300)
+fig, (ax1,ax2,ax3,ax4) = plt.subplots(ncols=4, sharey=True, subplot_kw=dict(frameon=True), figsize=(10,3), dpi=200)
+#plt.subplots_adjust(hspace=.0)
 
 plot_energ_in_rad(ax1,20.0,df)
 plot_energ_in_rad(ax2,50.0,df)
 plot_energ_in_rad(ax3,80.0,df)
 plot_energ_in_rad(ax4,100.0,df)
 
-ax1.set_ylabel('total energy [erg]')
-fig.tight_layout(pad=1.0)
+ax1.set_ylabel('energy [erg]')
+ax4.legend(loc='lower left',fontsize=7)
+
+fig.tight_layout(pad=0.5)
 
 
 plt.savefig('energy_insphere.png')

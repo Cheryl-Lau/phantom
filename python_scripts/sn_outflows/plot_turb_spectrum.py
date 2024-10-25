@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import sys
 
 Myr = 1e6*365*24*60*60
+utime = 4.706E+14
+t0_Myr = 7.1121E-02*utime/Myr  # starting time of SN injection (exclude HII evolve time)
 
 
 def read_dump_veldata(filename_vx,filename_vy,filename_vz):
@@ -247,12 +249,13 @@ def movingaverage(interval, window_size):
 def plot_powerspec(ax,time,wavenumber,spectrum,linestylestr,colourstr,labelstr):
 
     ax.plot(wavenumber,spectrum,linestylestr.strip(),color=colourstr.strip(),label=labelstr.strip())
+    ax.axvspan(1.2,5,alpha=0.3,color='lightgrey')
     ax.set_xscale('log')
     ax.set_yscale('log')
-    ax.set_xlabel('Wave number k [$\mathrm{pc^{-1}}$]')
-    ax.set_ylabel('Kinetic energy E(k) [erg]')
-    ax.set_xlim([1.3e-2,4e0])
-    ax.set_ylim([1e5,3e15])
+    ax.set_xlabel('wave number k [$\mathrm{pc^{-1}}$]')
+    ax.set_ylabel('kinetic energy E(k) [erg]')
+    ax.set_xlim([3.5e-2,2.5e0])
+    ax.set_ylim([1e5,5e15])
     ax.legend(loc='upper right',fontsize=7)
 
     return 
@@ -265,7 +268,7 @@ def create_spec(ax,filename_vx,filename_vy,filename_vz,labelstr,linestyle,textlo
     vx_compr,vy_compr,vz_compr,vx_solen,vy_solen,vz_solen = Helmholtz_Hodge_decomposition(vx_cube,vy_cube,vz_cube,nx,ny,nz)
 
     knyquist, wavenumber,tke_spectrum = compute_tke_spectrum(vx_cube,vy_cube,vz_cube,sizex,sizey,sizez,True)
-    plot_powerspec(ax,time_cgs,wavenumber,tke_spectrum,linestyle,'black',labelstr+' total KE')
+    plot_powerspec(ax,time_cgs,wavenumber,tke_spectrum,linestyle,'black',labelstr+' total $E_\mathrm{kin}$')
 
     knyquist, wavenumber,tke_spectrum = compute_tke_spectrum(vx_compr,vy_compr,vz_compr,sizex,sizey,sizez,True)
     plot_powerspec(ax,time_cgs,wavenumber[1:],tke_spectrum[1:],linestyle,'blue',labelstr+' compressive mode')
@@ -273,7 +276,10 @@ def create_spec(ax,filename_vx,filename_vy,filename_vz,labelstr,linestyle,textlo
     knyquist, wavenumber,tke_spectrum = compute_tke_spectrum(vx_solen,vy_solen,vz_solen,sizex,sizey,sizez,True)
     plot_powerspec(ax,time_cgs,wavenumber,tke_spectrum,linestyle,'red',labelstr+' solenoidal mode')
 
-    time_Myr = time_cgs/Myr 
+    if (labelstr == 'semi-confined'):
+        time_Myr = time_cgs/Myr - t0_Myr 
+    else:
+        time_Myr = time_cgs/Myr
     ax.text(textloc_x,textloc_y,labelstr+': '+str(round(time_Myr,3))+' Myr',fontsize=7)
 
     return 
@@ -281,56 +287,71 @@ def create_spec(ax,filename_vx,filename_vy,filename_vz,labelstr,linestyle,textlo
 
 def main():
 
-    fig,(ax1,ax2,ax3) = plt.subplots(nrows=3,sharex=False,subplot_kw=dict(frameon=True),figsize=(5,9),dpi=200)
+    fig,(ax1,ax2,ax3,ax4) = plt.subplots(nrows=4,sharex=False,subplot_kw=dict(frameon=True),figsize=(5,12),dpi=200)
 
 
     # Shock front 40 pc: 
-    ax1.text(1.5e-2,7e14,'Shock front at 40 pc')
+    ax1.text(4e-2,7e14,'Shock front at 40 pc')
 
     # Semi-confined case 
     filename_vx = 'semi_confined01/velfield_x_withhii_chnl01_00200.dat'
     filename_vy = 'semi_confined01/velfield_y_withhii_chnl01_00200.dat'
     filename_vz = 'semi_confined01/velfield_z_withhii_chnl01_00200.dat'
-    create_spec(ax1,filename_vx,filename_vy,filename_vz,'semi-confined','-',1.5e-2,2e14)
+    create_spec(ax1,filename_vx,filename_vy,filename_vz,'semi-confined','-',4e-2,2e14)
 
     # Free-field case 
     filename_vx = 'free_field/velfield_x_nocloud_bigenv_00005.dat'
     filename_vy = 'free_field/velfield_y_nocloud_bigenv_00005.dat'
     filename_vz = 'free_field/velfield_z_nocloud_bigenv_00005.dat'
-    create_spec(ax1,filename_vx,filename_vy,filename_vz,'free-field','--',1.5e-2,7e13)
+    create_spec(ax1,filename_vx,filename_vy,filename_vz,'free-field','--',4e-2,7e13)
 
 
     # Shock front 100 pc: 
-    ax2.text(1.5e-2,7e14,'Shock front at 100 pc')
+    ax2.text(4e-2,7e14,'Shock front at 100 pc')
 
     # Semi-confined case 
     filename_vx = 'semi_confined01/velfield_x_withhii_chnl01_00600.dat'
     filename_vy = 'semi_confined01/velfield_y_withhii_chnl01_00600.dat'
     filename_vz = 'semi_confined01/velfield_z_withhii_chnl01_00600.dat'
-    create_spec(ax2,filename_vx,filename_vy,filename_vz,'semi-confined','-',1.5e-2,2e14)
+    create_spec(ax2,filename_vx,filename_vy,filename_vz,'semi-confined','-',4e-2,2e14)
 
     # Free-field case 
     filename_vx = 'free_field/velfield_x_nocloud_bigenv_00050.dat'
     filename_vy = 'free_field/velfield_y_nocloud_bigenv_00050.dat'
     filename_vz = 'free_field/velfield_z_nocloud_bigenv_00050.dat'
-    create_spec(ax2,filename_vx,filename_vy,filename_vz,'free-field','--',1.5e-2,7e13)
+    create_spec(ax2,filename_vx,filename_vy,filename_vz,'free-field','--',4e-2,7e13)
 
 
     # Shock front 140 pc: 
-    ax3.text(1.5e-2,7e14,'Shock front at 140 pc')
+    ax3.text(4e-2,7e14,'Shock front at 140 pc')
 
     # Semi-confined case 
     filename_vx = 'semi_confined01/velfield_x_withhii_chnl01_00800.dat'
     filename_vy = 'semi_confined01/velfield_y_withhii_chnl01_00800.dat'
     filename_vz = 'semi_confined01/velfield_z_withhii_chnl01_00800.dat'
-    create_spec(ax3,filename_vx,filename_vy,filename_vz,'semi-confined','-',1.5e-2,2e14)
+    create_spec(ax3,filename_vx,filename_vy,filename_vz,'semi-confined','-',4e-2,2e14)
 
     # Free-field case 
     filename_vx = 'free_field/velfield_x_nocloud_bigenv_00100.dat'
     filename_vy = 'free_field/velfield_y_nocloud_bigenv_00100.dat'
     filename_vz = 'free_field/velfield_z_nocloud_bigenv_00100.dat'
-    create_spec(ax3,filename_vx,filename_vy,filename_vz,'free-field','--',1.5e-2,7e13)
+    create_spec(ax3,filename_vx,filename_vy,filename_vz,'free-field','--',4e-2,7e13)
 
+
+    # Shock front at 200 pc: 
+    ax4.text(4e-2,7e14,'Shock front at 200 pc')
+
+    # Semi-confined case 
+    filename_vx = 'semi_confined01/velfield_x_withhii_chnl01_01000.dat'
+    filename_vy = 'semi_confined01/velfield_y_withhii_chnl01_01000.dat'
+    filename_vz = 'semi_confined01/velfield_z_withhii_chnl01_01000.dat'
+    create_spec(ax4,filename_vx,filename_vy,filename_vz,'semi-confined','-',4e-2,2e14)
+
+    # Free-field case 
+    filename_vx = 'free_field/velfield_x_nocloud_bigenv_00200.dat'
+    filename_vy = 'free_field/velfield_y_nocloud_bigenv_00200.dat'
+    filename_vz = 'free_field/velfield_z_nocloud_bigenv_00200.dat'
+    create_spec(ax4,filename_vx,filename_vy,filename_vz,'free-field','--',4e-2,7e13)
 
 
     fig.tight_layout(pad=1.0)

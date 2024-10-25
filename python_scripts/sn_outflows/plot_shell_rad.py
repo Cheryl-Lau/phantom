@@ -22,30 +22,50 @@ def extract_shell_rad(ax):
         x_cgs,rho_cgs,u_cgs = np.loadtxt(filename,skiprows=3,unpack=True)
         x_pc = x_cgs/pc
 
-        # Extract the large jumps off cliff in log(u) plot 
-        grads = np.gradient(np.log10(u_cgs))
-        ineg = np.where(grads < 0)[0]
-        largegrad = np.percentile(np.abs(grads[ineg]),70)
-        ilargeneg = np.where(grads < -1*largegrad)
-        r_shell_pc_u = x_pc[ilargeneg]
-        time_Myr_arr_u = np.full(len(r_shell_pc_u),time_Myr)
-
-        # Extract the large jumps off cliff in log(rho) plot 
-        grads = np.gradient(np.log10(rho_cgs))
-        ineg = np.where(grads < 0)[0]
-        largegrad = np.percentile(np.abs(grads[ineg]),80)
-        ilargeneg = np.where(grads < -1*largegrad)
-        r_shell_pc_rho = x_pc[ilargeneg]
-        time_Myr_arr_rho = np.full(len(r_shell_pc_rho),time_Myr)
-
         # Plot both 
         if (firstcall==True):
-            ax.scatter(time_Myr_arr_u,np.abs(r_shell_pc_u),s=1,color='lightskyblue',label='large '+r'$-\nabla u$')
-            ax.scatter(time_Myr_arr_rho,np.abs(r_shell_pc_rho),s=1,color='salmon',label='large '+r'$-\nabla \rho$')
+            time_Myr_arr,r_shell_pc = get_large_falls(u_cgs,70,time_Myr,x_pc)
+            ax.scatter(time_Myr_arr,np.abs(r_shell_pc),s=1,color='lightskyblue',label='$70^\mathrm{th}$ percentile of '+r'$-\nabla u$')
+            time_Myr_arr,r_shell_pc = get_large_falls(u_cgs,80,time_Myr,x_pc)
+            ax.scatter(time_Myr_arr,np.abs(r_shell_pc),s=1,color='deepskyblue',label='$80^\mathrm{th}$ percentile of '+r'$-\nabla u$')
+            time_Myr_arr,r_shell_pc = get_large_falls(u_cgs,90,time_Myr,x_pc)
+            ax.scatter(time_Myr_arr,np.abs(r_shell_pc),s=1,color='royalblue',label='$90^\mathrm{th}$ percentile of '+r'$-\nabla u$')
+
+            time_Myr_arr,r_shell_pc = get_large_falls(rho_cgs,70,time_Myr,x_pc)
+            ax.scatter(time_Myr_arr,np.abs(r_shell_pc),s=1,color='mistyrose',label='$70^\mathrm{th}$ percentile of '+r'$-\nabla \rho$')
+            time_Myr_arr,r_shell_pc = get_large_falls(rho_cgs,80,time_Myr,x_pc)
+            ax.scatter(time_Myr_arr,np.abs(r_shell_pc),s=1,color='lightsalmon',label='$80^\mathrm{th}$ percentile of '+r'$-\nabla \rho$')
+            time_Myr_arr,r_shell_pc = get_large_falls(rho_cgs,90,time_Myr,x_pc)
+            ax.scatter(time_Myr_arr,np.abs(r_shell_pc),s=1,color='orangered',label='$90^\mathrm{th}$ percentile of '+r'$-\nabla \rho$')
             firstcall = False
+
         else:
-            ax.scatter(time_Myr_arr_u,np.abs(r_shell_pc_u),s=1,color='lightskyblue')
-            ax.scatter(time_Myr_arr_rho,np.abs(r_shell_pc_rho),s=1,color='salmon')
+            time_Myr_arr,r_shell_pc = get_large_falls(u_cgs,70,time_Myr,x_pc)
+            ax.scatter(time_Myr_arr,np.abs(r_shell_pc),s=1,color='lightskyblue')
+            time_Myr_arr,r_shell_pc = get_large_falls(u_cgs,80,time_Myr,x_pc)
+            ax.scatter(time_Myr_arr,np.abs(r_shell_pc),s=1,color='deepskyblue')
+            time_Myr_arr,r_shell_pc = get_large_falls(u_cgs,90,time_Myr,x_pc)
+            ax.scatter(time_Myr_arr,np.abs(r_shell_pc),s=1,color='royalblue')
+
+            time_Myr_arr,r_shell_pc = get_large_falls(rho_cgs,70,time_Myr,x_pc)
+            ax.scatter(time_Myr_arr,np.abs(r_shell_pc),s=1,color='mistyrose')
+            time_Myr_arr,r_shell_pc = get_large_falls(rho_cgs,80,time_Myr,x_pc)
+            ax.scatter(time_Myr_arr,np.abs(r_shell_pc),s=1,color='lightsalmon')
+            time_Myr_arr,r_shell_pc = get_large_falls(rho_cgs,90,time_Myr,x_pc)
+            ax.scatter(time_Myr_arr,np.abs(r_shell_pc),s=1,color='orangered')
+
+
+
+def get_large_falls(physprop_cgs,percentile,time_Myr,x_pc):
+
+    grads = np.gradient(np.log10(physprop_cgs))
+    ineg = np.where(grads < 0)[0]
+    largegrad = np.percentile(np.abs(grads[ineg]),percentile)
+    ilargeneg = np.where(grads < -1*largegrad)
+    r_shell_pc = x_pc[ilargeneg]
+    time_Myr_arr = np.full(len(r_shell_pc),time_Myr)
+
+    return time_Myr_arr,r_shell_pc
 
 
 def plot_analyt_model(ax):
@@ -57,7 +77,7 @@ def plot_analyt_model(ax):
     ax.plot(time_Myr,rad_shell_pc,color='black',label='analytical model')
 
 
-fig = plt.figure(figsize=[7,5],dpi=200)
+fig = plt.figure(figsize=[6,4.5],dpi=200)
 ax = fig.add_subplot(111)    
 
 plot_analyt_model(ax)
@@ -66,8 +86,8 @@ extract_shell_rad(ax)
 ax.set_xlabel('time [Myr]')
 ax.set_ylabel('cavity radius [pc]')
 ax.set_yscale('log')
-ax.set_ylim([2,280])
-ax.legend()
+ax.set_ylim([0.9,150])
+ax.legend(loc='lower right',fontsize=8)
 
 plt.savefig('shell_radius_evol.png')
 plt.show()
