@@ -29,7 +29,7 @@ module analysis
  integer :: npointy = 150   
  integer :: npointz = 150  
  
- real    :: maxr = 40 
+ real    :: maxr = 30 
  logical :: use_whole_box = .false. 
 
 contains
