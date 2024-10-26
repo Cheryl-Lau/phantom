@@ -28,8 +28,9 @@ module analysis
  integer :: npointx = 200   ! number of points on x-axis 
  integer :: npointy = 200   
  integer :: npointz = 200  
+ real    :: centre(3) = (/ 30., 0., 0. /)
  
- real    :: maxr = 30 
+ real    :: maxr = 20 
  logical :: use_whole_box = .false. 
 
 contains
@@ -119,13 +120,13 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  nref = 0
  do ipointx = 1,npointx
    dx = sizex/real(npointx)
-   xloc = -sizex/2. + dx*real(ipointx) 
+   xloc = -sizex/2. + dx*real(ipointx) + centre(1)
    do ipointy = 1,npointy
       dy = sizey/real(npointy)
-      yloc = -sizey/2. + dy*real(ipointy) 
+      yloc = -sizey/2. + dy*real(ipointy)  + centre(2)
       do ipointz = 1,npointz
          dz = sizez/real(npointz)
-         zloc = -sizez/2. + dz*real(ipointz)
+         zloc = -sizez/2. + dz*real(ipointz) + centre(3)
          nref = nref + 1 
          xyz_ref(1:3,nref) = (/xloc,yloc,zloc/)
          ixyz_ref(1:3,nref) = (/ipointx,ipointy,ipointz/)
