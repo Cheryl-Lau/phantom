@@ -28,9 +28,9 @@ module analysis
  integer :: npointx = 200   ! number of points on x-axis 
  integer :: npointy = 200   
  integer :: npointz = 200  
- real    :: centre(3) = (/ 30., 0., 0. /)
+ real    :: centre(3) = (/ 35., 0., 0. /)
  
- real    :: maxr = 20 
+ real    :: maxr = 15 
  logical :: use_whole_box = .false. 
 
 contains
