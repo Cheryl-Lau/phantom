@@ -6,7 +6,7 @@
 !--------------------------------------------------------------------------!
 module analysis
 !
-! Analysis routine which measures the interpolated gas flow properties (v,rho,P)
+! Analysis routine which measures the interpolated gas flow properties (rho,v,u,P_therm.P_ram)
 ! along a line from the supernova 
 !
 ! :References: None
@@ -25,7 +25,7 @@ module analysis
  private
 
  integer :: npoint = 200
- real    :: maxr = 25. 
+ real    :: maxr = 12. 
 
 contains
 
