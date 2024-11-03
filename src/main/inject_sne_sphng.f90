@@ -46,8 +46,8 @@ module inject
  logical, public :: one_sink_progenitor = .false.
  integer, public :: isink_progenitor = 5
 
- logical, public :: gaussian_vprofile = .false.   ! Set up Gasussian SN particle radial velocity profile 
- logical, public :: uniform_vprofile = .true.     ! Set up uniform velocity profile 
+ logical, public :: gaussian_vprofile = .true.     ! Set up Gasussian SN particle radial velocity profile 
+ logical, public :: uniform_vprofile = .false.     ! Set up uniform velocity profile 
 
  logical, public :: delay_sn_injection  = .true.
  logical, public :: delay_by_mslifetime = .false.   ! delay SN inject by MS lifetime, else 10 dtmax
