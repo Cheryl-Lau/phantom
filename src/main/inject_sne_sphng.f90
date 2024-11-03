@@ -46,6 +46,9 @@ module inject
  logical, public :: one_sink_progenitor = .false.
  integer, public :: isink_progenitor = 5
 
+ logical, public :: gaussian_vprofile = .false.   ! Set up Gasussian SN particle radial velocity profile 
+ logical, public :: uniform_vprofile = .true.     ! Set up uniform velocity profile 
+
  logical, public :: delay_sn_injection  = .true.
  logical, public :: delay_by_mslifetime = .false.   ! delay SN inject by MS lifetime, else 10 dtmax
 
@@ -305,17 +308,21 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        !
        ! Set up velocity profile of sn particles
        !
-       aN_scalefactor = 1. ! to avoid compiler warning
-       if (first_sn) then
-          call get_vrprofile_candidates(npartsn,massoftype(igas))   ! get candidate entries
-          i_rightcand = minloc(abs(Ek_cand(:)-engkin),1)  ! obtain the entry with closest Ek
-          iEk = int(i_cand(i_rightcand))
-          a_vrad = vprofile(1,iEK)                        ! obtain the corresponding a
-          aN_scalefactor = a_vrad*npartsn**(1./2.)        ! Store scale factor for forthcoming sne
-          first_sn = .false.
-       else
-          a_vrad = aN_scalefactor/npartsn**(1./2.)
-       endif
+       if (gaussian_vprofile) then 
+          aN_scalefactor = 1. ! to avoid compiler warning
+          if (first_sn) then
+             call get_vrprofile_candidates(npartsn,massoftype(igas))   ! get candidate entries
+             i_rightcand = minloc(abs(Ek_cand(:)-engkin),1)  ! obtain the entry with closest Ek
+             iEk = int(i_cand(i_rightcand))
+             a_vrad = vprofile(1,iEK)                        ! obtain the corresponding a
+             aN_scalefactor = a_vrad*npartsn**(1./2.)        ! Store scale factor for forthcoming sne
+             first_sn = .false.
+          else
+             a_vrad = aN_scalefactor/npartsn**(1./2.)
+          endif
+       elseif (uniform_vprofile) then 
+          vrad = sqrt((2*engkin)/(npartsn*massoftype(igas)))
+       endif 
        !
        ! Estimate new smoothing length
        !
@@ -331,8 +338,10 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        over_partsngroup: do iadd = npartold+1,npartold+npartsn,6
           ipartsn = iadd
           call gen_refpoints(xyz_ref,r_ref)
-          r_vrad = 2*r_ref   ! 2*r_dist/r_sn; scaling max=r_sn to max=2 of vrad func
-          vrad = vrfunc(a_vrad,r_vrad) 
+          if (gaussian_vprofile) then 
+             r_vrad = 2*r_ref   ! 2*r_dist/r_sn; scaling max=r_sn to max=2 of vrad func
+             vrad = vrfunc(a_vrad,r_vrad) 
+          endif 
           over_partsn: do ia = 1,6
              xyz_partsn  = xyz_sn(1:3,isn) + xyz_ref(1:3,ia)*r_sn
              vxyz_partsn = vxyz_sn(1:3,isn) + vrad*xyz_ref(1:3,ia)/r_ref
