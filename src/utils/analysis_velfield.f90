@@ -145,27 +145,15 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
 
  print*,'Begin interpolation'
- idone = 1
- percentcount = 0. 
+
  ! Interpolate fluid properties at each ref point 
  !$omp parallel do default(none) shared(nref,ixyz_ref,xyz_ref,vxyz_ref,npart,xyzh,vxyzu,pmass) &
  !$omp shared(radneigh,ifirstincell,node,unit_velocity,radneighfac,sep) &
  !$omp private(iref,ixyz_target,xyz_target,xyz_target_cgs,nneigh,n,ineigh,ip,xyzcache) &
  !$omp private(vx_sum,vy_sum,vz_sum,vx_b,vy_b,vz_b,vx_target,vy_target,vz_target) &
  !$omp private(xyz_b,h_b,rho_b,dr2,q2,q,wkern,grkern,wkern_norm,percent,ithread) &
- !$omp reduction(+:idone,percentcount) &
  !$omp schedule(runtime)
  do iref = 1,nref 
-
-    percent = 100.0*real(idone)/real(nref)
-    idone = idone + 1 
-    !$omp critical
-    if (percent > percentcount) then
-       write(*,'(f5.1,a)') percent, '% complete'
-       percentcount = percentcount + 2.
-    endif
-    !$omp end critical
-
     ixyz_target(1:3) = ixyz_ref(1:3,iref)
     xyz_target(1:3) = xyz_ref(1:3,iref)
 
