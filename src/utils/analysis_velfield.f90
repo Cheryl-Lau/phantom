@@ -159,15 +159,12 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
     percent = 100.0*real(idone)/real(nref)
     idone = idone + 1 
+    !$omp critical
     if (percent > percentcount) then
-       !$omp critical 
-       ithread = omp_get_thread_num()
-       if (ithread == 1) then 
-          write(*,'(f5.1,a)') percent, '% complete'
-          percentcount = percentcount + 2.
-       endif 
-       !$omp end critical
+       write(*,'(f5.1,a)') percent, '% complete'
+       percentcount = percentcount + 2.
     endif
+    !$omp end critical
 
     ixyz_target(1:3) = ixyz_ref(1:3,iref)
     xyz_target(1:3) = xyz_ref(1:3,iref)
