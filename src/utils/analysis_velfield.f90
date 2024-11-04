@@ -30,7 +30,7 @@ module analysis
  integer :: npointz = 200  
  real    :: centre(3) = (/ 25., 0., 0. /)
  
- real    :: maxr = 10 
+ real    :: maxr = 7.5 
  logical :: use_whole_box = .false. 
 
 contains
