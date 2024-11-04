@@ -28,9 +28,9 @@ module analysis
  integer :: npointx = 200   ! number of points on x-axis 
  integer :: npointy = 200   
  integer :: npointz = 200  
- real    :: centre(3) = (/ 0., 0., 0. /)
+ real    :: centre(3) = (/ 25., 0., 0. /)
  
- real    :: maxr = 30 
+ real    :: maxr = 10 
  logical :: use_whole_box = .false. 
 
 contains
@@ -145,15 +145,27 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
 
  print*,'Begin interpolation'
+ idone = 0
+ percentcount = 0. 
 
  ! Interpolate fluid properties at each ref point 
  !$omp parallel do default(none) shared(nref,ixyz_ref,xyz_ref,vxyz_ref,npart,xyzh,vxyzu,pmass) &
- !$omp shared(radneigh,ifirstincell,node,unit_velocity,radneighfac,sep) &
+ !$omp shared(radneigh,ifirstincell,node,unit_velocity,radneighfac,sep,numthreads) &
  !$omp private(iref,ixyz_target,xyz_target,xyz_target_cgs,nneigh,n,ineigh,ip,xyzcache) &
  !$omp private(vx_sum,vy_sum,vz_sum,vx_b,vy_b,vz_b,vx_target,vy_target,vz_target) &
- !$omp private(xyz_b,h_b,rho_b,dr2,q2,q,wkern,grkern,wkern_norm,percent,ithread) &
+ !$omp private(xyz_b,h_b,rho_b,dr2,q2,q,wkern,grkern,wkern_norm,percent,idone,percentcount,ithread) &
  !$omp schedule(runtime)
  do iref = 1,nref 
+
+!    !$omp atomic update 
+!    idone = idone + 1 
+!    percent = 100.*real(idone)/real(nref/numthreads)
+!    if (percent > percentcount) then 
+!       print*,'loading ',nint(percent),'%'
+!       !$omp atomic update 
+!       percentcount = percentcount + 2. 
+!    endif 
+
     ixyz_target(1:3) = ixyz_ref(1:3,iref)
     xyz_target(1:3) = xyz_ref(1:3,iref)
 
