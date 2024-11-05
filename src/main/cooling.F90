@@ -94,8 +94,8 @@ module cooling
  real    :: KI02_rho_min,KI02_rho_max
  real    :: rhov4_KI02(2,maxt)
 
- real    :: rhominJML_cgs = 1E-27   ! density range of which JML06 cooling curve has equilibium solution(s)
- real    :: rhomaxJML_cgs = 1E-12   !  -Note: rhominJML_cgs is hard limit; rhomaxJML_cgs can be increased by lowering TminJML
+ real    :: rhominJML_cgs = 1E-28   ! density range of which JML06 cooling curve has equilibium solution(s)
+ real    :: rhomaxJML_cgs = 1E-15   !  -Note: rhominJML_cgs is hard limit; rhomaxJML_cgs can be increased by lowering TminJML
  real    :: TminJML = 1E0           ! temperature range of JML06 cooling curve
  real    :: TmaxJML = 1E9
  real    :: rhoueqJML_table(5,maxt)
@@ -329,14 +329,17 @@ subroutine init_rhoutableJML(ierr)
  use units,   only:unit_density,unit_ergg
  use eos,     only:gmw,gamma
  integer, intent(out) :: ierr
- integer   :: i,irterr1,irterr2,irterr3,numroots
- real      :: nrhomin_cgs,nrhomax_cgs,dnrho_cgs,nrho_cgs,rho
- real      :: T01,T02,Teq1,Teq2,Teq3,ueq1,ueq2,ueq3
+ integer :: i,irterr1,irterr2,irterr3,numroots
+ real    :: nrhomin_cgs,nrhomax_cgs,dnrho_cgs,nrho_cgs,rho
+ real    :: T01,T02,Teq1,Teq2,Teq3,ueq1,ueq2,ueq3
+ logical :: write_table = .true. 
 
  nrhomin_cgs = rhominJML_cgs/mass_proton_cgs
  nrhomax_cgs = rhomaxJML_cgs/mass_proton_cgs
  dnrho_cgs = (log10(nrhomax_cgs)-log10(nrhomin_cgs))/maxt
  ierr = 0
+
+ if (write_table) open(unit=3020,file='rho_Teq_table.dat',status='replace')
 
  ! Temp of local max and min of JML06 cooling curve (for root-search brackets)
  T01 = 198609.4917357372
@@ -377,7 +380,11 @@ subroutine init_rhoutableJML(ierr)
     rhoueqJML_table(3,i) = ueq1
     rhoueqJML_table(4,i) = ueq2
     rhoueqJML_table(5,i) = ueq3
+
+    if (write_table) write(3020,*) rho*unit_density,numroots,Teq1,Teq2,Teq3 
  enddo
+
+ if (write_table) close(3020)
 
 end subroutine init_rhoutableJML
 
@@ -462,14 +469,13 @@ real function lambdacoolDR(temp)
 end function lambdacoolDR
 
 
-
 !
 ! Thermal equilibium: f_T = n*lambda(T) - gamma
 !
 real function equifunc(nrho_cgs,temp)
  real, intent(in) :: nrho_cgs,temp
 
- equifunc = nrho_cgs*GammaKI_cgs - nrho_cgs**2*lambdacoolDR(temp)
+ equifunc = nrho_cgs*GammaKI_cgs - nrho_cgs**2*lambdacoolJML(temp)
 
 end function equifunc
 
