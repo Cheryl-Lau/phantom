@@ -94,7 +94,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
    nneigh = 0 
    n = 0
-   do while (nneigh < 10)
+   do while (nneigh < 50)
       rad_neigh = rad_neigh * 1.1  ! try increase 
       !- Get list of neighbours around detector point 
       call getneigh(node,xyz_target,0.,rad_neigh,3,listneigh,nneigh,xyzh,xyzcache,neighcachesize,ifirstincell,.false.)
@@ -103,7 +103,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
          call warning('analysis_shell','not enough trial neighbours')
       endif 
       n = n + 1 
-      if (n > 50) call fatal('analysis_shell','cannot find neighbours')
+      if (n > 1000) call fatal('analysis_shell','cannot find neighbours')
    enddo 
 
    !- Compute properties by interpolating from true neighbours 
