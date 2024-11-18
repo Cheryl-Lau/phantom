@@ -28,6 +28,21 @@ def plot_line(ax,x,y,colour):
     return 
 
 
+def plot_dashed_line(ax,x,y,colour):
+    '''
+    For total energy  
+    sorts x, then sort y according to x 
+    '''
+    x_sorted = sorted(x)
+    y_sorted = [ydum for _, ydum in sorted(zip(x,y))]
+    x_sorted.pop(0)
+    y_sorted.pop(0)
+
+    ax.plot(x_sorted,y_sorted,'--',color=colour,linewidth=1)    
+
+    return 
+
+
 def read_input_combineframe():
 
     df = pd.DataFrame(columns=('chnl', 'time', 'radius', 'ekin','etherm','etot'))
@@ -82,9 +97,6 @@ def plot_energ_in_rad(ax,rad,df):
     time0_ff = np.min(time_ff00)   # sync to time when shock arrives rad 
     time0_cf = np.min(time_cf01)  
 
-#    ax.scatter(time_ff00-time0_ff,etot_ff00,s=1,color='darkblue',label='free-field ')
-#    ax.scatter(time_cf01-time0_cf,etot_cf01,s=1,color='salmon',label='confined '+'$\Omega = 0.1 \cdot 4 \pi$')
-#    ax.scatter(time_cf03-time0_cf,etot_cf03,s=1,color='firebrick',label='confined '+'$\Omega = 0.3 \cdot 4 \pi$')
 
     ax.scatter(time_ff00-time0_ff,ekin_ff00,s=1,color='navy',label='free-field $\mathrm{E_{kin}}$')
     ax.scatter(time_cf01-time0_cf,ekin_cf01,s=1,color='orangered',label='confined $\mathrm{E_{kin}}$ '+'$\Omega = 0.1 \cdot 4 \pi$')
@@ -100,6 +112,10 @@ def plot_energ_in_rad(ax,rad,df):
     plot_line(ax,time_cf01-time0_cf,etherm_cf01,'coral')
     plot_line(ax,time_cf03-time0_cf,ekin_cf03,'orange')
     plot_line(ax,time_cf03-time0_cf,etherm_cf03,'gold')
+
+    # total energy 
+    plot_dashed_line(ax,time_ff00-time0_ff,etot_ff00,'midnightblue')
+    plot_dashed_line(ax,time_cf01-time0_cf,etot_cf01,'darkred')
 
     ax.set_yscale('log')
     ax.set_xlabel('time [Myr]')

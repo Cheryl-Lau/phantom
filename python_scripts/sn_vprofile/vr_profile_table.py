@@ -11,17 +11,21 @@ Construct table of a, m, Nsn, Ek which satisfies the
 relation sum_i_Nsn 1/2mv^2 = Ek 
 '''
 
+unit_energ = 8.554E+40 
+umass = 1.989E+33
+
 test_one = False
 
 # Params to scan 
-a_scan = np.linspace(1E4,1E6,200)
-Nsn_scan = np.linspace(6,700,200)
-mi_scan = np.linspace(1E-4,1E-1,200)
+a_scan = np.linspace(2E9,3E9,200)
+Nsn_scan = np.linspace(10,3000,200)
+mi_scan = np.linspace(1E-3,1E-1,200)
+
 
 if test_one == True: 
-    a_scan = [-1.0]
-    Nsn_scan = [209]
-    mi_scan = [1E-3]
+    a_scan = [2E9,3E9]
+    Nsn_scan = [10,3000]
+    mi_scan = [1E-3,1E-1]
 
 num_trial = 20 
 
@@ -39,8 +43,8 @@ def vrfunc(a,r):
 def compute_Ek(a,mi,Nsn): 
     Ek_parts = []
     for ipart in range(int(Nsn)):
-        ri = rd.uniform(0,1) 
-        Ek_parts.append(1./2.*mi*(vrfunc(a,ri))**2) 
+        ri = rd.uniform(0,2) 
+        Ek_parts.append(1./2.*mi*umass*(vrfunc(a,ri))**2) 
     Ek = np.sum(Ek_parts)
     return Ek 
 
@@ -66,7 +70,7 @@ def main():
                 
                 a_table.append(a) 
                 Nsn_table.append(int(np.round(Nsn,0))) 
-                mi_table.append(mi) 
+                mi_table.append(mi*umass) 
                 Ek_table.append(meanEk) 
                 
                 entry += 1

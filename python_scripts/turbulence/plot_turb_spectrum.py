@@ -6,6 +6,11 @@ from numpy import sqrt, zeros, conj, pi, arange, ones, convolve
 import matplotlib.pyplot as plt 
 import sys
 
+Myr = 1e6*365*24*60*60
+utime = 4.706E+14
+t0_Myr = 7.1121E-02*utime/Myr  # starting time of SN injection (exclude HII evolve time)
+
+
 def read_dump_veldata(filename_vx,filename_vy,filename_vz):
 
     time_cgs = np.loadtxt(filename_vx,skiprows=1,max_rows=1)
@@ -32,7 +37,7 @@ def read_dump_veldata(filename_vx,filename_vy,filename_vz):
         vy_cube[iix,iiy,iiz] = vy[iref]
         vz_cube[iix,iiy,iiz] = vz[iref]
 
-    return vx_cube,vy_cube,vz_cube,sizex,sizey,sizez,nx,ny,nz
+    return time_cgs,vx_cube,vy_cube,vz_cube,sizex,sizey,sizez,nx,ny,nz
     
 
 def Helmholtz_Hodge_decomposition(u,v,w,nx,ny,nz):
@@ -241,68 +246,118 @@ def movingaverage(interval, window_size):
     return convolve(interval, window, 'same')
 
 
-def plot_powerspec(ax,wavenumber,spectrum,linestylestr,colourstr,labelstr):
+def plot_powerspec(ax,time,wavenumber,spectrum,linestylestr,colourstr,labelstr):
 
     ax.plot(wavenumber,spectrum,linestylestr.strip(),color=colourstr.strip(),label=labelstr.strip())
+    ax.axvspan(1.2,5,alpha=0.3,color='lightgrey')
+    ax.axvspan(1e-2,6.4e-2,alpha=0.3,color='lightgrey')
     ax.set_xscale('log')
     ax.set_yscale('log')
-    ax.set_xlabel('Wave number k [$\mathrm{pc^{-1}}$]')
-    ax.set_ylabel('Kinetic energy E(k) [erg]')
-    ax.set_xlim([8e-2,9e0])
-    ax.set_ylim([1e5,1e15])
-    ax.legend()
+    ax.set_xlabel('wave number k [$\mathrm{pc^{-1}}$]')
+    ax.set_ylabel('kinetic energy E(k) [erg]')
+    ax.set_xlim([3.5e-2,2.5e0])
+    ax.set_ylim([1e5,5e15])
+    ax.legend(loc='upper right',fontsize=7)
+
+    return 
+
+
+def create_spec(ax,filename_vx,filename_vy,filename_vz,labelstr,linestyle,textloc_x,textloc_y):
+
+    time_cgs,vx_cube,vy_cube,vz_cube,sizex,sizey,sizez,nx,ny,nz = read_dump_veldata(filename_vx,filename_vy,filename_vz)
+
+    vx_compr,vy_compr,vz_compr,vx_solen,vy_solen,vz_solen = Helmholtz_Hodge_decomposition(vx_cube,vy_cube,vz_cube,nx,ny,nz)
+
+    knyquist, wavenumber,tke_spectrum = compute_tke_spectrum(vx_cube,vy_cube,vz_cube,sizex,sizey,sizez,True)
+    plot_powerspec(ax,time_cgs,wavenumber,tke_spectrum,linestyle,'black',labelstr+' total $E_\mathrm{kin}$')
+
+    knyquist, wavenumber,tke_spectrum = compute_tke_spectrum(vx_compr,vy_compr,vz_compr,sizex,sizey,sizez,True)
+    plot_powerspec(ax,time_cgs,wavenumber[1:],tke_spectrum[1:],linestyle,'blue',labelstr+' compressive mode')
+
+    knyquist, wavenumber,tke_spectrum = compute_tke_spectrum(vx_solen,vy_solen,vz_solen,sizex,sizey,sizez,True)
+    plot_powerspec(ax,time_cgs,wavenumber,tke_spectrum,linestyle,'red',labelstr+' solenoidal mode')
+
+    if (labelstr == 'semi-confined'):
+        time_Myr = time_cgs/Myr - t0_Myr 
+    else:
+        time_Myr = time_cgs/Myr
+    ax.text(textloc_x,textloc_y,labelstr+': '+str(round(time_Myr,3))+' Myr',fontsize=7)
 
     return 
 
 
 def main():
 
-    fig = plt.figure(figsize=[7,5])
-    ax1 = fig.add_subplot(111)
+    fig,(ax1,ax2,ax3,ax4) = plt.subplots(nrows=4,sharex=False,subplot_kw=dict(frameon=True),figsize=(5,12),dpi=200)
+
+
+    # Shock front 40 pc: 
+    ax1.text(4e-2,7e14,'Shock front at 40 pc')
 
     # Semi-confined case 
-    filename_vx = 'semi_confined01/velfield_x_withhii_hires_lowden_be1_chnl01_01000.dat'
-    filename_vy = 'semi_confined01/velfield_y_withhii_hires_lowden_be1_chnl01_01000.dat'
-    filename_vz = 'semi_confined01/velfield_z_withhii_hires_lowden_be1_chnl01_01000.dat'
-
-    vx_cube,vy_cube,vz_cube,sizex,sizey,sizez,nx,ny,nz = read_dump_veldata(filename_vx,filename_vy,filename_vz)
-
-    vx_compr,vy_compr,vz_compr,vx_solen,vy_solen,vz_solen = Helmholtz_Hodge_decomposition(vx_cube,vy_cube,vz_cube,nx,ny,nz)
-
-    knyquist, wavenumber,tke_spectrum = compute_tke_spectrum(vx_cube,vy_cube,vz_cube,sizex,sizey,sizez,True)
-    plot_powerspec(ax1,wavenumber,tke_spectrum,'-','black','semi-confined velocity')
-
-    knyquist, wavenumber,tke_spectrum = compute_tke_spectrum(vx_compr,vy_compr,vz_compr,sizex,sizey,sizez,True)
-    plot_powerspec(ax1,wavenumber[1:],tke_spectrum[1:],'-','blue','semi-confined compressive mode')
-
-    knyquist, wavenumber,tke_spectrum = compute_tke_spectrum(vx_solen,vy_solen,vz_solen,sizex,sizey,sizez,True)
-    plot_powerspec(ax1,wavenumber,tke_spectrum,'-','red','semi-confined solenoidal mode')
-
+    filename_vx = 'semi_confined01/velfield_x_withhii_chnl01_00200.dat'
+    filename_vy = 'semi_confined01/velfield_y_withhii_chnl01_00200.dat'
+    filename_vz = 'semi_confined01/velfield_z_withhii_chnl01_00200.dat'
+    create_spec(ax1,filename_vx,filename_vy,filename_vz,'semi-confined','-',4e-2,2e14)
 
     # Free-field case 
-    filename_vx = 'free_field/velfield_x_nocloud_hires_be1_01000.dat'
-    filename_vy = 'free_field/velfield_y_nocloud_hires_be1_01000.dat'
-    filename_vz = 'free_field/velfield_z_nocloud_hires_be1_01000.dat'
-
-    vx_cube,vy_cube,vz_cube,sizex,sizey,sizez,nx,ny,nz = read_dump_veldata(filename_vx,filename_vy,filename_vz)
-
-    vx_compr,vy_compr,vz_compr,vx_solen,vy_solen,vz_solen = Helmholtz_Hodge_decomposition(vx_cube,vy_cube,vz_cube,nx,ny,nz)
-
-    knyquist, wavenumber,tke_spectrum = compute_tke_spectrum(vx_cube,vy_cube,vz_cube,sizex,sizey,sizez,True)
-    plot_powerspec(ax1,wavenumber,tke_spectrum,'--','black','free-field velocity')
-
-    knyquist, wavenumber,tke_spectrum = compute_tke_spectrum(vx_compr,vy_compr,vz_compr,sizex,sizey,sizez,True)
-    plot_powerspec(ax1,wavenumber[1:],tke_spectrum[1:],'--','blue','free-field compressive mode')
-
-    knyquist, wavenumber,tke_spectrum = compute_tke_spectrum(vx_solen,vy_solen,vz_solen,sizex,sizey,sizez,True)
-    plot_powerspec(ax1,wavenumber,tke_spectrum,'--','red','free-field solenoidal mode')
+    filename_vx = 'free_field/velfield_x_nocloud_bigenv_00005.dat'
+    filename_vy = 'free_field/velfield_y_nocloud_bigenv_00005.dat'
+    filename_vz = 'free_field/velfield_z_nocloud_bigenv_00005.dat'
+    create_spec(ax1,filename_vx,filename_vy,filename_vz,'free-field','--',4e-2,7e13)
 
 
+    # Shock front 100 pc: 
+    ax2.text(4e-2,7e14,'Shock front at 100 pc')
+
+    # Semi-confined case 
+    filename_vx = 'semi_confined01/velfield_x_withhii_chnl01_00600.dat'
+    filename_vy = 'semi_confined01/velfield_y_withhii_chnl01_00600.dat'
+    filename_vz = 'semi_confined01/velfield_z_withhii_chnl01_00600.dat'
+    create_spec(ax2,filename_vx,filename_vy,filename_vz,'semi-confined','-',4e-2,2e14)
+
+    # Free-field case 
+    filename_vx = 'free_field/velfield_x_nocloud_bigenv_00050.dat'
+    filename_vy = 'free_field/velfield_y_nocloud_bigenv_00050.dat'
+    filename_vz = 'free_field/velfield_z_nocloud_bigenv_00050.dat'
+    create_spec(ax2,filename_vx,filename_vy,filename_vz,'free-field','--',4e-2,7e13)
 
 
-    plt.show()
+    # Shock front 140 pc: 
+    ax3.text(4e-2,7e14,'Shock front at 140 pc')
+
+    # Semi-confined case 
+    filename_vx = 'semi_confined01/velfield_x_withhii_chnl01_00800.dat'
+    filename_vy = 'semi_confined01/velfield_y_withhii_chnl01_00800.dat'
+    filename_vz = 'semi_confined01/velfield_z_withhii_chnl01_00800.dat'
+    create_spec(ax3,filename_vx,filename_vy,filename_vz,'semi-confined','-',4e-2,2e14)
+
+    # Free-field case 
+    filename_vx = 'free_field/velfield_x_nocloud_bigenv_00100.dat'
+    filename_vy = 'free_field/velfield_y_nocloud_bigenv_00100.dat'
+    filename_vz = 'free_field/velfield_z_nocloud_bigenv_00100.dat'
+    create_spec(ax3,filename_vx,filename_vy,filename_vz,'free-field','--',4e-2,7e13)
+
+
+    # Shock front at 200 pc: 
+    ax4.text(4e-2,7e14,'Shock front at 200 pc')
+
+    # Semi-confined case 
+    filename_vx = 'semi_confined01/velfield_x_withhii_chnl01_01000.dat'
+    filename_vy = 'semi_confined01/velfield_y_withhii_chnl01_01000.dat'
+    filename_vz = 'semi_confined01/velfield_z_withhii_chnl01_01000.dat'
+    create_spec(ax4,filename_vx,filename_vy,filename_vz,'semi-confined','-',4e-2,2e14)
+
+    # Free-field case 
+    filename_vx = 'free_field/velfield_x_nocloud_bigenv_00200.dat'
+    filename_vy = 'free_field/velfield_y_nocloud_bigenv_00200.dat'
+    filename_vz = 'free_field/velfield_z_nocloud_bigenv_00200.dat'
+    create_spec(ax4,filename_vx,filename_vy,filename_vz,'free-field','--',4e-2,7e13)
+
+
+    fig.tight_layout(pad=1.0)
     fig.savefig('turb_ke_spec.png',dpi=200)
-
+    plt.show()
 
 
 

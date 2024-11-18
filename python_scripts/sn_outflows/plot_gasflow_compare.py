@@ -25,14 +25,14 @@ def plot_gas_detec(ax1,ax2,ax3,filepath,labelstr,colourstr,t0_shock):
         rho_cgs,vx_cgs,u_cgs,thermpr_cgs,rampr_cgs = np.loadtxt(filename,skiprows=3,max_rows=3,unpack=True)
 
         if (firstcall==True):
-            ax1.scatter(time_Myr,vx_cgs,s=1,color=colourstr,label=labelstr)
-            ax2.scatter(time_Myr,thermpr_cgs,s=1,color=colourstr,label=labelstr)
-            ax3.scatter(time_Myr,rampr_cgs,s=1,color=colourstr,label=labelstr)
+            ax1.scatter(time_Myr,vx_cgs,s=3,color=colourstr,label=labelstr)
+            ax2.scatter(time_Myr,thermpr_cgs,s=3,color=colourstr,label=labelstr)
+            ax3.scatter(time_Myr,rampr_cgs,s=3,color=colourstr,label=labelstr)
             firstcall = False
         else:
-            ax1.scatter(time_Myr,vx_cgs,s=1,color=colourstr)
-            ax2.scatter(time_Myr,thermpr_cgs,s=1,color=colourstr)
-            ax3.scatter(time_Myr,rampr_cgs,s=1,color=colourstr)
+            ax1.scatter(time_Myr,vx_cgs,s=3,color=colourstr)
+            ax2.scatter(time_Myr,thermpr_cgs,s=3,color=colourstr)
+            ax3.scatter(time_Myr,rampr_cgs,s=3,color=colourstr)
 
     return 
 

@@ -30,7 +30,7 @@ def get_pressure(rho,temp):
 
 # Sedov is a self-similar solution, here we'll put everything in cgs units 
 
-t_end = 0.42*Myr                 # sim end time 
+t_end = 0.33*Myr                 # sim end time 
 dt = t_end/1000                  # timestep 
 
 r_detect = 8. *3.086e+18        # location of detector 

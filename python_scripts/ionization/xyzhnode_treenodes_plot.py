@@ -7,19 +7,16 @@ import matplotlib.pyplot as plt
 plot_slice = True
 colour_mass = False  # else nH
 
-data = np.loadtxt('nixyzhmf_00000.txt',skiprows=3)
-imfilename = 'nixyzhmf_00000.png'
+time_cgs = np.loadtxt('nixyzhmf_04999.txt',skiprows=1,max_rows=1)
+Myr = 1e6*365*24*60*60 
 
-radius = 5
-centre = [0,0,0]
-zmin = -0.1 
-zmax = 0.2 
+n,i,x,y,z,h,m,nH = np.loadtxt('nixyzhmf_04999.txt',skiprows=3,unpack=True)
+imfilename = 'nixyzhmf_04999.png'
 
-x = data[:,2]
-y = data[:,3]
-z = data[:,4]
-m = data[:,6]
-nH = data[:,7]
+radius = 4.5
+centre = [2.181616076E+00,2.883273141E+00,-2.588239455E+00]  # sink 139
+zmin = -2.5
+zmax = -1.0
 
 print(np.sum(m))
 
@@ -27,16 +24,14 @@ max_m = max(m)
 m_scaled = m/max_m
 
 if (plot_slice == True): 
-    x_slice = []
-    y_slice = []
-    m_slice = []
-    nH_slice = []
-    for i in range(len(x)):
-        if z[i] > zmin and z[i] < zmax:
-            x_slice.append(x[i])
-            y_slice.append(y[i])
-            m_slice.append(m[i])
-            nH_slice.append(nH[i])
+
+    islice = np.where(np.logical_and(z > zmin,z < zmax))
+    x_slice = x[islice]
+    y_slice = y[islice]
+    m_slice = m[islice]
+    h_slice = h[islice]
+    nH_slice = nH[islice]
+
     max_m = max(m_slice)
     m_scaled = m_slice/max_m
 
@@ -44,18 +39,30 @@ if (plot_slice == True):
     y = y_slice 
     nH = nH_slice
 
-plt.xlim([-radius+centre[0],radius+centre[0]])
-plt.ylim([-radius+centre[1],radius+centre[1]])
-if (colour_mass == True):
-    plt.scatter(x,y,s=1,c=m_scaled)
-else:
-    plt.scatter(x,y,s=1,c=nH)
-    
-plt.xlabel('x [pc]')
-plt.ylabel('y [pc]')
-plt.axis('scaled')
-plt.savefig(imfilename.strip())
 
+fig, ax1 = plt.subplots(ncols=1, sharey=True, subplot_kw=dict(frameon=True), figsize=(6,5))
+
+if (colour_mass == True):
+    m = ax1.scatter(x,y,s=1,c=m_scaled,alpha=0.6)
+else:
+    m = ax1.scatter(x,y,s=1,c=nH,alpha=0.6)
+    
+plt.gca().set_aspect('equal')
+
+ax1.set_xlim([-radius+centre[0],radius+centre[0]])
+ax1.set_ylim([-radius+centre[1],radius+centre[1]])
+ax1.set_xlabel('x [pc]')
+ax1.set_ylabel('y [pc]')
+ax1.text(-radius*0.9+centre[0],radius*0.85+centre[1],'time = '+str(round(time_cgs/Myr,2))+' Myr')
+ax1.text(radius*0.2+centre[0],radius*0.85+centre[1],str(zmin)+' pc < z < '+str(zmax)+' pc')
+
+plt.colorbar(m,label='neutral fraction', orientation='vertical') 
+
+
+fig.tight_layout(pad=0.5)
+
+
+plt.savefig(imfilename.strip(),dpi=200)
 plt.show() 
 
 
