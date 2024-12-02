@@ -1612,6 +1612,7 @@ endif
 ifeq ($(SYSTEM), hypatia)
 # New HPC cluster at University of St. Andrews from 12/2024
     include Makefile_defaults_gfortran
+    FFLAGS+= -mcmodel=medium
     QSYS = slurm
 endif
 
