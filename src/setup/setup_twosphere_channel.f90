@@ -189,7 +189,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call prompt('Enter the separation between the centre of clouds in pc',cloud_sep_pc,0.)
 
     !- Settings for the envelope
-    np_envelope = 1E5 !3E5
+    np_envelope = 1E6 !3E5
     call prompt('Enter the approximate number of particles within the envelope boundaries',np_envelope,0,npmax)
     rho_envelope_cgs = 4E-25  ! for 1000K  
     call prompt('Enter the density of the envelope in g/cm^3',rho_envelope_cgs,0.)
