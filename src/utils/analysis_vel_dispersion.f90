@@ -25,7 +25,7 @@ module analysis
 
  integer, parameter :: nrad  = 10
  real    :: rad_thresh(nrad) = (/ 6e-2,8e-2,1e-1,2e-1,4e-1,6e-1,8e-1,1e0,2e0,4e0 /)
- real    :: rholimit_cgs     = 1e-22
+ real    :: rholimit_cgs     = 1e-21
  logical :: only_highdenpart = .true. 
 
 contains
@@ -38,7 +38,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  use io,       only:fatal,warning 
  use part,     only:hfact,rhoh,massoftype,igas
  use eos,      only:gamma
- use physcon,  only:gg 
+ use physcon,  only:gg,pi
  character(len=*), intent(in) :: dumpfile
  integer,          intent(in) :: num,npart,iunit
  real,             intent(in) :: xyzh(:,:),vxyzu(:,:)
@@ -46,8 +46,8 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  integer, parameter :: neighcachesize = 1E5
  integer :: ip,ineigh,nneigh,ixyzcachesize,n,irad,ip_neigh
  real    :: xyzcache(3,neighcachesize)
- real    :: pmass,maxrad,dist2,rho,rad2_limit,mean_v,sigma_v
- real    :: sigma_v_allrad(nrad),virial_term_allrad(nrad)
+ real    :: pmass,maxrad,dist2,rho,rad2_limit,mean_v,sigma_v,mean_rho
+ real    :: sigma_v_allrad(nrad),virial_term_allrad(nrad),rho_avg_allrad(nrad)
  real,   allocatable :: dumxyzh(:,:)
  character(len=70) :: filename
 
@@ -64,13 +64,15 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
  open(unit=2026,file='velocity_dispersion_'//TRIM(dumpfile)//'.dat',status='replace')
  open(unit=2027,file='virial_term_'//TRIM(dumpfile)//'.dat',status='replace')
+ open(unit=2028,file='density_sizescale_'//TRIM(dumpfile)//'.dat',status='replace')
 
 
  !- Loop over each length-scale 
  !$omp parallel do default(none) shared(npart,pmass,xyzh,vxyzu,rad_thresh,rholimit_cgs) &
- !$omp shared(node,hfact,maxrad,xyzcache,ifirstincell,unit_density,only_highdenpart,unit_velocity) &
- !$omp shared(sigma_v_allrad,virial_term_allrad,umass,udist) &
- !$omp private(ip,rho,nneigh,irad,rad2_limit,mean_v,sigma_v,n,ineigh,ip_neigh,dist2) &
+ !$omp shared(node,hfact,maxrad,xyzcache,ifirstincell,only_highdenpart) &
+ !$omp shared(umass,udist,unit_velocity,unit_density) &
+ !$omp private(ip,rho,nneigh,irad,rad2_limit,mean_v,sigma_v,mean_rho,n,ineigh,ip_neigh,dist2) &
+ !$omp private(sigma_v_allrad,virial_term_allrad,rho_avg_allrad) &
  !$omp schedule(runtime)
  over_part: do ip = 1,npart
     print*,'ip/npart',ip,'/',npart
@@ -85,8 +87,9 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
     over_rad: do irad = 1,nrad
        rad2_limit = (rad_thresh(irad))**2 
 
-       !- Find mean velocity 
+       !- Find mean velocity and density 
        mean_v = 0. 
+       mean_rho = 0.
        n = 0
        over_neigh_mean: do ineigh = 1,nneigh
           ip_neigh = listneigh(ineigh)
@@ -94,10 +97,12 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
           if (dist2 < rad2_limit) then 
              n = n + 1 
              mean_v = mean_v + sqrt(mag2(vxyzu(1:3,ip_neigh)))
+             mean_rho = mean_rho + pmass*(hfact/abs(xyzh(4,ip_neigh)))**3
           endif 
        enddo over_neigh_mean
        if (n == 0) cycle over_rad
        mean_v = mean_v/real(n) 
+       mean_rho = mean_rho/real(n) 
 
        !- Find dispersion (std)
        sigma_v = 0.
@@ -109,24 +114,31 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
           endif 
        enddo over_neigh_sigma
        sigma_v = sqrt(sigma_v/real(n)) 
-
        sigma_v_allrad(irad) = sigma_v*unit_velocity
+
+       !- Virial parameter 
        if (sigma_v > 0) then   
-          virial_term_allrad(irad) = 2.d0*(n*pmass)/(sigma_v**2*rad_thresh(irad))
+          virial_term_allrad(irad) = 2.d0*gg*(n*pmass*umass)/((sigma_v*unit_velocity)**2*rad_thresh(irad)*udist)
        else 
           virial_term_allrad(irad) = -1 ! to be removed during analysis 
        endif 
+
+       !- Mean density 
+       rho_avg_allrad(irad) = (n*pmass*umass)/(4./3.*pi*(rad_thresh(irad)*udist)**3)
+
     enddo over_rad
 
     !$omp critical 
-    write(2026,'(1i15,10f20.10)') ip, sigma_v_allrad(1:nrad)
-    write(2027,'(1i15,10f20.10)') ip, virial_term_allrad(1:nrad)
+    write(2026,'(1i15,10f30.10)') ip, sigma_v_allrad(1:nrad)
+    write(2027,'(1i15,10f30.10)') ip, virial_term_allrad(1:nrad)
+    write(2028,'(1i15,10es30.10)') ip, rho_avg_allrad(1:nrad)
     !$omp end critical 
  enddo over_part
  !$omp end parallel do
 
  close(2026)
  close(2027)
+ close(2028) 
  deallocate(dumxyzh)
 
 end subroutine do_analysis

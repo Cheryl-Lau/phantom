@@ -23,10 +23,12 @@ module analysis
  public :: do_analysis
 
  private
- integer, parameter :: num_velbin = 100
+ integer, parameter :: num_velbin = 500
  integer :: binned_vel(num_velbin)
- real    :: logvelbin_min = -1.
- real    :: logvelbin_max = 5.
+ real    :: velbin_min_cgs = 7E+3
+ real    :: velbin_max_cgs = 4E+7
+ real    :: logvelbin_min,logvelbin_max
+ logical :: locate_range = .false. 
 
 contains
 
@@ -38,8 +40,11 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  real,             intent(in) :: xyzh(:,:),vxyzu(:,:)
  real,             intent(in) :: particlemass,time
  integer :: i,ivelbin
- real    :: vel,dvel,velbin(num_velbin)
+ real    :: vel,dvel,velbin(num_velbin),maxvel,minvel
  character(len=70) :: filename
+
+ logvelbin_min = log10(velbin_min_cgs/unit_velocity)
+ logvelbin_max = log10(velbin_max_cgs/unit_velocity)
 
  !
  ! Separation of rho in log-scale
@@ -54,32 +59,48 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  !
  ! Bin all particles by density
  !
+ minvel = huge(minvel)
+ maxvel = tiny(maxvel)
  do i = 1,npart
     !
     ! Calculate |v|
     !
     vel = sqrt(vxyzu(1,i)**2 + vxyzu(2,i)**2 + vxyzu(3,i)**2)
-    !
-    ! Bin velocity
-    !
-    ivelbin = (log10(vel)-logvelbin_min+dvel)/dvel
-    if (ivelbin < 0) call fatal('analysis_binvelocity','require smaller logvelbin_min')
-    if (ivelbin > num_velbin) call fatal('analysis_binvelocity','require larger logvelbin_max')
-    binned_vel(ivelbin) = binned_vel(ivelbin) + 1
+    if (.not.locate_range) then 
+       !
+       ! Bin velocity
+       !
+       ivelbin = (log10(vel)-logvelbin_min+dvel)/dvel
+       if (ivelbin < 0) then 
+          print*,vel*unit_velocity
+          call fatal('analysis_binvelocity','require smaller logvelbin_min')
+       elseif (ivelbin > num_velbin) then 
+          print*,vel*unit_velocity
+          call fatal('analysis_binvelocity','require larger logvelbin_max')
+       endif 
+       binned_vel(ivelbin) = binned_vel(ivelbin) + 1
+    else 
+       minvel = min(vel,minvel)
+       maxvel = max(vel,maxvel)
+    endif 
  enddo
- !
- ! Convert to physical units and store results
- !
- do ivelbin = 1,num_velbin
-    velbin(ivelbin) = (10**(logvelbin_min + (ivelbin-1)*dvel))*unit_velocity
- enddo
+ if (locate_range) then 
+    print*,'max',maxvel*unit_velocity,'min',minvel*unit_velocity 
+ else 
+    !
+    ! Convert to physical units and store results
+    !
+    do ivelbin = 1,num_velbin
+       velbin(ivelbin) = (10**(logvelbin_min + (ivelbin-1)*dvel))*unit_velocity
+    enddo
 
- filename = 'velocity_binned_'//TRIM(dumpfile)//'.dat'
- open(unit=2024,file=filename)
- do ivelbin = 1,num_velbin
-    write(2024,*) velbin(ivelbin), binned_vel(ivelbin)
- enddo
- close(2024)
+    filename = 'velocity_binned_'//TRIM(dumpfile)//'.dat'
+    open(unit=2024,file=filename)
+    do ivelbin = 1,num_velbin
+       write(2024,*) velbin(ivelbin), binned_vel(ivelbin)
+    enddo
+    close(2024)
+ endif 
 
 end subroutine do_analysis
 !--------------------------------------------------------------------------

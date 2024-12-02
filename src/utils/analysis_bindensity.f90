@@ -23,10 +23,10 @@ module analysis
  public :: do_analysis
 
  private
- integer, parameter :: num_rhobin = 100
+ integer, parameter :: num_rhobin = 500
  integer :: binned_rho(num_rhobin)
- real    :: rhobin_min_cgs = 5E-23
- real    :: rhobin_max_cgs = 4E-18
+ real    :: rhobin_min_cgs = 1E-25
+ real    :: rhobin_max_cgs = 1E-5
  real    :: logrhobin_min,logrhobin_max
 
 contains
@@ -68,8 +68,13 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
     ! Bin rho
     !
     irhobin = (log10(rho)-logrhobin_min+drho)/drho
-    if (irhobin < 0) call fatal('analysis_bindensity','require smaller logrhobin_min')
-    if (irhobin > num_rhobin) call fatal('analysis_bindensity','require larger logrhobin_max')
+    if (irhobin < 0) then 
+       print*,'rho_cgs',rho*unit_density
+       call fatal('analysis_bindensity','require smaller logrhobin_min')
+    elseif (irhobin > num_rhobin) then 
+       print*,'rho_cgs',rho*unit_density
+       call fatal('analysis_bindensity','require larger logrhobin_max')
+    endif 
     binned_rho(irhobin) = binned_rho(irhobin) + 1
  enddo
  !
