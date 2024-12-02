@@ -163,7 +163,7 @@ module photoionize_cmi
 
  integer, parameter :: maxoutfile_ult = 99999
  integer :: maxoutfile = 5000         ! max number of (ni)xyzhmnH output files
- integer :: ncall_writefile = 1       ! interval to write (ni)xyzhmnH output file
+ integer :: ncall_writefile = 100     ! interval to write (ni)xyzhmnH output file
  integer :: icall,iunit,ifile,iruncmi
  integer :: ncall_checktreewalk = 50  ! interval to check for unnecessarily-opened nodes
  integer :: nphotosrc_old

@@ -35,11 +35,11 @@ module inject
  logical, public :: inject_sn = .true.  ! switch on/off sn for testing
 
  ! Runtime parameters for supernovae injection to read from input file
- integer, public :: maxsn     = 200
+ integer, public :: maxsn     = 100
  real,    public :: r_sn_cgs  = 3.086E17    ! 0.1 pc
  real,    public :: engsn_cgs = 1E51        ! 1E51 erg
- real,    public :: frackin   = 0.5
- real,    public :: fractherm = 0.5
+ real,    public :: frackin   = 1.0
+ real,    public :: fractherm = 0.0
 
  real,    public :: pmsncrit_cgs = 1.59E34  ! 8 solarm
  logical, public :: sink_progenitor = .false.
@@ -56,8 +56,8 @@ module inject
 
  ! Set sne properties if not using sinks as progenitors
  integer, parameter :: maxsn_insert = 1
- real    :: mstar_cgs = 1.9891d35  ! 100 solarm
- real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 0., 0., 0., 1.317E+12 /), &
+ real    :: mstar_cgs = 1.59E34  ! 8 solarm  !1.9891d35  ! 100 solarm
+ real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 0., 0., 0., 0. /), &
                                                            shape=(/4,maxsn_insert/))
 
  ! Global storage for all sne (also used for switching-off cooling)
@@ -115,6 +115,7 @@ subroutine init_inject(ierr)
  if (.not.sink_progenitor) then
     if (mstar_cgs < pmsncrit_cgs) call warning('inject_sne_sphng','recommend setting a larger mstar_cgs')
     mstar = mstar_cgs/umass
+    print*,'mstar_cgs mstar',mstar_cgs,mstar
  endif
  !
  ! Import tabulated velocity profile (Precomputed solutions to
@@ -174,8 +175,8 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  use io,         only:master,fatal,warning
  use part,       only:nptmass,massoftype,igas,kill_particle,hfact
  use partinject, only:add_or_update_particle
- use physcon,    only:pi
- use units,      only:unit_energ
+ use physcon,    only:pi,pc 
+ use units,      only:unit_energ,udist,unit_velocity 
  use timestep,   only:dtmax
  use cooling,    only:snecoolingoff,maxcoolingoff,xyzh_coolingoff,dt_cooloff,ncoolingoff
  real,    intent(in)    :: time,dtlast
@@ -191,6 +192,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  real     :: xyz_partsn(3),vxyz_partsn(3),xyz_ref(3,6),r_ref,hnew,unew,dist,dist_nearby
  real     :: vrad,a_vrad,r_vrad,aN_scalefactor
  real     :: ekintot,ethermtot,etot_allparts_old,etot_allparts,endiff_cgs
+ real     :: vrad_min,vrad_max,r_ref_max,r_vrad_max
  logical  :: timematch_inject,queueflag_iallsn
 
  !
@@ -219,7 +221,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  !
  if (nallsn >= 1) then
     do iallsn = 1,nallsn
-       timematch_inject = abs(xyzht_allsn(5,iallsn) - time) < dtmax
+       timematch_inject = abs(xyzht_allsn(5,iallsn) - time) < dtmax+tiny(dtmax)
        queueflag_iallsn = queueflag(iallsn)
        if (timematch_inject .and. .not.queueflag_iallsn) then
           nsn = nsn + 1
@@ -334,6 +336,12 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        !    each other around the origin;
        !    Uses the 6 refpoints to place 6 particles as a group at a time.
        !
+
+       vrad_max = tiny(vrad_max)
+       r_ref_max = tiny(r_ref_max)
+       open(unit=2040,file='sn_velocity_profile.dat',status='replace')
+       write(2040,'(2a20)') 'r [cm]','vel [cm/s]'
+
        npartold = npart
        over_partsngroup: do iadd = npartold+1,npartold+npartsn,6
           ipartsn = iadd
@@ -349,7 +357,23 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
                                          npartoftype,xyzh,vxyzu)
              ipartsn = ipartsn + 1
           enddo over_partsn
+          ! Record max vel in mid-regions and vel on the outermost 
+          if (vrad > vrad_max) then 
+             vrad_max = vrad 
+             r_vrad_max = r_ref 
+          endif 
+          if (r_ref > r_ref_max) then 
+             r_ref_max = r_ref
+             vrad_min  = vrad 
+          endif 
+          write(2040,'(2e20.10)') r_ref*r_sn*udist, vrad*unit_velocity 
        enddo over_partsngroup
+
+       print*,'vrad_min [cm/s] ',vrad_min*unit_velocity,'at radius [pc]',r_ref_max*r_sn*udist/pc 
+       print*,'vrad_max [cm/s] ',vrad_max*unit_velocity,'at radius [pc]',r_vrad_max*r_sn*udist/pc 
+       print*,'approx distance to form shell [pc] ',(r_ref_max*r_sn-r_vrad_max*r_sn)*vrad_max/(vrad_max-vrad_min) *udist/pc 
+       close(2040)
+
  !      !
  !      ! Put nearby particles around r_sn to smallest timestep to avoid being 'shocked'
  !      !
