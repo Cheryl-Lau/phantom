@@ -79,7 +79,7 @@ module cooling
 
  private
  integer, parameter :: nTg = 64
- integer, parameter :: maxt = 1000
+ integer, parameter :: maxt = 5000
  real,    parameter :: Tref = 1.d5, T_floor = 10.   ! required for exact_cooling
  integer :: nt
  real    :: temper(maxt),lambda(maxt),slope(maxt),yfunc(maxt)
@@ -94,9 +94,9 @@ module cooling
  real    :: KI02_rho_min,KI02_rho_max
  real    :: rhov4_KI02(2,maxt)
 
- real    :: rhominJML_cgs = 1E-28   ! density range of which JML06 cooling curve has equilibium solution(s)
- real    :: rhomaxJML_cgs = 1E-15   !  -Note: rhominJML_cgs is hard limit; rhomaxJML_cgs can be increased by lowering TminJML
- real    :: TminJML = 1E0           ! temperature range of JML06 cooling curve
+ real    :: rhominJML_cgs = 6.35d-29   ! density range of which JML06 cooling curve has equilibium solution(s)
+ real    :: rhomaxJML_cgs = 1.d-14    !  -Note: rhominJML_cgs is hard limit; rhomaxJML_cgs can be increased by lowering TminJML
+ real    :: TminJML = 1E0            ! temperature range of JML06 cooling curve
  real    :: TmaxJML = 1E9
  real    :: rhoueqJML_table(5,maxt)
 
