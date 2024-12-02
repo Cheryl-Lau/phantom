@@ -834,7 +834,7 @@ ifeq ($(SETUP), starbench_hpc)
     ANALYSIS=analysis_hiiregion_temp.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
-    CMACIONIZE_KENNEDY=yes
+    CMACIONIZE_HYPATIA=yes
     PERIODIC=no
     GRAVITY=no
     ISOTHERMAL=no
@@ -864,7 +864,7 @@ ifeq ($(SETUP), rhdturbbox_hpc)
     ANALYSIS=analysis_ionizedmass.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
-    CMACIONIZE_KENNEDY=yes
+    CMACIONIZE_HYPATIA=yes
     PERIODIC=no
     GRAVITY=no
     ISOTHERMAL=no
@@ -899,7 +899,7 @@ ifeq ($(SETUP), rhdsne_hpc)
     ANALYSIS=analysis_bindensity.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
-    CMACIONIZE_KENNEDY=yes
+    CMACIONIZE_HYPATIA=yes
     PERIODIC=no
     GRAVITY=yes
     ISOTHERMAL=no
@@ -935,7 +935,7 @@ ifeq ($(SETUP), elongcloud_env_hpc)
     MODFILE=moddump_clear_around_sink.f90 
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
-    CMACIONIZE_KENNEDY=yes
+    CMACIONIZE_HYPATIA=yes
     PERIODIC=no
     GRAVITY=yes
     ISOTHERMAL=no
@@ -949,7 +949,7 @@ ifeq ($(SETUP), sncavity)
 #	 Injecting SN into cloud with cavity and channels
     SETUPFILE=velfield_fromcubes.f90 setup_twosphere_channel.f90
     SRCINJECT=inject_sne_sphng.f90
-    ANALYSIS=analysis_velfield.f90
+    ANALYSIS=analysis_prop_from_ionsrc.f90
     MODFILE=moddump_clear_channels.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
@@ -971,7 +971,7 @@ ifeq ($(SETUP), sncavity_hpc)
     MODFILE=moddump_rmv_shock.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
-    CMACIONIZE_KENNEDY=yes
+    CMACIONIZE_HYPATIA=yes
     PERIODIC=no
     GRAVITY=no 
     ISOTHERMAL=no
@@ -1396,6 +1396,12 @@ ifeq ($(CMACIONIZE_KENNEDY),yes)
     LDFLAGS+= -L/$(CMI_DIR)/build/lib -lCMIFortranLibrary -lCMILibrary -lLegacyEngine -lSharedEngine /usr/lib64/libhdf5.so -lstdc++ -lc
 endif
 
+ifeq ($(CMACIONIZE_HYPATIA), yes)
+    LDFLAGS+= -L/$(CMI_DIR)/build/lib -lCMIFortranLibrary -lCMILibrary -lLegacyEngine -lSharedEngine \
+    $(HDF5ROOT)/lib/libhdf5.so /usr/lib64/libz.so /usr/lib64/libdl.a /usr/lib64/libm.so \
+    /software/MPI/openmpi-5.0.5/lib/libmpi.so -lstdc++ -lc
+endif
+
 
 #----------------------------------------------------------------
 ifeq ($(SYSTEM),cray)
@@ -1599,6 +1605,13 @@ endif
 ifeq ($(SYSTEM), kennedy)
 # HPCs cluster at University of St. Andrews
     include Makefile_defaults_ifort
+    OMPFLAGS = -qopenmp
+    QSYS = slurm
+endif
+
+ifeq ($(SYSTEM), hypatia)
+# New HPC cluster at University of St. Andrews from 12/2024
+    include Makefile_defaults_gfortran
     OMPFLAGS = -qopenmp
     QSYS = slurm
 endif

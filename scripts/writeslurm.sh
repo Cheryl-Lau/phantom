@@ -32,6 +32,10 @@ echo 'export OMP_NUM_THREADS=32'
 echo 'export KMP_STACKSIZE=128M'
 echo 'ulimit -s unlimited'
 
+echo 'module load openmpi/5.0.5'
+echo 'module load gcclibs/11.4.1'
+echo 'module load ucx/1.16.0'
+
 echo 'echo $SLURM_NPROCS'
 echo 'echo "HOSTNAME = $HOSTNAME"'
 echo 'echo "HOSTTYPE = $HOSTTYPE"'
