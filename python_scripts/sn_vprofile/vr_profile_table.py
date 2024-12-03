@@ -14,18 +14,19 @@ relation sum_i_Nsn 1/2mv^2 = Ek
 unit_energ = 8.554E+40 
 umass = 1.989E+33
 
-test_one = False
+test_one = False 
+
 
 # Params to scan 
-a_scan = np.linspace(2E9,3E9,200)
-Nsn_scan = np.linspace(10,3000,200)
-mi_scan = np.linspace(1E-3,1E-1,200)
+a_scan = np.logspace(np.log10(5E8),np.log10(1E12),200)
+Nsn_scan = np.logspace(np.log10(10),np.log10(3000),200)
+mi_scan = np.logspace(np.log10(1E-3),np.log10(1E-1),200)
 
 
 if test_one == True: 
-    a_scan = [2E9,3E9]
-    Nsn_scan = [10,3000]
-    mi_scan = [1E-3,1E-1]
+    a_scan = [1E9]
+    Nsn_scan = [3000]
+    mi_scan = [1E-1]
 
 num_trial = 20 
 
@@ -43,10 +44,24 @@ def vrfunc(a,r):
 def compute_Ek(a,mi,Nsn): 
     Ek_parts = []
     for ipart in range(int(Nsn)):
-        ri = rd.uniform(0,2) 
+        ri = ranpoint_insphere()
+        r1 = 2.0*ri
         Ek_parts.append(1./2.*mi*umass*(vrfunc(a,ri))**2) 
     Ek = np.sum(Ek_parts)
     return Ek 
+
+
+def ranpoint_insphere():
+    a_vec = np.array([1,1,1])
+    a_mag = np.linalg.norm(a_vec)
+    while ((a_mag > 1) and (a_mag < 0.01)):
+        x = 2.0*(rd.uniform(0,1)-0.5)
+        y = 2.0*(rd.uniform(0,1)-0.5) 
+        z = 2.0*(rd.uniform(0,1)-0.5)
+        a_vec = np.array([x,y,z])
+        a_mag = np.linalg.norm(a_vec)
+    r = a_mag
+    return r
 
 
 def main(): 
