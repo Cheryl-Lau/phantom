@@ -56,7 +56,7 @@ module inject
 
  ! Set sne properties if not using sinks as progenitors
  integer, parameter :: maxsn_insert = 1
- real    :: mstar_cgs = 1.59E34  ! 8 solarm  !1.9891d35  ! 100 solarm
+ real    :: mstar_cgs = 1.59E34  ! 8 solarm
  real    :: xyzt_sn_insert_cgs(4,maxsn_insert) = reshape((/ 0., 0., 0., 0. /), &
                                                            shape=(/4,maxsn_insert/))
 
@@ -69,14 +69,11 @@ module inject
  logical :: snflag_sink(maxptmass)    ! Flag when sink particle has boomed
  logical :: queueflag(maxallsn)
 
- integer, parameter :: maxvprofile = 8E6
- real    :: vprofile(4,maxvprofile)   ! Tabulated velocity profiles of sn particles
- real    :: tol_m       = 2.51E-4     ! Half of interval of m in table
- real    :: tol_npartsn = 2.          ! Half of interval of npartsn in table
- real    :: i_cand(400),Ek_cand(400)  ! Store entries where both m and npartsn match (200/400)
+ integer :: maxvprofile = 8E6
+ real,   allocatable :: vprofile(:,:) ! Tabulated velocity profiles of sn particles
  logical :: first_sn
 
- integer :: iseed = -12345
+ integer :: iseed = -432
  real    :: r_sn,engsn,pmsncrit,mstar
  real    :: xyzt_sn_insert(4,maxsn_insert)
 
@@ -122,6 +119,7 @@ subroutine init_inject(ierr)
  ! Ek = sum_{i}{Nsn} 1/2 mi vi(a)^2 with vi(a) defined by vrfunc)
  !
  open(1723,file=find_phantom_datafile('vprofile_sn.txt','sne_sphng'))
+ allocate(vprofile(4,maxvprofile))
  do ientry = 1,maxvprofile
    read(1723,*) (vprofile(i,ientry), i=1,4)  ! a,Nsn,m,Ek
  enddo
@@ -184,10 +182,12 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  integer, intent(inout) :: npart
  integer, intent(inout) :: npartoftype(:)
  real,    intent(out)   :: dtinject
- integer  :: ipart,isn,iadd,ia,ip,ii,icf,iallsn
+ integer  :: ipart,isn,iadd,ia,ip,ii,icf,iallsn,ncand
  integer  :: npartold,nsn,nkilled,npartsn,ipartsn,progindex,iprog_sn(maxsn),iinsert_sn(maxsn)
  integer  :: i_rightcand,iEk
  integer  :: indexallsn(maxsn)
+ integer, allocatable :: i_cand(:)
+ real,    allocatable :: Ek_cand(:) 
  real     :: xyz_sn(3,maxsn),vxyz_sn(3,maxsn),m_sn(maxsn),h_sn(maxsn),mradsn,engkin,engtherm,numden,t_sn
  real     :: xyz_partsn(3),vxyz_partsn(3),xyz_ref(3,6),r_ref,hnew,unew,dist,dist_nearby
  real     :: vrad,a_vrad,r_vrad,aN_scalefactor
@@ -281,6 +281,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
              call warning('inject_sne_sphng','no particles found within blast radius')
           endif
        endif
+
        !
        ! Adding in 1/4 mass of progenitor into supernova
        !
@@ -291,11 +292,13 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        else
           mradsn = mradsn + 0.25*mstar
        endif
+
        !
        ! Energies of supernova
        !
        engkin   = engsn * frackin
        engtherm = engsn * fractherm
+
        !
        ! Set number of new particles assuming mass is conserved
        !
@@ -303,21 +306,20 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        print*,'Number of SN particles: ',npartsn
        if (npartsn > nkilled) print*,'adding ',npartsn-nkilled,' extra particles'
        if (npartsn < 6) call fatal('inject_sne_sphng','too few supernova particles')
+
        !
        ! Internal energy of sn particles
        !
        unew = (engtherm/npartsn)/massoftype(igas)
+
        !
        ! Set up velocity profile of sn particles
        !
        if (gaussian_vprofile) then 
           aN_scalefactor = 1. ! to avoid compiler warning
           if (first_sn) then
-             call get_vrprofile_candidates(npartsn,massoftype(igas))   ! get candidate entries
-             i_rightcand = minloc(abs(Ek_cand(:)-engkin),1)  ! obtain the entry with closest Ek
-             iEk = int(i_cand(i_rightcand))
-             a_vrad = vprofile(1,iEK)                        ! obtain the corresponding a
-             aN_scalefactor = a_vrad*npartsn**(1./2.)        ! Store scale factor for forthcoming sne
+             call interp_from_vrprofile(npartsn,massoftype(igas),engkin,a_vrad) 
+             aN_scalefactor = a_vrad*npartsn**(1./2.)  ! Store scale factor for forthcoming sne
              first_sn = .false.
           else
              a_vrad = aN_scalefactor/npartsn**(1./2.)
@@ -325,18 +327,19 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        elseif (uniform_vprofile) then 
           vrad = sqrt((2*engkin)/(npartsn*massoftype(igas)))
        endif 
+
        !
        ! Estimate new smoothing length
        !
        numden = npartsn / (4./3.*pi*r_sn**3)
        hnew = hfact * (numden)**(-1./3.)
+
        !
        ! Add npartsn particles back-in in a symmetrical manner -
        !    Generates a random set of 6 refpoints at same distance and right-angles to
        !    each other around the origin;
        !    Uses the 6 refpoints to place 6 particles as a group at a time.
        !
-
        vrad_max = tiny(vrad_max)
        r_ref_max = tiny(r_ref_max)
        open(unit=2040,file='sn_velocity_profile.dat',status='replace')
@@ -347,7 +350,8 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
           ipartsn = iadd
           call gen_refpoints(xyz_ref,r_ref)
           if (gaussian_vprofile) then 
-             r_vrad = 2*r_ref   ! 2*r_dist/r_sn; scaling max=r_sn to max=2 of vrad func
+             r_vrad = 2.d0*r_ref   ! 2*r_dist/r_sn; scaling max=r_sn to max=2 of vrad func
+             print*,'r_vrad',r_ref 
              vrad = vrfunc(a_vrad,r_vrad) 
           endif 
           over_partsn: do ia = 1,6
@@ -368,7 +372,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
           endif 
           write(2040,'(2e20.10)') r_ref*r_sn*udist, vrad*unit_velocity 
        enddo over_partsngroup
-
+   stop
        print*,'vrad_min [cm/s] ',vrad_min*unit_velocity,'at radius [pc]',r_ref_max*r_sn*udist/pc 
        print*,'vrad_max [cm/s] ',vrad_max*unit_velocity,'at radius [pc]',r_vrad_max*r_sn*udist/pc 
        print*,'approx distance to form shell [pc] ',(r_ref_max*r_sn-r_vrad_max*r_sn)*vrad_max/(vrad_max-vrad_min) *udist/pc 
@@ -384,6 +388,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  !                                        npart,npartoftype,xyzh,vxyzu)
  !         endif
  !      enddo over_nearbyparts
+
        !
        ! Flag to avoid further detonation
        !
@@ -561,7 +566,7 @@ subroutine gen_refpoints(xyz_ref,r_ref)
  ! Random vector point a within sphere of unit radius
  ! and beyond a small accretion radius
  a_vec = (/ 1.,1.,1. /)
- do while (mag(a_vec) > 1 .or. mag(a_vec) < h_acc/r_sn)
+ do while (mag(a_vec) > 1.d0 .or. mag(a_vec) < h_acc/r_sn)   
     x1 = 2.*(ran2(iseed)-0.5)
     y1 = 2.*(ran2(iseed)-0.5)
     z1 = 2.*(ran2(iseed)-0.5)
@@ -609,45 +614,76 @@ end function vrfunc
 
 !
 ! Extract indicies of all entries in vprofile table (and its corresponding Ek)
-! where both npartsn and m matches
+! where both npartsn and m are closest to the required value 
+!  vprofile(4,maxvprofile)  a,Nsn,m,Ek
 !
-subroutine get_vrprofile_candidates(npartsn,mi)
- use io, only:fatal
+subroutine interp_from_vrprofile(npartsn,m,engkin,a_vrad) 
+ use io,    only:fatal
+ use units, only:umass,udist,unit_energ,unit_velocity 
  integer, intent(in)  :: npartsn
- real,    intent(in)  :: mi
- integer :: i,ifill,npartsn_in
- real    :: mi_in
+ real,    intent(in)  :: m,engkin
+ real,    intent(out) :: a_vrad
+ integer :: i,ifill,npartsn_in,npartsn_closest,mindiff_npartsn,ncand
+ real    :: m_in,mindiff_m,m_closest,engkin_extracted,engkin_in,mindiff_engkin,a_vrad_cgs
+ real    :: tol_m = 1E+29
 
- ! Use the closest value if parameters are beyond vprofile range
- mi_in = mi
+ ! Use the max/min value if parameters are beyond vprofile range
+ m_in = m
  npartsn_in = npartsn
- if (mi > 1E-1) then
+ if (m > 1E-1) then
     print*,'Warning - particle mass is beyond vprofile range. Setting mi to 1E-1.'
-    mi_in = 1E-1
- elseif (mi < 1E-4) then
+    m_in = 1E-1
+ elseif (m < 1E-3) then
     print*,'Warning - particle mass is smaller than vprofile range. Setting mi to 1E-4.'
-    mi_in = 1E-4
+    m_in = 1E-3
  endif
- if (npartsn > 700) then
+ if (npartsn > 3000) then
     print*,'Warning - number of supernova particles is beyond vprofile range. Setting npartsn to 700.'
-    npartsn_in = 700
+    npartsn_in = 3000
  endif
 
- ifill = 0
+ ! Convert units 
+ m_in = m_in*umass 
+ engkin_in = engkin*unit_energ 
+
+
+ ! Find value of closest npart_in, closest m_in, and closest engkin_in
+ mindiff_m = huge(mindiff_m)
+ mindiff_npartsn = huge(mindiff_npartsn)
+ mindiff_engkin = huge(mindiff_engkin)
  do i = 1,maxvprofile
-    if (vprofile(2,i) >= npartsn_in-tol_npartsn .and. vprofile(2,i) <= npartsn_in+tol_npartsn .and. &
-        vprofile(3,i) >= mi_in-tol_m .and. vprofile(3,i) <= mi_in+tol_m) then
-       ifill = ifill + 1
-       i_cand(ifill)  = i
-       Ek_cand(ifill) = vprofile(4,i)
-    endif
- enddo
+    if (abs(m_in - vprofile(3,i)) < mindiff_m) then 
+       mindiff_m = abs(m_in - vprofile(3,i)) 
+       m_closest = vprofile(3,i)
+    endif 
+    if (abs(npartsn_in - vprofile(2,i)) < mindiff_npartsn) then 
+       mindiff_npartsn = abs(npartsn_in - vprofile(2,i))
+       npartsn_closest = vprofile(2,i) 
+    endif 
+ enddo 
 
- if (ifill == 0)  call fatal('inject_sne_sphng','Unable to find matching entries from vprofile')
- if (ifill < 200) call fatal('inject_sne_sphng','Unable to find all matching entries in vprofile')
- if (ifill > 400) call fatal('inject_sne_sphng','Require a smaller tol_m and/or tol_npartsn')
+ print*,'m_in,m_closest,mindiff_m',m_in,m_closest,mindiff_m
+ print*,'npartsn_in,npartsn_closest,mindiff_npartsn',npartsn_in,npartsn_closest,mindiff_npartsn
 
-end subroutine get_vrprofile_candidates
+ ! Extract rows whoes m and npartsn match npartsn_closest and m_closest
+ mindiff_engkin = huge(mindiff_engkin)
+ do i = 1,maxvprofile
+    if (vprofile(2,i) == npartsn_closest .and.  &
+        vprofile(3,i) > m_closest-tol_m  .and.  &
+        vprofile(3,i) < m_closest+tol_m) then 
+
+       if (abs(engkin_in - vprofile(4,i)) < mindiff_engkin) then 
+          mindiff_engkin = abs(engkin_in - vprofile(4,i)) 
+          engkin_extracted = vprofile(4,i)
+          a_vrad_cgs = vprofile(1,i)
+       endif 
+    endif 
+ enddo 
+
+ a_vrad = a_vrad_cgs/unit_velocity
+ print*,'engkin_extracted,a_vrad',engkin_extracted,a_vrad
+
+end subroutine interp_from_vrprofile
 
 
 ! ----------------------------------------------------------------------------------
