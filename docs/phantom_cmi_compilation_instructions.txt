@@ -1,0 +1,268 @@
+
+
+#################################:On Linux PC:######################################
+
+-hdf5-
+
+Install HDF5 from https://www.hdfgroup.org/downloads/hdf5/source-code/ (tar file)
+Extract in home dir
+
+./configure --enable-fortran --enable-cxx
+make 
+make install
+
+-bashrc-
+
+# Phantom
+export SYSTEM=gfortran
+export PHANTOM_DIR=/minthome/okitacscl1/phantom
+export OMP_SCHEDULE="dynamic"
+export OMP_STACKSIZE=512M
+ulimit -s unlimited
+export HDF5=no
+export HDF5ROOT=/minthome/okitacscl1/hdf5-1.12.2/hdf5
+export LD_LIBRARY_PATH=/minthome/okitacscl1/hdf5-1.12.2/hdf5/lib:$LD_LIBRARY_PATH
+
+# CMacIonize
+export CMI_DIR=/minthome/okitacscl1/CMacIonize
+export HDF5_ROOT=/minthome/okitacscl1/hdf5-1.12.2/hdf5
+
+-CMI-
+
+mkdir build
+cd build 
+cmake -DMAKE_BUILD_TYPE=Release -DMAX_NUMBER_OF_THREADS=12 -DACTIVATE_FORTRAN_BINDING=True -DOUTPUT_HEATING=True /minthome/okitacscl1/CMacIonize 
+(check that it has found the hdf5 and the fortran compiler) 
+make 
+
+-Phantom-
+
+Add the following into Makefile: 
+(flags from CMacIonize/build/compilation - cmi_fortran_*.txt)
+
+SRCPHOTOION=
+
+ifeq ($(SETUP), cmi)
+#	Coupling Phantom to CMacIonize for adding ionizing radiation
+    SETUPFILE=velfield_fromcubes.f90 setup_sphere_evolvedmc.f90
+    FPPFLAGS= -DPHOTOION
+    SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
+    CMACIONIZE=yes
+    ...
+endif
+
+ifeq ($(CMACIONIZE), yes)
+    LDFLAGS+= -L/$(CMI_DIR)/build/lib -lCMIFortranLibrary -lCMILibrary -lLegacyEngine -lSharedEngine $(HDF5ROOT)/lib/libhdf5.so /usr/lib/x86_64-linux-gnu/libz.so /usr/lib/x86_64-linux-gnu/libdl.a /usr/lib/x86_64-linux-gnu/libm.so  -lstdc++ -lc
+endif
+
+(Add ${SRCPHOTOION} into SOURCES)
+
+photoionize_cmi.o: photoionize_cmi.F90
+	$(FC) -c $(FFLAGS) -fopenmp -I$(CMI_DIR)/build/include $< -o $@ 
+
+Run dir: 
+make; make setup
+
+
+
+#################################:On Kennedy:######################################
+[with intel compilers]
+
+-hdf5-
+
+Use the hdf5 already intalled in /usr (files spreaded across its subdirectories lib include etc.)
+
+-bashrc-
+
+# Phantom
+export SYSTEM=kennedy
+export PHANTOM_DIR=/gpfs1/home/cscl1/phantom
+ulimit -s unlimited
+export OMP_SCHEFULE="dynamic"
+export OMP_STACKSIZE=512M
+export HDF5=no
+export HDF5ROOT=/usr
+export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
+
+# Activate ifort 
+source /opt/intel/oneapi/setvars.sh >> /dev/null 2>&1
+
+# Setting HDF5 for ifort (from phantom/docs/hdf5.rst)
+export CC=icc
+export F9X=ifort
+export CXX=icpc
+
+# CMacIonize 
+export CMI_DIR=/gpfs1/home/cscl1/CMacIonize
+export HDF5_ROOT=/usr
+
+-CMI-
+
+mkdir build 
+cd build 
+cmake -DMAKE_BUILD_TYPE=Release -DMAX_NUMBER_OF_THREADS=128 -DOUTPUT_HEATING=True -DACTIVATE_FORTRAN_BINDING=True -DCMAKE_Fortran_COMPILER=/gpfs1/apps/opt/intel/oneapi/compiler/2022.0.1/linux/bin/intel64/ifort /home/cscl1/CMacIonize 
+(path to compilers obtained with command 'which ifort')
+(check that it has found hdf5 and used ifort not gfortran - has to be same compiler as phantom)
+make
+
+-Phantom-
+
+Add the following into Makefile: 
+(flags from CMacIonize/build/compilation - cmi_fortran_*.txt)
+
+SRCPHOTOION=
+
+ifeq ($(SETUP), cmi)
+#	Coupling Phantom to CMacIonize for adding ionizing radiation
+    SETUPFILE=velfield_fromcubes.f90 setup_sphere_evolvedmc.f90
+    FPPFLAGS= -DPHOTOION
+    SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
+    CMACIONIZE_KENNEDY=yes
+    ...
+endif
+
+ifeq ($(CMACIONIZE_KENNEDY), yes)
+    LDFLAGS+= -L/$(CMI_DIR)/build/lib -lCMIFortranLibrary -lCMILibrary -lLegacyEngine -lSharedEngine /usr/lib64/libhdf5.so -lstdc++ -lc
+endif
+
+photoionize_cmi.o: photoionize_cmi.F90
+	$(FC) -c $(FFLAGS) -fopenmp -I$(CMI_DIR)/build/include $< -o $@ 
+
+
+Run dir: 
+make; make setup
+
+
+
+
+#################################:On Hypatia:######################################
+[with gfortran]
+
+-hdf5-
+
+Download HDF5 through command line:
+wget https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.12/hdf5-1.12.2/src/hdf5-1.12.2.tar.gz
+gzip -cd hdf5-1.12.2.tar.gz | tar xvf -
+
+cd hdf5-1.12.2
+./configure --enable-fortran --enable-cxx
+make 
+make install
+
+
+-bashrc-
+
+# Phantom
+export SYSTEM=gfortran
+export PHANTOM_DIR=/home/cscl1/phantom
+export OMP_SCHEDULE="dynamic"
+export OMP_STACKSIZE=512M
+ulimit -s unlimited
+export HDF5=no
+export HDF5ROOT=/home/cscl1/hdf5-1.12.2/hdf5
+export LD_LIBRARY_PATH=/home/cscl1/hdf5-1.12.2/hdf5/lib:$LD_LIBRARY_PATH
+
+# CMacIonize
+export CMI_DIR=/home/cscl1/CMacIonize
+export HDF5_ROOT=/home/cscl1/hdf5-1.12.2/hdf5
+
+# Activate compilers 
+module load openmpi/5.0.5
+module load gcclibs/11.4.1
+module load ucx/1.16.0
+
+
+-CMI-
+
+mkdir build 
+cd build 
+cmake -DMAKE_BUILD_TYPE=Release -DMAX_NUMBER_OF_THREADS=192 -DACTIVATE_FORTRAN_BINDING=True -DOUTPUT_HEATING=True -DCMAKE_Fortran_COMPILER=/usr/bin/gfortran /home/cscl1/CMacIonize 
+(check that it has found hdf5 and the fortran compiler)
+make
+
+
+-Phantom-
+
+Add the following into Makefile: 
+(flags from CMacIonize/build/compilation - cmi_fortran_*.txt)
+
+SRCPHOTOION=
+
+ifeq ($(SETUP), cmi)
+#	Coupling Phantom to CMacIonize for adding ionizing radiation
+    SETUPFILE=velfield_fromcubes.f90 setup_sphere_evolvedmc.f90
+    FPPFLAGS= -DPHOTOION
+    SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
+    CMACIONIZE_HYPATIA=yes
+    ...
+endif
+ 
+ifeq ($(CMACIONIZE_HYPATIA), yes)
+    LDFLAGS+= -L/$(CMI_DIR)/build/lib -lCMIFortranLibrary -lCMILibrary -lLegacyEngine -lSharedEngine $(HDF5ROOT)/lib/libhdf5.so /usr/lib64/libz.so /usr/lib64/libdl.a /usr/lib64/libm.so /software/MPI/openmpi-5.0.5/lib/libmpi.so -lstdc++ -lc
+endif
+
+photoionize_cmi.o: photoionize_cmi.F90
+	$(FC) -c $(FFLAGS) -fopenmp -I$(CMI_DIR)/build/include $< -o $@ 
+
+
+Run dir: 
+make; make setup
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
