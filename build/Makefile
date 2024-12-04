@@ -959,7 +959,7 @@ ifeq ($(SETUP), sncavity)
     ISOTHERMAL=no
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
-    MAXP=20000000
+    MAXP=2000000
     NCELLSMAX=4*maxp
 endif
 
@@ -977,7 +977,7 @@ ifeq ($(SETUP), sncavity_hpc)
     ISOTHERMAL=no
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
-    MAXP=20000000
+    MAXP=5000000
     NCELLSMAX=4*maxp
 endif
 
