@@ -69,7 +69,7 @@ module inject
  logical :: snflag_sink(maxptmass)    ! Flag when sink particle has boomed
  logical :: queueflag(maxallsn)
 
- integer :: maxvprofile = 8E6
+ integer :: maxvprofile = 1E6
  real,   allocatable :: vprofile(:,:) ! Tabulated velocity profiles of sn particles
  logical :: first_sn
 
@@ -351,7 +351,6 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
           call gen_refpoints(xyz_ref,r_ref)
           if (gaussian_vprofile) then 
              r_vrad = 2.d0*r_ref   ! 2*r_dist/r_sn; scaling max=r_sn to max=2 of vrad func
-             print*,'r_vrad',r_ref 
              vrad = vrfunc(a_vrad,r_vrad) 
           endif 
           over_partsn: do ia = 1,6
@@ -372,7 +371,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
           endif 
           write(2040,'(2e20.10)') r_ref*r_sn*udist, vrad*unit_velocity 
        enddo over_partsngroup
-   stop
+
        print*,'vrad_min [cm/s] ',vrad_min*unit_velocity,'at radius [pc]',r_ref_max*r_sn*udist/pc 
        print*,'vrad_max [cm/s] ',vrad_max*unit_velocity,'at radius [pc]',r_vrad_max*r_sn*udist/pc 
        print*,'approx distance to form shell [pc] ',(r_ref_max*r_sn-r_vrad_max*r_sn)*vrad_max/(vrad_max-vrad_min) *udist/pc 
