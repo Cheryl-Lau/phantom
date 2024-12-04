@@ -18,9 +18,9 @@ test_one = False
 
 
 # Params to scan 
-a_scan = np.logspace(np.log10(5E8),np.log10(1E12),200)
-Nsn_scan = np.logspace(np.log10(10),np.log10(3000),200)
-mi_scan = np.logspace(np.log10(1E-3),np.log10(1E-1),200)
+a_scan = np.logspace(np.log10(5E8),np.log10(1E12),100)
+Nsn_scan = np.logspace(np.log10(10),np.log10(3000),100)
+mi_scan = np.logspace(np.log10(1E-3),np.log10(1E-1),100)
 
 
 if test_one == True: 
@@ -28,7 +28,7 @@ if test_one == True:
     Nsn_scan = [3000]
     mi_scan = [1E-1]
 
-num_trial = 20 
+num_trial = 10 
 
 
 def vrfunc(a,r): 
@@ -45,7 +45,7 @@ def compute_Ek(a,mi,Nsn):
     Ek_parts = []
     for ipart in range(int(Nsn)):
         ri = ranpoint_insphere()
-        r1 = 2.0*ri
+        ri = 2.0*ri
         Ek_parts.append(1./2.*mi*umass*(vrfunc(a,ri))**2) 
     Ek = np.sum(Ek_parts)
     return Ek 
