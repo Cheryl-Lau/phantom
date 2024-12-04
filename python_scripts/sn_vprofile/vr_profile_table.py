@@ -54,7 +54,7 @@ def compute_Ek(a,mi,Nsn):
 def ranpoint_insphere():
     a_vec = np.array([1,1,1])
     a_mag = np.linalg.norm(a_vec)
-    while ((a_mag > 1) and (a_mag < 0.01)):
+    while ((a_mag > 1) or (a_mag < 0.01)):
         x = 2.0*(rd.uniform(0,1)-0.5)
         y = 2.0*(rd.uniform(0,1)-0.5) 
         z = 2.0*(rd.uniform(0,1)-0.5)
