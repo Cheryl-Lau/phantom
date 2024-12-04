@@ -19,11 +19,11 @@ esac
 echo '#SBATCH --ntasks=1'
 case $yn in 
    [Yy]* ) echo '#SBATCH --cpus-per-task=20';;
-   [Nn]* ) echo '#SBATCH --cpus-per-task=150';;
-   * ) echo '#SBATCH --cpus-per-task=150';;
+   [Nn]* ) echo '#SBATCH --cpus-per-task=60';;
+   * ) echo '#SBATCH --cpus-per-task=60';;
 esac
 case $yn in
-   [Yy]* ) echo '#SBATCH --time=24:00:00';;
+   [Yy]* ) echo '#SBATCH --time=10:00:00';;
    [Nn]* ) echo '#SBATCH --time=168:00:00';;
    * ) echo '#SBATCH --time=168:00:00';;
 esac
@@ -31,7 +31,7 @@ echo '#SBATCH --output='$infile'.qout'
 echo '#SBATCH --error='$infile'.err'
 echo '#SBATCH --mail-type=BEGIN,END,FAIL'
 echo '#SBATCH --mail-user='$username'@st-andrews.ac.uk'
-echo '#SBATCH --mem=120G'
+echo '#SBATCH --mem=80G'
 
 echo 'export OMP_SCHEDULE="dynamic"'
 echo 'export OMP_NUM_THREADS=96'
