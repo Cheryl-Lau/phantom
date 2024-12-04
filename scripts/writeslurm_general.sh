@@ -19,8 +19,8 @@ esac
 echo '#SBATCH --ntasks=1'
 case $yn in 
    [Yy]* ) echo '#SBATCH --cpus-per-task=20';;
-   [Nn]* ) echo '#SBATCH --cpus-per-task=60';;
-   * ) echo '#SBATCH --cpus-per-task=60';;
+   [Nn]* ) echo '#SBATCH --cpus-per-task=50';;
+   * ) echo '#SBATCH --cpus-per-task=50';;
 esac
 case $yn in
    [Yy]* ) echo '#SBATCH --time=10:00:00';;
