@@ -15,7 +15,7 @@ Myr = 1e6*365*24*60*60
 solarm = 1.9891e+33
 
 
-sdf, sdf_sinks = sarracen.read_phantom('cloud_21_20_11660')
+sdf, sdf_sinks = sarracen.read_phantom('cloud_21_05_02240')
 
 
 def process_sdf(sdf):
@@ -53,6 +53,7 @@ def plot_render_rho_xy(ax,time_Myr,sdf,centre,radius):
     ax.set_xlabel('x [pc]')
     ax.set_ylabel('y [pc]')
     ax.text(centre[0]-radius*0.8,centre[1]+radius*0.8,'t = '+str(round(time_Myr,3))+' Myr',color='white')
+    ax.text(centre[0]-radius*0.9,centre[1]-radius*0.9,r'$\rho_0 = 10^{-21}\ \mathrm{g\ cm^{-3}} \ \ \ \alpha = 0.5$',color='white')
 
     return 
 
@@ -61,11 +62,12 @@ def plot_render_rho_xz(ax,time_Myr,sdf,centre,radius):
     '''
     Plot input sdf log col-dens on the given ax
     '''
-    ax = sdf.render('rho', ax=ax, xlim=(centre[0]-radius,centre[0]+radius), ylim=(centre[2]-radius,centre[2]+radius), rotation=[0,0,90], rot_origin=[0,0,0], log_scale=True, cmap='gist_heat', vmin=1e-1, vmax=1e5, cbar_kws=dict(label='column density [g$\ \mathrm{cm}^{-2}$]',orientation='vertical',shrink=0.7,pad=0.02))
+    ax = sdf.render('rho', ax=ax, xlim=(centre[0]-radius,centre[0]+radius), ylim=(centre[2]-radius,centre[2]+radius), rotation=[0,0,-90], rot_origin=[0,0,0], log_scale=True, cmap='gist_heat', vmin=1e-1, vmax=1e5, cbar_kws=dict(label='column density [g$\ \mathrm{cm}^{-2}$]',orientation='vertical',shrink=0.7,pad=0.02))
 
     ax.set_xlabel('x [pc]')
     ax.set_ylabel('z [pc]')
     ax.text(centre[0]-radius*0.8,centre[2]+radius*0.8,'t = '+str(round(time_Myr,3))+' Myr',color='white')
+    ax.text(centre[0]-radius*0.9,centre[2]-radius*0.9,r'$\rho_0 = 10^{-21}\ \mathrm{g\ cm^{-3}} \ \ \ \alpha = 0.5$',color='white')
 
     return 
 
@@ -101,9 +103,14 @@ def plot_massive_sinks_xy(ax,sdf_sinks,centre,radius):
     y = sdf_sinks['y'].loc[imassive]
     m = sdf_sinks['m'].loc[imassive]
 
-    m_max = np.max(m)*1.1
+    m_max = np.max(m)
+    sdf_max = sdf_sinks.query(f'm == {m_max}')
+    x_max = sdf_max['x']
+    y_max = sdf_max['y']
 
-    pcm = ax.scatter(x,y,s=4,c=m,cmap='GnBu',marker='o',vmin=m_threshold,vmax=m_max)
+    pcm = ax.scatter(x,y,s=4,c=m,cmap='winter',marker='o',vmin=m_threshold,vmax=m_max)
+    ax.scatter(x_max,y_max,s=40,c=m_max,cmap='winter',marker='*',vmin=m_threshold,vmax=m_max)
+
     ax.set_xlim([centre[0]-radius,centre[0]+radius])
     ax.set_ylim((centre[1]-radius,centre[1]+radius))
 
@@ -123,10 +130,14 @@ def plot_massive_sinks_xz(ax,sdf_sinks,centre,radius):
     z = sdf_sinks['z'].loc[imassive]
     m = sdf_sinks['m'].loc[imassive]
 
-    m_max = np.max(m)*1.1
-    print(m_max)
+    m_max = np.max(m)
+    sdf_max = sdf_sinks.query(f'm == {m_max}')
+    x_max = sdf_max['x']
+    z_max = sdf_max['z']
 
-    pcm = ax.scatter(x,z,s=4,c=m,cmap='GnBu',marker='o',vmin=m_threshold,vmax=m_max)
+    pcm = ax.scatter(x,z,s=4,c=m,cmap='winter',marker='o',vmin=m_threshold,vmax=m_max)
+    ax.scatter(x_max,z_max,s=40,c=m_max,cmap='winter',marker='*',vmin=m_threshold,vmax=m_max)
+
     ax.set_xlim([centre[0]-radius,centre[0]+radius])
     ax.set_ylim((centre[2]-radius,centre[2]+radius))
 
@@ -141,8 +152,8 @@ ax2 = axes[1]
 
 
 t_Myr, sdf = process_sdf(sdf)
-centre = [5,4,0]
-radius = 15.0 
+centre = [0,2,0]
+radius = 6.0 
 
 plot_render_rho_xy(ax1,t_Myr,sdf,centre,radius)
 plot_render_rho_xz(ax2,t_Myr,sdf,centre,radius)
