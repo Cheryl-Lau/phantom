@@ -25,8 +25,7 @@ module setup
 ! :Dependencies: boundary, dim, domain, eos, infile_utils, io, options, part,
 !   physcon, prompting, setup_params, timestep, unifdis, units
 !
- use setup_params,  only:rhozero
- use timestep,      only:dtmax,tmax
+ use timestep, only:dtmax,tmax
  implicit none
 
  public  :: setpart
@@ -34,7 +33,8 @@ module setup
  private
 
  integer :: np_req
- real    :: pmass,cs0_cgs,rms_mach,rhozero_cgs 
+ real    :: pmass,cs0_cgs,rms_mach 
+ real    :: xmini,xmaxi,ymini,ymaxi,zmini,zmaxi
  real(kind=8)       :: udist,umass
  character(len=20)  :: dist_unit,mass_unit
 
@@ -53,6 +53,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use units,        only:set_units,unit_density,unit_velocity,unit_ergg,utime,select_unit
  use eos,          only:gmw,ieos
  use part,         only:periodic
+ use setup_params, only:rhozero
  use unifdis,      only:set_unifdis
  use options,      only:alphau,nfulldump,nmaxdumps,icooling,ipdv_heating,ishock_heating
  use cooling,      only:ufloor,Tfloor
@@ -78,9 +79,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  integer, parameter :: maxrow = 1E7
  real    :: xyzh_raw(4,maxrow)
  real    :: vol_box,boxlength,boxsize_fromfile,boxsize_toscale,deltax
- real    :: boxsize_sample,rho_sample,rho_sample_cgs,rho_fracdiff
- real    :: totmass,totmass_req,temp,pmass_cgs,u0,u0_cgs,tmax_cgs,dtmax_cgs
-real     :: xmini,xmaxi,ymini,ymaxi,zmini,zmaxi
+ real    :: boxsize_sample,rho_sample,rho_sample_cgs,rho_fracdiff,rhozero_cgs
+ real    :: totmass,temp,pmass_cgs,u0,u0_cgs,tmax_cgs,dtmax_cgs
+ real    :: centre(3),radius
  real    :: t_ff,rmsmach,v2i,turbfac,turbboxsize,mean_v,sigma_v,cs0
  integer :: i,ierr,io_file,ix,npmax,npart_sample
  logical :: iexist
@@ -131,15 +132,23 @@ real     :: xmini,xmaxi,ymini,ymaxi,zmini,zmaxi
     !
     ! Particle mass
     !
-    pmass_cgs = 1.9891E30 ! 10^-3 solarm
+    pmass_cgs = 1E-1*solarm
     pmass = pmass_cgs/umass
     call prompt('Enter particle mass in units of '//mass_unit,pmass,0.)
     !
-    ! Density
-    !
-    rhozero_cgs = 6E-21
-    call prompt('Enter initial density in g cm^-3',rhozero_cgs,0.)
-
+    ! Boundaries 
+    ! 
+    centre = (/ 0.,0.,0. /)
+    radius = 10. 
+    xmini = centre(1) - radius ; xmaxi = centre(1) + radius
+    ymini = centre(2) - radius ; ymaxi = centre(2) + radius
+    zmini = centre(3) - radius ; zmaxi = centre(3) + radius
+    call prompt('enter xmin boundary',xmini)
+    call prompt('enter xmax boundary',xmaxi,xmini)
+    call prompt('enter ymin boundary',ymini)
+    call prompt('enter ymax boundary',ymaxi,ymini)
+    call prompt('enter zmin boundary',zmini)
+    call prompt('enter zmax boundary',zmaxi,zmini)
     !
     ! set initial sound speed
     !
@@ -148,7 +157,7 @@ real     :: xmini,xmaxi,ymini,ymaxi,zmini,zmaxi
     !
     ! Set timestep and end-time
     !
-    dtmax_cgs = 3.15360E9   ! 1E-4 Myr
+    dtmax_cgs = 3.15360E10   ! 1E-4 Myr
     tmax_cgs  = 1e3*dtmax_cgs
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
@@ -160,8 +169,6 @@ real     :: xmini,xmaxi,ymini,ymaxi,zmini,zmaxi
     rms_mach = 10.
     call prompt('Enter the Mach number of the cloud turbulence',rms_mach,0.)
 
-    print*,'*************'
-    print*,rhozero_cgs,cs0_cgs 
     if (id==master) call write_setupfile(filename)
     stop 'rerun phantomsetup after editing .setup file'
  else
@@ -175,29 +182,13 @@ real     :: xmini,xmaxi,ymini,ymaxi,zmini,zmaxi
  !
  ! Convert units 
  !
- rhozero = rhozero_cgs/unit_density
  cs0 = cs0_cgs/unit_velocity 
  !
- ! Calculate total mass required with npart_requested
+ ! Set boundaries
  !
- totmass_req = np_req*pmass
- !
- ! Calculate volume needed
- !
- vol_box   = totmass_req/rhozero
- boxlength = vol_box**(1./3.)
- xmini = -0.5*boxlength; xmaxi = 0.5*boxlength
- ymini = -0.5*boxlength; ymaxi = 0.5*boxlength
- zmini = -0.5*boxlength; zmaxi = 0.5*boxlength
-!
-! Set boundaries
-!
-xmini = -0.5*boxlength; xmaxi = 0.5*boxlength
-ymini = -0.5*boxlength; ymaxi = 0.5*boxlength
-zmini = -0.5*boxlength; zmaxi = 0.5*boxlength
-call set_boundary(xmini,xmaxi,ymini,ymaxi,zmini,zmaxi)
+ boxlength = abs(xmaxi-xmini)
+ call set_boundary(xmini,xmaxi,ymini,ymaxi,zmini,zmaxi)
  print*,'boundaries before: ',xmini,xmaxi,ymini,ymaxi,zmini,zmaxi
-
  !
  ! Set particle distribution
  !
@@ -205,7 +196,6 @@ call set_boundary(xmini,xmaxi,ymini,ymaxi,zmini,zmaxi)
  deltax = (xmaxi-xmini)/np_req**(1./3.)
  call set_unifdis('cubic',id,master,xmini,xmaxi,ymini,ymaxi,zmini,zmaxi,deltax,hfact,&
                 npart,xyzh,periodic)
-
  !
  ! Check real boundaries after setup
  !
@@ -219,7 +209,27 @@ call set_boundary(xmini,xmaxi,ymini,ymaxi,zmini,zmaxi)
  enddo 
  boxlength = max(xmaxi-xmini,ymaxi-ymini,zmaxi-zmini)
  print*,'boundaries after: ',xmini,xmaxi,ymini,ymaxi,zmini,zmaxi
-
+ !
+ ! Calculate density
+ !
+ totmass = pmass*npart 
+ vol_box = abs(xmaxi-xmini)*abs(ymaxi-ymini)*abs(zmaxi-zmini)
+ rhozero = totmass/vol_box 
+ print*,'Box density [g cm^-3]: ',rhozero*unit_density 
+ write(*,'(a)',advance='no') ' Density acceptable ([y]/n)?'
+ read(*,'(a)') dens_ans
+ if (len(trim(adjustl(dens_ans))) /= 0) then
+    if (trim(adjustl(dens_ans)) == 'n') then
+       print*,'stopping program - adjust gamma, gmw or cs0'
+       stop
+    elseif (trim(adjustl(dens_ans)) == 'y') then
+       print*,'y - proceeding...'
+    else
+       print*,'Invalid input'
+    endif
+ else
+    print*,'y - proceeding...'
+ endif
  !
  ! Set particle properties
  !
@@ -229,49 +239,6 @@ call set_boundary(xmini,xmaxi,ymini,ymaxi,zmini,zmaxi)
  do i = 1,npartoftype(igas)
     call set_particle_type(i,igas)
  enddo
-
-
- !
- ! Check that the density of xyzh matches the input rhozero_cgs
- !
- boxsize_sample = 1.5*xmaxi
- npart_sample = 0
- do i = 1,npart
-    if (xyzh(1,i) >= -0.5*boxsize_sample .and. xyzh(1,i) <= 0.5*boxsize_sample .and. &
-        xyzh(2,i) >= -0.5*boxsize_sample .and. xyzh(2,i) <= 0.5*boxsize_sample .and. &
-        xyzh(3,i) >= -0.5*boxsize_sample .and. xyzh(3,i) <= 0.5*boxsize_sample) then
-       npart_sample = npart_sample + 1
-    endif
- enddo
- if (npart_sample == 0) call fatal('setup_unifdis_cmi','no particles within sampling box')
-
- rho_sample     = npart_sample*massoftype(igas) / boxsize_sample**3.
- rho_sample_cgs = rho_sample*unit_density
- rhozero_cgs    = rhozero*unit_density   !- re-define since it's not written to .setup file
- print*,'required density:  ',rhozero_cgs,'g cm^-3'
- print*,'density from xyzh: ',rho_sample_cgs,'g cm^-3'
-
- rho_fracdiff = abs(rho_sample_cgs - rhozero_cgs)/rhozero_cgs
- if (rho_fracdiff > 1E-1) then
-    call fatal('setup_unifdis_cmi','box density does not match the input value')
- elseif (rho_fracdiff > 1E-3) then
-    write(*,'(a15,f3.1,a58)',advance='no') 'Box density is ',rho_fracdiff*100.,'% off from &
-             &input value, would you like to proceed ([y]/n)?'
-    read(*,'(a)') dens_ans
-    if (len(trim(adjustl(dens_ans))) /= 0) then
-       if (trim(adjustl(dens_ans)) == 'n') then
-          print*,'stopping program - try adjust boxsize_sample'
-          stop
-       elseif (trim(adjustl(dens_ans)) == 'y') then
-          print*,'y - proceeding...'
-       else
-          print*,'Invalid input'
-       endif
-    else
-       print*,'y - proceeding...'
-    endif
- endif
- 
  !
  ! Calculate temperature from input sound speed
  !
@@ -291,7 +258,6 @@ call set_boundary(xmini,xmaxi,ymini,ymaxi,zmini,zmaxi)
  else
     print*,'y - proceeding...'
  endif
-
  !
  ! Polytropic constant
  !
@@ -300,7 +266,6 @@ call set_boundary(xmini,xmaxi,ymini,ymaxi,zmini,zmaxi)
  else
     polyk = 0.
  endif
-
  !
  ! Turbulent velocity field
  !
@@ -344,6 +309,8 @@ call set_boundary(xmini,xmaxi,ymini,ymaxi,zmini,zmaxi)
        sigma_v = sigma_v + (mag(vxyzu(1:3,i)) - mean_v)**2 
     enddo 
     sigma_v = sqrt(sigma_v/real(npart))
+    print*,'Mean velocity [cm s^-1]: ',mean_v*unit_velocity 
+    print*,'Dispersion [cm s^-1]: ',sigma_v*unit_velocity 
  endif
 
  !
@@ -355,12 +322,11 @@ call set_boundary(xmini,xmaxi,ymini,ymaxi,zmini,zmaxi)
    if (size(vxyzu(:,i)) >= 4) vxyzu(4,i) = u0
  enddo
 
-
  !
  ! Set runtime parameters
  !
  ieos      = 2     ! adiabatic eos
- nout      = 1
+ nout      = 10
  nmaxdumps = 100
  nfulldump = 1
  Tfloor    = 3.
@@ -425,12 +391,21 @@ subroutine write_setupfile(filename)
  call write_inopt(dist_unit,'dist_unit','distance unit (e.g. au)',iunit)
  call write_inopt(mass_unit,'mass_unit','mass unit (e.g. solarm)',iunit)
  !
+ ! Boundaries 
+ !
+ write(iunit,"(/,a)") '# boundaries'
+ call write_inopt(xmini,'xmin','xmin boundary',iunit)
+ call write_inopt(xmaxi,'xmax','xmax boundary',iunit)
+ call write_inopt(ymini,'ymin','ymin boundary',iunit)
+ call write_inopt(ymaxi,'ymax','ymax boundary',iunit)
+ call write_inopt(zmini,'zmin','zmin boundary',iunit)
+ call write_inopt(zmaxi,'zmax','zmax boundary',iunit)
+ !
  ! other parameters
  !
  write(iunit,"(/,a)") '# setup'
  call write_inopt(np_req,'np_req','total number of particles requested',iunit)
  call write_inopt(pmass,'pmass','particle mass',iunit)
- call write_inopt(rhozero_cgs,'rhozero_cgs','initial gas density',iunit)
  call write_inopt(cs0_cgs,'cs0_cgs','initial sound speed',iunit)
  call write_inopt(dtmax,'dtmax','timestep in code units',iunit)
  call write_inopt(tmax,'tmax','end-time in code units',iunit)
@@ -465,11 +440,19 @@ subroutine read_setupfile(filename,ierr)
  call read_inopt(mass_unit,'mass_unit',db,errcount=nerr)
  call read_inopt(dist_unit,'dist_unit',db,errcount=nerr)
  !
+ ! boundaries
+ !
+ call read_inopt(xmini,'xmin',db,errcount=nerr)
+ call read_inopt(xmaxi,'xmax',db,min=xmini,errcount=nerr)
+ call read_inopt(ymini,'ymin',db,errcount=nerr)
+ call read_inopt(ymaxi,'ymax',db,min=ymini,errcount=nerr)
+ call read_inopt(zmini,'zmin',db,errcount=nerr)
+ call read_inopt(zmaxi,'zmax',db,min=zmini,errcount=nerr)
+ !
  ! other parameters
  !
  call read_inopt(np_req,'np_req',db,min=8,errcount=nerr)
  call read_inopt(pmass,'pmass',db,min=0.,errcount=nerr)
- call read_inopt(rhozero_cgs,'rhozero_cgs',db,min=0.,errcount=nerr)
  call read_inopt(cs0_cgs,'cs0_cgs',db,min=0.,errcount=nerr)
  call read_inopt(dtmax,'dtmax',db,min=0.,errcount=nerr)
  call read_inopt(tmax,'tmax',db,min=0.,errcount=nerr)
