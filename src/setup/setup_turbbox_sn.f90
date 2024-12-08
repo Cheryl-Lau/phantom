@@ -157,7 +157,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Set timestep and end-time
     !
-    dtmax_cgs = 3.15360E10   ! 1E-4 Myr
+    dtmax_cgs = 3.15360E+12   ! 1E-2 Myr
     tmax_cgs  = 1e3*dtmax_cgs
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
@@ -358,6 +358,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     write(2050,*) 'rms_mach:   ',rms_mach
     write(2050,*) 'mean_v:     ',mean_v,mean_v*unit_velocity,'cm s^-1'
     write(2050,*) 'sigma_v:    ',sigma_v,sigma_v*unit_velocity,'cm s^-1'
+    write(2050,*) 't_turb:     ',boxlength/sigma_v,boxlength/sigma_v*utime/(1E6*365*24*60**2),'Myr'
  endif 
  write(2050,*) 'npart:      ',npart
  write(2050,*) 'part mass:  ',massoftype(igas),massoftype(igas)*umass,'g'
