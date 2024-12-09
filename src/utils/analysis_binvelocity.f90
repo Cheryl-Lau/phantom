@@ -25,7 +25,7 @@ module analysis
  private
  integer, parameter :: num_velbin = 500
  integer :: binned_vel(num_velbin)
- real    :: velbin_min_cgs = 7E+3
+ real    :: velbin_min_cgs = 1.5E+3
  real    :: velbin_max_cgs = 4E+7
  real    :: logvelbin_min,logvelbin_max
  logical :: locate_range = .false. 
