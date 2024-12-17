@@ -913,7 +913,7 @@ ifeq ($(SETUP), elongcloud_env)
 #	 Injecting supernova and radiation into an elongated cloud with envelope
     SETUPFILE=velfield_fromcubes.f90 setup_elongated_envelope.f90
     SRCINJECT=inject_sne_sphng.f90
-    ANALYSIS=analysis_vel_dispersion.f90
+    ANALYSIS=analysis_bindensity.f90
     MODFILE=moddump_clear_around_sink.f90 
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
@@ -985,13 +985,13 @@ ifeq ($(SETUP), snturbbox)
 #	 Injecting SN into a turbulence box
     SETUPFILE=velfield_fromcubes.f90 setup_turbbox_sn.f90
     SRCINJECT=inject_sne_sphng.f90
-    ANALYSIS=analysis_binvelocity.f90
+    ANALYSIS=analysis_bindensity.f90
     PERIODIC=yes
     GRAVITY=no 
     ISOTHERMAL=no
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
-    MAXP=2000000
+    MAXP=6000000
     NCELLSMAX=4*maxp
 endif
 
