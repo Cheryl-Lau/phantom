@@ -7,16 +7,27 @@ import glob
 import h5py
 import pandas as pd 
 
+def printall(name, obj):
+    print(name, dict(obj.attrs))
+
+
 udist_si = 3.085E16
+pmass = 1e-1*1.9891E+33
+mass_proton_cgs = 1.67262158E-24
+mass_proton_si = mass_proton_cgs*1E-3 
+
 
 for fname in sorted(glob.glob("snapshot010.hdf5")):
     file = h5py.File(fname,"r")
+
+    file.visititems(printall)
 
     box = np.array(file["/Header"].attrs["BoxSize"])
     box_center = 0.5 * box
     
     coords = np.array(file["/PartType0/Coordinates"])
     nfracH = np.array(file["/PartType0/NeutralFractionH"])
+    numden = np.array(file["/PartType0/NumberDensity"])
 
     x = coords[:,0]
     y = coords[:,1]
@@ -25,30 +36,14 @@ for fname in sorted(glob.glob("snapshot010.hdf5")):
     x_corr = coords[:,0]/udist_si - box_center[0]/udist_si
     y_corr = coords[:,1]/udist_si - box_center[1]/udist_si
     z_corr = coords[:,2]/udist_si - box_center[2]/udist_si
-    dataset = pd.DataFrame({'x':x_corr, 'y':y_corr, 'z':z_corr, 'nH':nfracH}, columns=['x','y','z','nH'])
-    dataset.to_csv('xyzf_cmi.txt',float_format='%0.4e', sep='\t')
-    
-    x_slice = []
-    y_slice = []
-    nH_slice = []
-    for i in range(len(x)):
-        
-        if (z[i] > 0*udist_si+box_center[2] and z[i] < 0.2*udist_si+box_center[2]):
-            x_slice.append(x[i]/udist_si)
-            y_slice.append(y[i]/udist_si)
-            nH_slice.append(nfracH[i])
-            
 
-    print('nH_slice',nH_slice)
-    nH_scaled = nH_slice/max(nH_slice)
-    
-    plt.scatter(x_slice,y_slice,s=1,c=nH_scaled)
-    
+    rho_si = numden*mass_proton_si
+    rho_cgs = rho_si*1E-3
 
-    for frac in nH_slice:
-        if (frac < 0.):
-            print('negative',frac)
-    
+    dataset = pd.DataFrame({'x':x_corr, 'y':y_corr, 'z':z_corr, 'rho':rho_cgs}, columns=['x','y','z','rho'])
+    print(dataset)
+    dataset.to_csv('xyzp_cmi.txt',float_format='%0.4e', sep='\t')
+
     file.close()
             
     
