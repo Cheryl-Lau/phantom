@@ -70,6 +70,7 @@ module inject
  logical :: queueflag(maxallsn)
 
  integer :: maxvprofile = 1E6
+ integer :: maxnpartsn  = 3000
  real,   allocatable :: vprofile(:,:) ! Tabulated velocity profiles of sn particles
  logical :: first_sn
 
@@ -191,7 +192,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
  real     :: xyz_sn(3,maxsn),vxyz_sn(3,maxsn),m_sn(maxsn),h_sn(maxsn),mradsn,engkin,engtherm,numden,t_sn
  real     :: xyz_partsn(3),vxyz_partsn(3),xyz_ref(3,6),r_ref,hnew,unew,dist,dist_nearby
  real     :: vrad,a_vrad,r_vrad,aN_scalefactor
- real     :: ekintot,ethermtot,etot_allparts_old,etot_allparts,endiff_cgs
+ real     :: ekintot,ethermtot,etot_allparts_old,etot_allparts,endiff_cgs,ekin_allparts_old,etherm_allparts_old
  real     :: vrad_min,vrad_max,r_ref_max,r_vrad_max
  logical  :: timematch_inject,queueflag_iallsn
 
@@ -258,6 +259,8 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        ekintot   = ekintot + 1./2.*massoftype(igas)*dot_product(vxyzu(1:3,ipart),vxyzu(1:3,ipart))
        ethermtot = ethermtot + vxyzu(4,ipart)*massoftype(igas)
     enddo
+    ekin_allparts_old = ekintot
+    etherm_allparts_old = ethermtot
     etot_allparts_old =  ekintot + ethermtot
 
     over_sne: do isn = 1,nsn
@@ -305,7 +308,12 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        npartsn = nint(mradsn/massoftype(igas))
        print*,'Number of SN particles: ',npartsn
        if (npartsn > nkilled) print*,'adding ',npartsn-nkilled,' extra particles'
-       if (npartsn < 6) call fatal('inject_sne_sphng','too few supernova particles')
+       if (npartsn < 6) call fatal('inject_sne_sphng','too few sn particles')
+       if (npartsn > maxnpartsn .and. engkin > 0) then 
+          call warning('inject_sne_sphng','number of sn particles is beyond pre-computed table range')
+          npartsn = maxnpartsn
+          print*,'Setting npartsn to ',npartsn 
+       endif 
 
        !
        ! Internal energy of sn particles
@@ -412,6 +420,9 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        ethermtot = ethermtot + vxyzu(4,ipart)*massoftype(igas)
     enddo
     etot_allparts = ekintot + ethermtot
+
+    print*,'Added KE [erg]: ',(ekintot - ekin_allparts_old) *unit_energ 
+    print*,'Added TE [erg]: ',(ethermtot - etherm_allparts_old) *unit_energ
 
     endiff_cgs = (etot_allparts - etot_allparts_old) *unit_energ
     print*,'Energy added [erg]: ',endiff_cgs
@@ -633,12 +644,12 @@ subroutine interp_from_vrprofile(npartsn,m,engkin,a_vrad)
     print*,'Warning - particle mass is beyond vprofile range. Setting mi to 1E-1.'
     m_in = 1E-1
  elseif (m < 1E-3) then
-    print*,'Warning - particle mass is smaller than vprofile range. Setting mi to 1E-4.'
+    print*,'Warning - particle mass is smaller than vprofile range. Setting mi to 1E-3.'
     m_in = 1E-3
  endif
- if (npartsn > 3000) then
-    print*,'Warning - number of supernova particles is beyond vprofile range. Setting npartsn to 700.'
-    npartsn_in = 3000
+ if (npartsn > maxnpartsn) then
+    print*,'Warning - number of supernova particles is beyond vprofile range. Setting npartsn to ',maxnpartsn
+    npartsn_in = maxnpartsn
  endif
 
  ! Convert units 
