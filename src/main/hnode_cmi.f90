@@ -42,6 +42,9 @@ module hnode_cmi
  integer, parameter :: neighcachesize = 1E5 ! 5000
  integer, parameter :: maxkmid = 1024
 
+ logical :: estimate_h = .true.  ! Test estimate only with node size (without root-solving)
+ logical :: print_h    = .true. 
+
 contains
 !-----------------------------------------------------------------------
 !+
@@ -94,7 +97,7 @@ subroutine hnode_iterate(irun,node,nxyzm_treetocmi,ncminode,h_solvertocmi)
  tottime_neigh   = 0.
  tottime_iterate = 0.
  !$omp parallel do default(none) shared(ncminode,nxyzm_treetocmi,node) &
- !$omp shared(hfact_node,h_solvertocmi,tolh_node,brute_force) &
+ !$omp shared(hfact_node,h_solvertocmi,tolh_node,brute_force,estimate_h) &
  !$omp shared(pos_kmid,size_kmid,kmid_start,nkmid,nneigh1d_fac) &
  !$omp shared(node_failed,inosol,pos_node_nosol) &
  !$omp private(icminode,na,pos_node,size_node,nnodeneigh,listnodeneigh,xyzcache_nodeneigh) &
@@ -107,6 +110,14 @@ subroutine hnode_iterate(irun,node,nxyzm_treetocmi,ncminode,h_solvertocmi)
     na = int(nxyzm_treetocmi(1,icminode))
     pos_node  = node(na)%xcen(1:3)
     size_node = node(na)%size
+
+    !- Test: simply estimate h with node size
+    if (estimate_h) then 
+       h_solvertocmi(icminode) = hfact_node*2.*size_node
+       tottime_neigh = 0.
+       tottime_iterate  = 0.
+       cycle over_na
+    endif 
 
     !- Get trial neighbours nb
     time1_neigh = omp_get_wtime()
@@ -169,6 +180,14 @@ subroutine hnode_iterate(irun,node,nxyzm_treetocmi,ncminode,h_solvertocmi)
  write(*,'(3x,a15,es21.6)') '- iterate time ',tottime_iterate
 
  call record_time(irun,'after_hsolve')
+
+ if (print_h) then 
+    open(2062,file='smoothing_lengths.dat',status='replace')
+    do icminode = 1,ncminode
+       write(2062,*) h_solvertocmi(icminode)
+    enddo 
+    close(2062)
+ endif 
 
 end subroutine hnode_iterate
 
