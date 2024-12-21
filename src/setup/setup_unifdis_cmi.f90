@@ -152,7 +152,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Density
     !
-    rhozero_cgs = 1E-18  ! 5.21E-21
+    rhozero_cgs = 5.21E-21
     call prompt('Enter initial density in g/cm^3',rhozero_cgs,0.)
     print*,'read density:',rhozero_cgs 
     !

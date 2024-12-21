@@ -28,6 +28,9 @@ module analysis
  real    :: rhobin_min_cgs = 1E-25
  real    :: rhobin_max_cgs = 1E-5
  real    :: logrhobin_min,logrhobin_max
+ real    :: centre(3) = (/ 2.18,2.88,-2.58 /)
+ real    :: radius = 6. 
+ logical :: box_only = .true. 
 
 contains
 
@@ -39,7 +42,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  integer,          intent(in) :: num,npart,iunit
  real,             intent(in) :: xyzh(:,:),vxyzu(:,:)
  real,             intent(in) :: particlemass,time
- integer :: i,irhobin
+ integer :: i,irhobin,npart_box
  real    :: rho,drho,rhobin(num_rhobin)
  character(len=70) :: filename
 
@@ -59,7 +62,16 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  !
  ! Bin all particles by density
  !
+ npart_box = 0
  do i = 1,npart
+    !
+    ! Filter 
+    !
+    if (box_only) then 
+       if (xyzh(1,i) < centre(1)-radius .or. xyzh(1,i) > centre(1)+radius .or. &
+           xyzh(2,i) < centre(2)-radius .or. xyzh(2,i) > centre(2)+radius .or. &
+           xyzh(3,i) < centre(3)-radius .or. xyzh(3,i) > centre(3)+radius) cycle 
+    endif 
     !
     ! Convert smoothing length h to density rho
     !
@@ -76,6 +88,8 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
        call fatal('analysis_bindensity','require larger logrhobin_max')
     endif 
     binned_rho(irhobin) = binned_rho(irhobin) + 1
+
+    npart_box = npart_box + 1 
  enddo
  !
  ! Convert to physical units and store results
@@ -90,6 +104,8 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
     write(2021,*) rhobin(irhobin), binned_rho(irhobin)
  enddo
  close(2021)
+
+ print*,'Number of particles in box',npart_box
 
 end subroutine do_analysis
 !--------------------------------------------------------------------------

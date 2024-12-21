@@ -29,6 +29,9 @@ module analysis
  real    :: velbin_max_cgs = 4E+7
  real    :: logvelbin_min,logvelbin_max
  logical :: locate_range = .false. 
+ real    :: centre(3) = (/ 2.18,2.88,-2.58 /)
+ real    :: radius = 6. 
+ logical :: box_only = .true. 
 
 contains
 
@@ -62,6 +65,14 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  minvel = huge(minvel)
  maxvel = tiny(maxvel)
  do i = 1,npart
+    !
+    ! Filter 
+    !
+    if (box_only) then 
+       if (xyzh(1,i) < centre(1)-radius .or. xyzh(1,i) > centre(1)+radius .or. &
+           xyzh(2,i) < centre(2)-radius .or. xyzh(2,i) > centre(2)+radius .or. &
+           xyzh(3,i) < centre(3)-radius .or. xyzh(3,i) > centre(3)+radius) cycle 
+    endif 
     !
     ! Calculate |v|
     !
