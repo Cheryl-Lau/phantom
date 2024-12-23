@@ -8,7 +8,7 @@ module moddump
 !
 ! Slightly push away the particles around a sink to ease feedback 
 !
-! :References: None
+! :References: Blomme, R, 1990, A&A, 229, 513-526 (https://ui.adsabs.harvard.edu/abs/1990A%26A...229..513B/abstract)
 !
 ! :Owner: Cheryl Lau
 !
@@ -19,9 +19,9 @@ module moddump
 
  implicit none
 
- integer :: isink = 6   ! index of target sink 
+ integer :: isink = 14            ! index of target sink 
  real    :: rad_max  = 0.1        ! threshold radius 
- real    :: vel_max_cgs = 3e7     ! stellar wind vel
+ real    :: vel_max_cgs = 3e8     ! stellar wind vel (Blomme 1990)
 
 contains
 

@@ -425,18 +425,18 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Photoionization settings
     !
     inject_rad = .false.
-    sink_ionsrc = .false.
+    sink_ionsrc = .true.
 
     monochrom_source  = .false.
     fix_temp_hii      = .false.
     treat_Rtype_phase = .true.
 
     photoionize_tree  = .true.
-    tree_accuracy_cmi = 0.3
+    tree_accuracy_cmi = 0.2
     nHlimit_fac       = 100.
-    rcut_opennode_cgs = 2.6*pc
-    rcut_leafpart_cgs = 2.4*pc
-    delta_rcut_cgs    = 0.2*pc
+    rcut_opennode_cgs = 3.0*pc
+    rcut_leafpart_cgs = 1.0*pc
+    delta_rcut_cgs    = 0.5*pc
 
     !
     ! Supernova settings
