@@ -415,9 +415,10 @@ subroutine set_ionizing_source_cmi(time,nptmass,xyzmh_ptmass)
        target_sink_found = .false. 
        over_sinks: do isink = 1,nptmass 
           if (isink == isink_ionsrc) then 
+             mptmass = xyzmh_ptmass(4,isink)
+             if (mptmass < 0.) call fatal('photoionize_cmi','user-specified sink has been accreted')
              target_sink_found = .true. 
              xyz_photosrc(1:3,nphotosrc) = xyzmh_ptmass(1:3,isink)
-             mptmass = xyzmh_ptmass(4,isink)
              fluxq = get_ionflux_star(mptmass)
              ionflux_photosrc(nphotosrc) = fluxq    ! [nphoton/s]
              mass_photosrc(nphotosrc)    = mptmass
