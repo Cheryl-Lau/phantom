@@ -26,8 +26,8 @@ module analysis
 
  integer :: npointx_map = 100
  integer :: npointy_map = 100
- real    :: xyz_src(3)  = (/ 2.846205480E+00 ,   3.053893899E+00  ,  1.778048070E+00 /)  ! Position of feedback source in code units 
- real    :: radius      = 80.               ! radius of spherical surface in code units 
+ real    :: xyz_src(3)  = (/ 0,0,0 /)  ! Position of feedback source in code units 
+ real    :: radius      = 1.6               ! radius of spherical surface in code units 
 
 contains
 
