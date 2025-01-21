@@ -134,7 +134,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
             call warning('analysis_outflow','not enough trial neighbours')
          endif 
          ntry = ntry + 1 
-         if (ntry > 20) call fatal('analysis_outflow','cannot find neighbours')
+         if (ntry > 200) call fatal('analysis_outflow','cannot find neighbours')
        enddo 
 
        !- Compute properties by interpolating from true neighbours 
