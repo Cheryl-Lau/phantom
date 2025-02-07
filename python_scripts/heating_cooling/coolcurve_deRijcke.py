@@ -20,21 +20,22 @@ def main():
     nrho_cgs = rho_cgs/mass_proton_cgs 
     lambda_cgs = coolrate_cgs / nrho_cgs**2  # erg cm^3 s^-1
 
-    plt.figure(figsize=[7,5],dpi=200)
+    plt.figure(figsize=[6,4.2],dpi=200)
 
     plt.plot(temp,coolcurve(temp),'--',label='fitted function',color='grey')
 #    temp_test = np.logspace(0.5,9,100)
 #    plt.plot(temp_test,coolcurve(temp_test))
     plt.plot(temp,lambda_cgs,label='DeRijcke et al. 2013',color='black')
     
-    plt.xlabel('Temperature [K]')
-    plt.ylabel("Lambda [$ \mathrm{ erg \ cm^{3} \ s^{-1} } $]")
+    plt.xlabel('Temperature [K]',fontsize=12)
+    plt.ylabel("Lambda [$ \mathrm{ erg \ cm^{3} \ s^{-1} } $]",fontsize=12)
     
     plt.xscale('log')
     plt.yscale('log')
-    plt.legend()
-    plt.show()
-    plt.savefig('coolcurve_DeRijcke13.png')
+    plt.legend(fontsize=12,loc='lower right')
+    plt.tight_layout()
+#    plt.show()
+    plt.savefig('coolcurve_DeRijcke13.pdf',format='pdf')
     
     
 

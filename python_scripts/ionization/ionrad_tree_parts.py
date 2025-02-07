@@ -90,12 +90,13 @@ def main():
     ax2.set_ylabel('Residuals [%]',fontsize=11)
     ax2.set_xlim([-0.005,0.125])
     ax2.set_ylim([-9,4])
+#    ax2.set_ylim([-6,17])
     ax2.hlines(y=0, xmin=-0.005, xmax=0.125, color='grey', linestyle='--', lw=1, alpha=0.3)
     ax2.tick_params(axis='x',labelsize=12)
     ax2.tick_params(axis='y',labelsize=12)
     ax2.minorticks_on()
     #plt.show()
-    plt.savefig('ionization_front_radius_evol.png')
+    plt.savefig('ionization_front_radius_evol.svg')
     
     
 def extract_data(tree):
@@ -110,9 +111,9 @@ def extract_data(tree):
     pwd = os.getcwd()
     pardir = os.path.abspath(os.path.join(pwd, os.pardir))
     if tree == True:
-        path = pardir+'\\tree128_snapshots\\nixyzhmf_*.txt'
+        path = 'tree128_snapshots/nixyzhmf_*.txt'
     else:
-        path = pardir+'\\parts_snapshots\\xyzhmf_*.txt'
+        path = 'parts_snapshots/xyzhmf_*.txt'
     for filename in glob.glob(path):  
         print(filename)
         
@@ -156,10 +157,21 @@ def extract_data(tree):
         spitzrad.append(rad_spitz_pc)
         hosoinurad.append(rad_hosoinu_pc)
     
-    return time, ionrad, spitzrad, hosoinurad
+    ionrad = sort_array(time,ionrad)
+    spitzrad = sort_array(time,spitzrad)
+    hosoinurad = sort_array(time,hosoinurad)
+    time = sort_array(time,time)
+
+    return np.array(time), np.array(ionrad), np.array(spitzrad), np.array(hosoinurad)
+   
+
+def sort_array(array1,array2):
+
+    array2_sorted = [x for _,x in sorted(zip(array1,array2))]
+
+    return array2_sorted
     
-    
-    
+
 def get_ionrad(x_points,y_points,z_points,nH_points):
     '''
     Find ionization front from one output file 
