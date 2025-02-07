@@ -101,7 +101,7 @@ subroutine hnode_iterate(irun,node,nxyzm_treetocmi,ncminode,h_solvertocmi)
 
  skip_hsolve = .false. 
  if (estimate_h) skip_hsolve = .true.
- if (estimate_h_when_slow .and. ncminode > 1E6) skip_hsolve = .true.
+ if (estimate_h_when_slow .and. ncminode > 1E5) skip_hsolve = .true.
 
  avgneigh = 0
  tottime_neigh   = 0.
