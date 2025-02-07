@@ -42,8 +42,11 @@ module hnode_cmi
  integer, parameter :: neighcachesize = 1E5 ! 5000
  integer, parameter :: maxkmid = 1024
 
- logical :: estimate_h = .false.  ! Test estimate only with node size (without root-solving)
- logical :: print_h    = .false. 
+ logical :: estimate_h  = .false.  ! Test estimate only with node size (without root-solving)
+ logical :: estimate_h_when_slow = .true. 
+
+ logical :: print_h     = .false. 
+ logical :: print_neigh = .false. 
 
 contains
 !-----------------------------------------------------------------------
@@ -73,6 +76,7 @@ subroutine hnode_iterate(irun,node,nxyzm_treetocmi,ncminode,h_solvertocmi)
  real    :: tottime_neigh,tottime_iterate
  real    :: pos_node_nosol(3,10000)
  logical :: brute_force,node_failed
+ logical :: skip_hsolve
 
  write(*,'(2x,a30,i7,a6)') 'Solving smoothing lengths for ',ncminode,' nodes'
 
@@ -93,11 +97,17 @@ subroutine hnode_iterate(irun,node,nxyzm_treetocmi,ncminode,h_solvertocmi)
  node_failed = .false.
  inosol = 0
 
+ if (print_neigh) open(2026,file='nneigh.dat',status='replace')
+
+ skip_hsolve = .false. 
+ if (estimate_h) skip_hsolve = .true.
+ if (estimate_h_when_slow .and. ncminode > 1E6) skip_hsolve = .true.
+
  avgneigh = 0
  tottime_neigh   = 0.
  tottime_iterate = 0.
  !$omp parallel do default(none) shared(ncminode,nxyzm_treetocmi,node) &
- !$omp shared(hfact_node,h_solvertocmi,tolh_node,brute_force,estimate_h) &
+ !$omp shared(hfact_node,h_solvertocmi,tolh_node,brute_force,skip_hsolve,print_neigh) &
  !$omp shared(pos_kmid,size_kmid,kmid_start,nkmid,nneigh1d_fac) &
  !$omp shared(node_failed,inosol,pos_node_nosol) &
  !$omp private(icminode,na,pos_node,size_node,nnodeneigh,listnodeneigh,xyzcache_nodeneigh) &
@@ -111,11 +121,18 @@ subroutine hnode_iterate(irun,node,nxyzm_treetocmi,ncminode,h_solvertocmi)
     pos_node  = node(na)%xcen(1:3)
     size_node = node(na)%size
 
-    !- Test: simply estimate h with node size
-    if (estimate_h) then 
-       h_solvertocmi(icminode) = hfact_node*2.*size_node
+    !- If requested, simply estimate h with node size
+    if (skip_hsolve) then 
+       h_solvertocmi(icminode) = hfact_node*2.*size_node *0.55
        tottime_neigh = 0.
        tottime_iterate  = 0.
+       if (print_neigh) then 
+          nnodeneigh = 0
+          call get_nnodeneigh(node,na,nxyzm_treetocmi,ncminode,2.d0*h_solvertocmi(icminode),nnodeneigh)
+          !$omp critical
+          write(2026,*) nnodeneigh
+          !$omp end critical
+       endif 
        cycle over_na
     endif 
 
@@ -163,6 +180,8 @@ subroutine hnode_iterate(irun,node,nxyzm_treetocmi,ncminode,h_solvertocmi)
 
  enddo over_na
  !$omp end parallel do
+
+ if (print_neigh) close(2026)
 
  if (node_failed) then
     open(2052,file='nodes_no_sol.txt',status='replace')
@@ -226,6 +245,7 @@ subroutine hnode_newton_raphson(node,icminode,pos_na,size_na,ncminode,nnodeneigh
        converged = .true.
        h_solvertocmi(icminode) = h
        avgneigh = avgneigh + nrealneigh
+       write(2026,*) nrealneigh
     endif
     niter = niter + 1
     if (niter > 100) exit
@@ -287,6 +307,7 @@ subroutine hnode_bisection(node,icminode,pos_na,size_na,ncminode,nnodeneigh,list
           converged = .true.
           h_solvertocmi(icminode) = hmid
           avgneigh = avgneigh + nrealneigh
+          write(2026,*) nrealneigh
        endif
     endif
     niter = niter + 1
@@ -350,7 +371,7 @@ end subroutine getfunc_from_neigh_sum
 
 !-----------------------------------------------------------------------
 !+
-! Get neighbours with brute-force
+! Get neighbours with brute-force i.e. put all into trial neigh list
 !+
 !-----------------------------------------------------------------------
 subroutine get_nodeneigh_bruteforce(node,na,nxyzm_treetocmi,ncminode,nnodeneigh,listnodeneigh,&
@@ -529,5 +550,38 @@ subroutine get_nodeneigh(node,na,pos_na,size_na,nxyzm_treetocmi,ncminode,nnodene
  if (print_neighfind) print*,'number of trial neighbours',nnodeneigh
 
 end subroutine get_nodeneigh
+
+
+!-----------------------------------------------------------------------
+!+
+! Count node neighbour number within a given radius 
+!+
+!-----------------------------------------------------------------------
+subroutine get_nnodeneigh(node,na,nxyzm_treetocmi,ncminode,radmax,nnodeneigh)
+ use dtypekdtree, only:kdnode
+ use utils_cmi,   only:mag2
+ use io,          only:fatal
+ type(kdnode), intent(in)    :: node(:)
+ integer,      intent(in)    :: na  !- target node
+ real,         intent(in)    :: radmax
+ real,         intent(in)    :: nxyzm_treetocmi(:,:)
+ integer,      intent(in)    :: ncminode
+ integer,      intent(inout) :: nnodeneigh
+ integer :: inode,nb
+ real    :: pos_na(3),pos_nb(3),radmax2,dist2
+
+ pos_na  = node(na)%xcen(1:3)
+ radmax2 = radmax**2 
+
+ do inode = 1,ncminode
+    nb = int(nxyzm_treetocmi(1,inode))
+    pos_nb = node(nb)%xcen(1:3)
+    dist2  = mag2(pos_na(1:3)-pos_nb(1:3))
+    if (nb /= na .and. dist2 < radmax2) then
+       nnodeneigh = nnodeneigh + 1
+    endif
+ enddo
+
+end subroutine get_nnodeneigh
 
 end module hnode_cmi
