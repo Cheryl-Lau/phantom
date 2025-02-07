@@ -9,7 +9,12 @@ module photoionize_cmi
 ! The CMI suite: *photoionize_cmi.F90* kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 
 !                utils_cmi.f90
 ! This module contains all the subroutines necessary for doing photoionization
-! using the Monte Carlo Radiative Transfer code CMacIonize
+! using the Monte Carlo Radiative Transfer code CMacIonize.
+!
+! Brief instructions on how to compile Phantom with CMacIonize can be found on 
+! https://github.com/Cheryl-Lau/phantom/blob/master/phantom_cmi_compilation_instructions.txt
+! Note that the compilation method may vary on different machines, especially the ld flags. 
+!
 !
 ! Two options are available -
 !  1. Pass all particles to CMI for density-mapping and construct grid cell around each
@@ -58,11 +63,15 @@ module photoionize_cmi
 !   - temp_hii            : *Presumed temperature of ionized gas*
 !   - fix_temp_hii        : *Heats ionized particles to temp_hii, else computes heating and cooling*
 !   - implicit_cmi        : *Update internal energy of particles with implicit method, else explicit*
-!   - treat_Rtype_phase   : *Change heating/cooling rates during R-type phase of HII region*
+!   - treat_Rtype_phase   : *Check that dt is greater than the duration of R-type phase of HII region*
+!                            P.S. if anyone knows how to calculate heating rate under non-ionization
+!                            equilibrium without using MC estimator pls let me know....
 !
 ! :Dependencies: infile_utils, physcon, units, io, dim, boundaries, eos, part, kdtree, linklist,
 !                kdtree_cmi, hnode_cmi, heatcool_cmi
 !
+! :Warning: CMacIonize easily runs into seg-fault during grid initialization. Increasing hlimit_fac 
+!           and extradist_fac should resolve the issue, but make sure it is not merging too many cells.
 !
  use cmi_fortran_library
 
@@ -1889,7 +1898,7 @@ subroutine write_options_photoionize(iunit)
  call write_inopt(temp_hii,'temp_hii','Temperature of ionized gas',iunit)
  call write_inopt(fix_temp_hii,'fix_temp_hii','Heat ionized particles to specified temp_hii',iunit)
  call write_inopt(implicit_cmi,'implicit_cmi','Use implicit method to update internal energies',iunit)
- call write_inopt(treat_Rtype_phase,'treat_Rtype_phase','Change heating/cooling rate during R-type phase',iunit)
+ call write_inopt(treat_Rtype_phase,'treat_Rtype_phase','Check that dt covers duration of R-type phase',iunit)
 
 end subroutine write_options_photoionize
 
