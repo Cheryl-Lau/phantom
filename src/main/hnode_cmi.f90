@@ -42,8 +42,8 @@ module hnode_cmi
  integer, parameter :: neighcachesize = 1E5 ! 5000
  integer, parameter :: maxkmid = 1024
 
- logical :: estimate_h  = .false.  ! Test estimate only with node size (without root-solving)
- logical :: estimate_h_when_slow = .true. 
+ logical :: estimate_h  = .false.         ! Option to estimate only with node size (without root-solving)
+ logical :: estimate_h_when_slow = .true. ! Option to just estimate h when ncminode is too large
 
  logical :: print_h     = .false. 
  logical :: print_neigh = .false. 
