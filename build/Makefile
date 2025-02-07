@@ -959,8 +959,8 @@ ifeq ($(SETUP), sncavity)
     ISOTHERMAL=no
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
-    MAXP=2000000
-    NCELLSMAX=4*maxp
+    MAXP=20000000
+    NCELLSMAX=2*maxp
 endif
 
 ifeq ($(SETUP), sncavity_hpc)
@@ -977,15 +977,15 @@ ifeq ($(SETUP), sncavity_hpc)
     ISOTHERMAL=no
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
-    MAXP=5000000
-    NCELLSMAX=4*maxp
+    MAXP=20000000
+    NCELLSMAX=2*maxp
 endif
 
 ifeq ($(SETUP), snturbbox)
 #	 Injecting SN into a turbulence box
     SETUPFILE=velfield_fromcubes.f90 setup_turbbox_sn.f90
     SRCINJECT=inject_sne_sphng.f90
-    ANALYSIS=analysis_bindensity.f90
+    ANALYSIS=analysis_binvelocity.f90
     PERIODIC=yes
     GRAVITY=no 
     ISOTHERMAL=no
