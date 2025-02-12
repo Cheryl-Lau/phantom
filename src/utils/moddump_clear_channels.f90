@@ -22,13 +22,20 @@ module moddump
 !
  implicit none
 
- real   :: rad_chnl = 10.05 !25.0
- real   :: omegafrac_chnl = 0.1
- real   :: pfrac_chnl = 0.9 !0.9999
+ real   :: rad_chnl = 12.0
+ real   :: omegafrac_chnl = 0.5
+ real   :: pfrac_chnl = 0.9
 
  integer, parameter :: nchnl = 1
  real   :: rchnl_vec(3,nchnl) = reshape((/ 1,0,0  /), &
                                          shape=(/3,nchnl/))
+!- Combos 
+!  1  0  0
+! -1  0  0 
+!  0  1  0
+!  0 -1  0
+!  0  0  1
+!  0  0 -1
 
 contains
 
@@ -45,7 +52,7 @@ subroutine modify_dump(npart,npartoftype,massoftype,xyzh,vxyzu)
  integer :: maxpart,npart_store,ip,ichnl 
  integer :: iseed = -12345
  real    :: omega,omega_chnl,xp,yp,zp,xc,yc,zc
- real    :: rp(3),rc(3),rpc,absrp,r_circ,area,pdotc
+ real    :: rp(3),rc(3),absrp,absrc,theta_pc 
  logical :: add_particle
 
  omega_chnl = omegafrac_chnl * 4.*pi
@@ -72,17 +79,12 @@ subroutine modify_dump(npart,npartoftype,massoftype,xyzh,vxyzu)
           xc = rchnl_vec(1,ichnl)
           yc = rchnl_vec(2,ichnl)
           zc = rchnl_vec(3,ichnl)
-          rc = (/ xc,yc,zc /)
+          rc = (/ xc,yc,zc /) *rad_chnl
+          absrc = sqrt(mag2(rc))
 
-          pdotc = dot_product(rp,rc)      ! projection of rp on rc
-          if (pdotc > 0) then             ! less than 90 deg
-             rpc = pdotc/sqrt(mag2(rc))   ! projected length -> radius of cone  
-             if (rpc < 0) call fatal('moddump_clear_channels','wrong rpc')
-             r_circ = sqrt(mag2(rp) - rpc**2)
-             if (r_circ < 0) call fatal('moddump_clear_channels','wrong r_circ')
-             area   = 4.*pi*r_circ**2
-             omega  = area/rpc**2
-
+          theta_pc = acos(dot_product(rp,rc)/(absrp*absrc))  ! angle between rp and rc 
+          if (theta_pc < pi/2.d0) then                       ! within 90 deg 
+             omega = 2.d0*pi*(1.d0-cos(theta_pc))            ! solid angle subtended by cone of 2.d0*theta_pc 
              if (omega < omega_chnl) then
                 if (ran2(iseed) < pfrac_chnl) add_particle = .false.
              endif
