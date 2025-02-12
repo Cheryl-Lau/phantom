@@ -169,7 +169,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call prompt('Enter the mass of particles in solarm units',mpart_solarm,0.)
 
     !- Settings for the cloud to inject feedback (cloud1)
-    np_cloud1 = 7E6
+    np_cloud1 = 1E7
     call prompt('Enter the approximate number of particles in cloud1 (with feedback injected)',np_cloud1,0,npmax)
     rho_cloud1_cgs = 1E-21
     call prompt('Enter the density of cloud1 in g/cm^3',rho_cloud1_cgs,0.)
@@ -571,7 +571,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     nptmass                      = 1
     xyzmh_ptmass(:,:)            = 0.
     xyzmh_ptmass(1:3,nptmass)    = 0.
-    xyzmh_ptmass(4,nptmass)      = 100*solarm/umass
+    xyzmh_ptmass(4,nptmass)      = 50*solarm/umass
     xyzmh_ptmass(ihacc,nptmass)  = 0.005*pc/udist
     xyzmh_ptmass(ihsoft,nptmass) = 0.005*pc/udist
     vxyz_ptmass                  = 0.
@@ -656,7 +656,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Supernova settings
     !
-    inject_sn = .true.
+    inject_sn = .false.
     sink_progenitor = .true.
     one_sink_progenitor = .true.
     isink_progenitor = 1

@@ -18,7 +18,7 @@ module moddump
 !
  implicit none
 
- real :: r_moddens = 4.0
+ real :: r_moddens = 4.8
  real :: rho_moddens_cgs = 1e-23 
 
 contains

@@ -70,7 +70,7 @@ module photoionize_cmi
 ! :Dependencies: infile_utils, physcon, units, io, dim, boundaries, eos, part, kdtree, linklist,
 !                kdtree_cmi, hnode_cmi, heatcool_cmi
 !
-! :Warning: CMacIonize easily runs into seg-fault during grid initialization. Increasing hlimit_fac 
+! :Warning: CMacIonize easily runs into seg-fault during grid initialization. Bringing up hlimit_fac 
 !           and extradist_fac should resolve the issue, but make sure it is not merging too many cells.
 !
  use cmi_fortran_library

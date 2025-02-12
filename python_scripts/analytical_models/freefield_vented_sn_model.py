@@ -30,25 +30,25 @@ def get_pressure(rho,temp):
 
 # Sedov is a self-similar solution, here we'll put everything in cgs units 
 
-t_end = 0.33*Myr                 # sim end time 
+t_end = 0.35*Myr                 # sim end time 
 dt = t_end/1000                  # timestep 
 
-r_detect = 8. *3.086e+18        # location of detector 
+r_detect = 11. *3.086e+18        # location of detector 
 
 r_sn = 0.1 *3.086e+18           # SN ejecta radius 
 E_sn = 1e51                     # SN energy 
-m_sn = 25.0 *1.989e+33          # SN ejecta mass 
+m_sn = 50.0*0.25 *1.989e+33     # SN ejecta mass 
 vol_sn = 4/3*np.pi*r_sn**3      # volume occupied by SN ejecta 
 
-r_cloud = 10. *3.086e+18        # Cloud radius 
-rho_cloud = 1e-21               # density of cloud around HII region/cavity
+r_cloud = 12. *3.086e+18        # Cloud radius 
+rho_cloud = 2e-21               # density of cloud around HII region/cavity
 p_cloud = get_pressure(rho_cloud,1e1)
 
-r_stag = 4. *3.086e+18          # HII region stagnation radius 
-rho_hii = 1e-23
+r_stag = 5. *3.086e+18          # HII region stagnation radius 
+rho_hii = 1e-23 #9e-22
 p_hii = get_pressure(rho_hii,1e4)
 
-rho_inshell = 1e-19             # density within swept-up shell 
+rho_inshell = 1e-18             # density within swept-up shell 
 dr_inshell = 0.2 *3.086e+18     # thickness of shell 
 
 rho_env = 4e-25                 # density of envelope 
@@ -76,9 +76,6 @@ expand_sout = False
 '''
 def free_field_sn(ax1,ax2,ax3):
 
-    place_in_HIIregion = False
-    place_in_cloud = False
-
     s_out = omega*r_stag**2   # to compare with confined case 
     s_out = s_out *sout_fac
     
@@ -91,39 +88,14 @@ def free_field_sn(ax1,ax2,ax3):
     etot = 0.                   # accumulated energy passing through s_out 
     r_shell = r_detect          # initial radius of shell 
 
-    # initial momentum before entering snowplough phase (if doing snowplough)
-    m_inshell = 4*np.pi*r_shell**2*dr_inshell*rho_inshell 
-    momen_shell = m_inshell * 2/5 * (1.17)**(5/2) * (E_sn/rho_env)**(1/2) * r_shell**(-3/2)
-
     while (t < t_end): 
-
-        global rho_ffbg, p_ffbg
-
-        if (place_in_HIIregion == True):
-            if (r_shell < r_stag):
-                rho_ffbg = rho_hii
-                p_ffbg = p_hii
-                print('in HII') 
-            elif (r_shell < r_stag+dr_inshell): 
-                rho_ffbg = rho_inshell 
-                p_ffbg = p_inshell
-                print('in shell')
-            elif (r_shell < r_cloud):
-                rho_ffbg = rho_cloud
-                p_ffbg = p_cloud 
-        elif (place_in_cloud == True):
-            if (r_shell < r_cloud):
-                rho_ffbg = rho_cloud 
-                p_ffbg = p_cloud 
 
         # Update shell radius as it expands 
         v_shell = 2/5 * (1.17)**(5/2) * (E_sn/rho_ffbg)**(1/2) * r_shell**(-3/2)  # sedov sol 
-#        v_shell = 1/4 * (1.17)**(-2) * (momen_shell/rho_ffbg) * r_shell**(-3)   # snowplough
         r_shell = r_shell + v_shell*dt 
         
         # Properties immediately behind shock according to Sedov equations
         v_shell = 2/5 * (1.17)**(5/2) * (E_sn/rho_ffbg)**(1/2) * r_shell**(-3/2)
-#        v_shell = 1/4* (1.17)**(-2) * (momen_shell/rho_ffbg) * r_shell**(-3)
         cs = np.sqrt(gamma*p_ffbg/rho_ffbg)
         mach = v_shell/cs
         
@@ -148,8 +120,7 @@ def free_field_sn(ax1,ax2,ax3):
         v_detect_evol.append(v_detect)
         p_detect_evol.append(p_detect)
         ramp_detect_evol.append(ramp_detect)
-        
-        
+
     if (plot_velocity):
         ax1.scatter(time,v_detect_evol,s=0.1,color='blue',label='free-field')
         
@@ -163,6 +134,90 @@ def free_field_sn(ax1,ax2,ax3):
     np.savetxt('free_field_model.txt',free_field_model)
 
     print('- Free-field SN -')
+    print('Supernova energy: ',E_sn)
+    print('Supernova energy in direction of detector: ',E_sn*omega/(4*np.pi))
+    print('Accumulated energy in direction of detector: ',etot,' erg')
+
+
+
+def confined_sn(ax1,ax2,ax3):
+
+    s_out = omega*r_stag**2   # to compare with confined case 
+    s_out = s_out *sout_fac
+    
+    time = []
+    v_detect_evol = []          # velocity at detector
+    p_detect_evol = []          # thermal pressure 
+    ramp_detect_evol = []       # ram pressure 
+    
+    t = 0.
+    etot = 0.                   # accumulated energy passing through s_out 
+    r_shell = r_detect          # initial radius of shell 
+
+    # initial momentum before entering snowplough phase (if doing snowplough)
+    m_inshell = 4*np.pi*r_stag**2*dr_inshell*rho_inshell 
+    momen_shell = m_inshell * 2/5 * (1.17)**(5/2) * (E_sn/rho_hii)**(1/2) * r_stag**(-3/2)
+
+    while (t < t_end): 
+
+        global rho_ffbg, p_ffbg
+
+        if (r_shell < r_stag):
+            rho_ffbg = rho_hii
+            p_ffbg = p_hii
+        elif (r_shell < r_cloud):
+            rho_ffbg = rho_cloud
+            p_ffbg = p_cloud 
+#        else: 
+#            rho_ffbg = rho_env
+#            p_ffbg = p_env
+
+        # Update shell radius as it expands 
+        if (r_shell < r_stag):
+            v_shell = 2/5 * (1.17)**(5/2) * (E_sn/rho_ffbg)**(1/2) * r_shell**(-3/2)  # sedov sol 
+        else: 
+            v_shell = 1/4 * (1.0)**(-2) * (momen_shell/rho_ffbg) * r_shell**(-3)   # snowplough
+        r_shell = r_shell + v_shell*dt 
+
+        cs = np.sqrt(gamma*p_ffbg/rho_ffbg)
+        mach = v_shell/cs
+
+        # Properties within shocked region 
+        r_fac = r_detect/r_shell
+        a = (7*gamma-1)/(gamma**2-1)
+        b = 3/(gamma-1)
+        c = (2*gamma+10)/(gamma-7)
+        d = (2*gamma**2+7*gamma-3)/(gamma-7)
+        v_detect = v_shell * (r_fac/gamma + ((gamma-1)/(gamma**2+gamma)) * r_fac**a)
+        rho_detect = rho_ffbg * (gamma+1)/(gamma-1)*r_fac**b/gamma**c*(gamma+1-r_fac**(a-1))**c
+        p_detect = p_ffbg * mach**2 * (2*gamma**(1-d))/(gamma+1) * (gamma+1-r_fac**(a-1))**d
+        ramp_detect = rho_detect * v_detect**2
+        
+        # Energy passing through area s_out at r_detect within dt 
+        m_box = rho_detect * s_out * v_detect * dt 
+        e_box = 0.5*m_box*v_detect**2 + p_detect/(rho_detect*(gamma-1))*m_box
+        etot = etot + e_box 
+        
+        t = t + dt 
+        time.append(t)
+        v_detect_evol.append(v_detect)
+        p_detect_evol.append(p_detect)
+        ramp_detect_evol.append(ramp_detect)
+        
+        
+    if (plot_velocity):
+        ax1.scatter(time,v_detect_evol,s=0.1,color='green',label='confined')
+        
+    if (plot_thermp):
+        ax2.scatter(time,p_detect_evol,s=0.1,color='green',label='confined')
+
+    if (plot_ramp):
+        ax3.scatter(time,ramp_detect_evol,s=0.1,color='green',label='confined')
+
+    confined_model = np.column_stack((time,v_detect_evol,p_detect_evol,ramp_detect_evol))
+    np.savetxt('confined_model.txt',confined_model)
+
+    print('- Confined SN -')
     print('Supernova energy: ',E_sn)
     print('Supernova energy in direction of detector: ',E_sn*omega/(4*np.pi))
     print('Accumulated energy in direction of detector: ',etot,' erg')
@@ -274,7 +329,7 @@ def part_confined_sn(with_HII,expand_cav,ax1,ax2,ax3):
             s_out = s_out*1.00001
 
         # Detector is at the middle of the channel 
-        rho_mid = (rho_vent+rho_env)/2
+        rho_mid = rho_vent #(rho_vent+rho_env)/2
         p_mid = p_env*(rho_mid/rho_env)**gamma
         ramp_mid = rho_mid * v_out**2
 
@@ -360,7 +415,9 @@ def main():
     ax3.set_xlabel('time [s]')
     ax3.set_ylabel('ram pressure [g/cm/s^2]')
     
+
     free_field_sn(ax1,ax2,ax3)
+    confined_sn(ax1,ax2,ax3)
     part_confined_sn(with_HII_region,expanding_cavity,ax1,ax2,ax3)
     
     ax1.legend()
