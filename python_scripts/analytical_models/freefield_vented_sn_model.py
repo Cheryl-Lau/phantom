@@ -33,7 +33,7 @@ def get_pressure(rho,temp):
 t_end = 0.35*Myr                 # sim end time 
 dt = t_end/1000                  # timestep 
 
-r_detect = 11. *3.086e+18        # location of detector 
+r_detect = 8. *3.086e+18        # location of detector 
 
 r_sn = 0.1 *3.086e+18           # SN ejecta radius 
 E_sn = 1e51                     # SN energy 
@@ -44,8 +44,8 @@ r_cloud = 12. *3.086e+18        # Cloud radius
 rho_cloud = 2e-21               # density of cloud around HII region/cavity
 p_cloud = get_pressure(rho_cloud,1e1)
 
-r_stag = 5. *3.086e+18          # HII region stagnation radius 
-rho_hii = 1e-23 #9e-22
+r_stag = 4.8 *3.086e+18          # HII region stagnation radius 
+rho_hii = 1e-22 #9e-22
 p_hii = get_pressure(rho_hii,1e4)
 
 rho_inshell = 1e-18             # density within swept-up shell 
