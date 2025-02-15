@@ -24,7 +24,7 @@ module analysis
 
  private
 
- real    :: xyz_target(3) = (/ 0.42, 1.0, 1.17 /)  ! Position of detector 8 for w/cooling, 25 for no cooling
+ real    :: xyz_target(3) = (/ 8.d0, 0.d0, 0.d0 /)  ! Position of detector
 
 contains
 
