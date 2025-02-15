@@ -27,8 +27,6 @@ case $yn in
    [Nn]* ) echo '#SBATCH --time=168:00:00';;
    * ) echo '#SBATCH --time=168:00:00';;
 esac
-echo '#SBATCH --output='$infile'.qout'
-echo '#SBATCH --error='$infile'.err'
 echo '#SBATCH --mail-type=BEGIN,END,FAIL'
 echo '#SBATCH --mail-user='$username'@st-andrews.ac.uk'
 echo '#SBATCH --mem=80G'
