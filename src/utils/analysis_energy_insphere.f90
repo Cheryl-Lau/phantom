@@ -24,18 +24,13 @@ module analysis
 
  private
 
- integer, parameter :: nrad = 4
-! real     :: rad_list(nrad) = (/ 20.,50.,80.,100.,150.,200. /) ! radii of spherical surfaces in code units 
- real     :: rad_list(nrad) = (/ 8.,15.,25.,35. /) 
+ integer, parameter :: nrad = 5
+ real     :: rad_list(nrad) = (/ 15.,30.,45.,60.,75. /) ! radii of spherical surfaces in code units 
  real     :: xyz_src(3) = (/ 0., 0., 0. /)            ! Position of feedback source in code units 
 
 contains
 
 subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
- use linklist, only:node,ifirstincell,listneigh,set_linklist
- use kdtree,   only:getneigh
- use dim,      only:maxneigh
- use kernel,   only:get_kernel,cnormk,radkern2
  use units,    only:udist,utime,unit_energ 
  use io,       only:fatal,warning 
  use part,     only:hfact,rhoh,massoftype,igas

@@ -24,30 +24,25 @@ module analysis
 
  private
 
- integer, parameter :: nrad = 4
-! real     :: rad_list(nrad) = (/ 20.,50.,80.,100.,150.,200. /) ! radii of spherical surfaces in code units 
- real     :: rad_list(nrad) = (/ 8.,15.,25.,35. /) 
+ integer, parameter :: nrad = 5
+ real     :: rad_list(nrad) = (/ 15.,30.,45.,60.,75. /) ! radii of spherical surfaces in code units 
  real     :: xyz_src(3) = (/ 0., 0., 0. /)            ! Position of feedback source in code units 
 
 contains
 
 subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
- use linklist, only:node,ifirstincell,listneigh,set_linklist
- use kdtree,   only:getneigh
- use dim,      only:maxneigh
- use kernel,   only:get_kernel,cnormk,radkern2
  use units,    only:udist,utime,umass,unit_velocity 
  use io,       only:fatal,warning 
  use part,     only:hfact,rhoh,massoftype,igas
  use eos,      only:gamma
- use physcon,  only:pi 
+ use physcon,  only:pi,solarm,km,mass_proton_cgs
  character(len=*), intent(in) :: dumpfile
  integer,          intent(in) :: num,npart,iunit
  real,             intent(in) :: xyzh(:,:),vxyzu(:,:)
  real,             intent(in) :: particlemass,time
- integer :: irad,ip
+ integer :: irad,ip,nback
  real    :: time_cgs,pmass,rad2,rad_cgs,momen_tot,momen_tot_cgs,momen_part
- real    :: dist2,r_unitvec(3),radvel
+ real    :: dist2,r_unitvec(3),radvel,momen_kimmcen14,momen_cioffi88,nH,rho_cgs
  character(len=70) :: filename
 
  filename = 'momentum_insphere_'//TRIM(dumpfile)//'.dat'
@@ -57,7 +52,18 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
  write(2206,'(1a20)') 'time [s]'
  write(2206,'(1e20.10)') time_cgs
- write(2206,'(2a25)') 'radius [cm]','radial momentum [g cm s^-1]'
+
+ !- Predicted terminal momentum from literature 
+ rho_cgs = 4.d-25
+ nH = rho_cgs/mass_proton_cgs
+ write(2206,'(a60)') 'terminal momentum [g cm s^-1]'
+ momen_cioffi88 = 4.8d5*km * (1.d0)**(13.d0/14.d0) * (nH)**(-1.d0/7.d0) * solarm 
+ write(2206,'(1e60.10)') momen_cioffi88 
+ momen_kimmcen14 = 3.d5*km * (1.d0)**(16.d0/17.d0) * (nH)**(-2.d0/17.d0) * solarm 
+ write(2206,'(1e60.10)') momen_kimmcen14
+
+ !- Header 
+ write(2206,'(2a30)') 'radius [cm]','radial momentum [g cm s^-1]'
  close(2206)
 
  !- Particle mass
@@ -66,24 +72,28 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  each_radius: do irad = 1,nrad 
     rad2 = (rad_list(irad))**2
     momen_tot = 0.
+    nback = 0
     do ip = 1,npart
        dist2 = mag2(xyzh(1:3,ip) - xyz_src(1:3)) 
        if (dist2 < rad2) then 
-           r_unitvec = (xyzh(1:3,ip) - xyz_src(1:3)) / sqrt(dist2)
-           radvel = dot_product(vxyzu(1:3,ip),r_unitvec)
-           momen_part = pmass*radvel
-           momen_tot = momen_tot + momen_part 
+          r_unitvec = (xyzh(1:3,ip) - xyz_src(1:3)) / sqrt(dist2)
+          radvel = dot_product(vxyzu(1:3,ip),r_unitvec)
+          if (radvel < 0.) nback = nback + 1 
+          momen_part = pmass*radvel
+          momen_tot = momen_tot + momen_part 
        endif 
     enddo 
+    if (nback > 0) print*,nint(real(nback)/real(npart)*100.d0),'% of the particles went backwards!'
+    if (momen_tot < 0.d0) call warning('analysis_momentum_insphere','shock reversed')
     ! convert to cgs units 
     rad_cgs = rad_list(irad) *udist 
     momen_tot_cgs = momen_tot *umass*unit_velocity 
 
-
     open(unit=2206,file=filename,position='append')
-    write(2206,'(2e25.10)') rad_cgs, momen_tot_cgs
+    write(2206,'(2e30.10)') rad_cgs, momen_tot_cgs
     close(2206)
  enddo each_radius 
+
 
 end subroutine do_analysis
 
