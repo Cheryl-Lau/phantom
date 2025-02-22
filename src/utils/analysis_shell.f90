@@ -25,8 +25,8 @@ module analysis
 
  private
 
- integer :: npoint = 200
- real    :: maxr = 20. 
+ integer :: npoint = 300
+ real    :: maxr = 30. 
 
 contains
 
