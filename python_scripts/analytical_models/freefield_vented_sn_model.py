@@ -48,7 +48,7 @@ r_stag = 4.8 *3.086e+18          # HII region stagnation radius
 rho_hii = 1e-22
 p_hii = get_pressure(rho_hii,1e4)
 
-rho_inshell = 1e-18             # density within swept-up shell 
+rho_inshell = 1e-19             # density within swept-up shell 
 dr_inshell = 0.2 *3.086e+18     # thickness of shell 
 
 rho_env = 4e-25                 # density of envelope 
