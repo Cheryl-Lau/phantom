@@ -59,7 +59,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  write(2206,'(a60)') 'terminal momentum [g cm s^-1]'
  momen_cioffi88 = 4.8d5*km * (1.d0)**(13.d0/14.d0) * (nH)**(-1.d0/7.d0) * solarm 
  write(2206,'(1e60.10)') momen_cioffi88 
- momen_kimmcen14 = 3.d5*km * (1.d0)**(16.d0/17.d0) * (nH)**(-2.d0/17.d0) * solarm 
+ momen_kimmcen14 = 3.d5*km * (1.d0)**(16.d0/17.d0) * (nH)**(-2.d0/17.d0) * solarm * (0.01)**(-0.14)
  write(2206,'(1e60.10)') momen_kimmcen14
 
  !- Header 
