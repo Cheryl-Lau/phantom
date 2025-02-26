@@ -957,7 +957,7 @@ ifeq ($(SETUP), sncavity)
     PERIODIC=no
     GRAVITY=no 
     ISOTHERMAL=no
-    IND_TIMESTEPS=yes
+    IND_TIMESTEPS=no
     KNOWN_SETUP=yes
     MAXP=20000000
     NCELLSMAX=2*maxp
@@ -975,7 +975,7 @@ ifeq ($(SETUP), sncavity_hpc)
     PERIODIC=no
     GRAVITY=no 
     ISOTHERMAL=no
-    IND_TIMESTEPS=yes
+    IND_TIMESTEPS=no
     KNOWN_SETUP=yes
     MAXP=20000000
     NCELLSMAX=2*maxp
