@@ -10,9 +10,9 @@ echo '#!/bin/bash -l'
 echo '#SBATCH --job-name '$jobname
 echo '#SBATCH --nodes=1'
 case $yn in
-   [Yy]* ) echo '#SBATCH --partition small';;
-   [Nn]* ) echo '#SBATCH --partition large';;
-   * ) echo '#SBATCH --partition large';;
+   [Yy]* ) echo '#SBATCH --partition small-short';;
+   [Nn]* ) echo '#SBATCH --partition large-long';;
+   * ) echo '#SBATCH --partition large-long';;
 esac
 echo '#SBATCH --ntasks=1'
 case $yn in 
@@ -21,7 +21,7 @@ case $yn in
    * ) echo '#SBATCH --cpus-per-task=50';;
 esac
 case $yn in
-   [Yy]* ) echo '#SBATCH --time=10:00:00';;
+   [Yy]* ) echo '#SBATCH --time=20:00:00';;
    [Nn]* ) echo '#SBATCH --time=168:00:00';;
    * ) echo '#SBATCH --time=168:00:00';;
 esac
@@ -32,7 +32,11 @@ echo '#SBATCH --mail-user='$USER'@st-andrews.ac.uk'
 echo '#SBATCH --mem=80G'
 
 echo 'export OMP_SCHEDULE="dynamic"'
-echo 'export OMP_NUM_THREADS=96'
+case $yn in
+   [Yy]* ) echo 'export OMP_NUM_THREADS=48';;
+   [Nn]* ) echo 'export OMP_NUM_THREADS=96';;
+   * ) echo 'export OMP_NUM_THREADS=96';;
+esac
 echo 'export KMP_STACKSIZE=128M'
 echo 'ulimit -s unlimited'
 
