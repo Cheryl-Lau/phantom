@@ -23,10 +23,11 @@ module analysis
 
  private
 
- integer, parameter :: nrad  = 10
- real    :: rad_thresh(nrad) = (/ 6e-2,8e-2,1e-1,2e-1,4e-1,6e-1,8e-1,1e0,2e0,4e0 /)
- real    :: rholimit_cgs     = 1e-21
- logical :: only_highdenpart = .true. 
+ integer, parameter :: nrad  = 50
+ real    :: rad_min = 1.d-2
+ real    :: rad_max = 1.d+1
+ real    :: rholimit_cgs     = 1.d-21
+ logical :: only_highdenpart = .false. 
 
 contains
 
@@ -46,7 +47,9 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  integer, parameter :: neighcachesize = 1E5
  integer :: ip,ineigh,nneigh,ixyzcachesize,n,irad,ip_neigh
  real    :: xyzcache(3,neighcachesize)
- real    :: pmass,maxrad,dist2,rho,rad2_limit,mean_v,sigma_v,mean_rho
+ real    :: pmass,dist2,rho,rad2_limit,mean_v,sigma_v,mean_rho
+ real    :: logr_min,dlogr,rad 
+ real    :: rad_thresh(nrad)
  real    :: sigma_v_allrad(nrad),virial_term_allrad(nrad),rho_avg_allrad(nrad)
  real,   allocatable :: dumxyzh(:,:)
  character(len=70) :: filename
@@ -54,8 +57,14 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  !- Particle mass
  pmass = massoftype(igas)
 
- !- Max radius 
- maxrad = rad_thresh(nrad)
+ !- Set up rad_thresh(nrad) array
+ logr_min = log(rad_min)
+ dlogr    = log(rad_max/rad_min)/dble(nrad)
+ do irad = 1,nrad 
+    rad = exp(logr_min + dble(irad)*dlogr)
+    rad_thresh(irad) = rad 
+ enddo 
+ print*,'measuring sigma at: ',rad_thresh(1:nrad)
 
  !- Build tree 
  allocate(dumxyzh(4,npart))
@@ -66,10 +75,15 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  open(unit=2027,file='virial_term_'//TRIM(dumpfile)//'.dat',status='replace')
  open(unit=2028,file='density_sizescale_'//TRIM(dumpfile)//'.dat',status='replace')
 
+ !- Write header line - the radii
+ write(2026,'(15x,100f30.10)') rad_thresh(1:nrad)
+ write(2027,'(15x,100f30.10)') rad_thresh(1:nrad)
+ write(2028,'(15x,100f30.10)') rad_thresh(1:nrad)
+
 
  !- Loop over each length-scale 
  !$omp parallel do default(none) shared(npart,pmass,xyzh,vxyzu,rad_thresh,rholimit_cgs) &
- !$omp shared(node,hfact,maxrad,xyzcache,ifirstincell,only_highdenpart) &
+ !$omp shared(node,hfact,rad_max,xyzcache,ifirstincell,only_highdenpart) &
  !$omp shared(umass,udist,unit_velocity,unit_density) &
  !$omp private(ip,rho,nneigh,irad,rad2_limit,mean_v,sigma_v,mean_rho,n,ineigh,ip_neigh,dist2) &
  !$omp private(sigma_v_allrad,virial_term_allrad,rho_avg_allrad) &
@@ -81,8 +95,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
     if (only_highdenpart .and. rho < rholimit_cgs/unit_density) cycle over_part
 
     ! Get all neigh 
-    call getneigh(node,xyzh(1:3,ip),0.,maxrad,3,listneigh,nneigh,xyzh,xyzcache,neighcachesize,ifirstincell,.false.)
-
+    call getneigh(node,xyzh(1:3,ip),0.,rad_max,3,listneigh,nneigh,xyzh,xyzcache,neighcachesize,ifirstincell,.false.)
 
     over_rad: do irad = 1,nrad
        rad2_limit = (rad_thresh(irad))**2 
@@ -129,9 +142,9 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
     enddo over_rad
 
     !$omp critical 
-    write(2026,'(1i15,10f30.10)') ip, sigma_v_allrad(1:nrad)
-    write(2027,'(1i15,10f30.10)') ip, virial_term_allrad(1:nrad)
-    write(2028,'(1i15,10es30.10)') ip, rho_avg_allrad(1:nrad)
+    write(2026,'(1i15,100f30.10)') ip, sigma_v_allrad(1:nrad)
+    write(2027,'(1i15,100f30.10)') ip, virial_term_allrad(1:nrad)
+    write(2028,'(1i15,100es30.10)') ip, rho_avg_allrad(1:nrad)
     !$omp end critical 
  enddo over_part
  !$omp end parallel do
