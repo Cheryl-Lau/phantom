@@ -33,7 +33,7 @@ module setup
  private
 
  integer :: np_req
- real    :: pmass,cs0_cgs,rms_mach 
+ real    :: pmass,temp,rms_mach 
  real    :: xmini,xmaxi,ymini,ymaxi,zmini,zmaxi
  real(kind=8)       :: udist,umass
  character(len=20)  :: dist_unit,mass_unit
@@ -80,7 +80,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real    :: xyzh_raw(4,maxrow)
  real    :: vol_box,boxlength,boxsize_fromfile,boxsize_toscale,deltax
  real    :: boxsize_sample,rho_sample,rho_sample_cgs,rho_fracdiff,rhozero_cgs
- real    :: totmass,temp,pmass_cgs,u0,u0_cgs,tmax_cgs,dtmax_cgs
+ real    :: totmass,cs0_cgs,pmass_cgs,u0,u0_cgs,tmax_cgs,dtmax_cgs
  real    :: centre(3),radius
  real    :: t_ff,rmsmach,v2i,turbfac,turbboxsize,mean_v,sigma_v,cs0
  integer :: i,ierr,io_file,ix,npmax,npart_sample
@@ -126,20 +126,20 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set number of particles (to be updated after set_unifdis)
     !
     npmax = int(size(xyzh(1,:)))
-    np_req = 1E6
+    np_req = 1.0005e6 ! nint((2.*15.*pc)**3*4e-25/(1e-2*solarm))    
     call prompt('Enter total number of particles',np_req,1)
     if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
     !
     ! Particle mass
     !
-    pmass_cgs = 1E-1*solarm
+    pmass_cgs = 1E-2*solarm
     pmass = pmass_cgs/umass
     call prompt('Enter particle mass in units of '//mass_unit,pmass,0.)
     !
     ! Boundaries 
     ! 
     centre = (/ 0.,0.,0. /)
-    radius = 10. 
+    radius = 15. 
     xmini = centre(1) - radius ; xmaxi = centre(1) + radius
     ymini = centre(2) - radius ; ymaxi = centre(2) + radius
     zmini = centre(3) - radius ; zmaxi = centre(3) + radius
@@ -150,10 +150,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call prompt('enter zmin boundary',zmini)
     call prompt('enter zmax boundary',zmaxi,zmini)
     !
-    ! set initial sound speed
+    ! set initial temperature
     !
-    cs0_cgs = 0.91E5
-    call prompt('Enter initial sound speed in cm s^-1',cs0_cgs,0.)
+    temp = 61.5  ! 1000. 
+    call prompt('Enter initial temperature in K',temp,0.)
     !
     ! Set timestep and end-time
     !
@@ -166,7 +166,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Set turbulence 
     !
-    rms_mach = 10.
+    rms_mach = 5.
     call prompt('Enter the Mach number of the cloud turbulence',rms_mach,0.)
 
     if (id==master) call write_setupfile(filename)
@@ -179,10 +179,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  call set_units(dist=udist,mass=umass,G=1.d0)
 
- !
- ! Convert units 
- !
- cs0 = cs0_cgs/unit_velocity 
  !
  ! Set boundaries
  !
@@ -240,24 +236,11 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call set_particle_type(i,igas)
  enddo
  !
- ! Calculate temperature from input sound speed
+ ! Calculate sound speed from input temperature 
  !
- temp = (cs0*unit_velocity)**2*gmw*mass_proton_cgs/(gamma*kboltz)
- print*,'temperature: ',temp,'K'
- write(*,'(a)',advance='no') ' Temperature acceptable ([y]/n)?'
- read(*,'(a)') temp_ans
- if (len(trim(adjustl(temp_ans))) /= 0) then
-    if (trim(adjustl(temp_ans)) == 'n') then
-       print*,'stopping program - adjust gamma, gmw or cs0'
-       stop
-    elseif (trim(adjustl(temp_ans)) == 'y') then
-       print*,'y - proceeding...'
-    else
-       print*,'Invalid input'
-    endif
- else
-    print*,'y - proceeding...'
- endif
+ cs0_cgs = sqrt(temp * (gamma*kboltz) / (gmw*mass_proton_cgs))
+ cs0 = cs0_cgs/unit_velocity 
+
  !
  ! Polytropic constant
  !
@@ -407,7 +390,7 @@ subroutine write_setupfile(filename)
  write(iunit,"(/,a)") '# setup'
  call write_inopt(np_req,'np_req','total number of particles requested',iunit)
  call write_inopt(pmass,'pmass','particle mass',iunit)
- call write_inopt(cs0_cgs,'cs0_cgs','initial sound speed',iunit)
+ call write_inopt(temp,'temp','initial sound speed',iunit)
  call write_inopt(dtmax,'dtmax','timestep in code units',iunit)
  call write_inopt(tmax,'tmax','end-time in code units',iunit)
  call write_inopt(rms_mach,'rms_mach','turbulent rms mach number',iunit)
@@ -454,7 +437,7 @@ subroutine read_setupfile(filename,ierr)
  !
  call read_inopt(np_req,'np_req',db,min=8,errcount=nerr)
  call read_inopt(pmass,'pmass',db,min=0.,errcount=nerr)
- call read_inopt(cs0_cgs,'cs0_cgs',db,min=0.,errcount=nerr)
+ call read_inopt(temp,'temp',db,min=0.,errcount=nerr)
  call read_inopt(dtmax,'dtmax',db,min=0.,errcount=nerr)
  call read_inopt(tmax,'tmax',db,min=0.,errcount=nerr)
  call read_inopt(rms_mach,'rms_mach',db,nerr)
