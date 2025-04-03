@@ -26,7 +26,7 @@ module analysis
  integer, parameter :: nrad  = 50
  real    :: rad_min = 1.d-2
  real    :: rad_max = 1.d+1
- real    :: rholimit_cgs     = 1.d-21
+ real    :: rholimit_cgs     = 1.d-22
  logical :: only_highdenpart = .false. 
 
 contains
