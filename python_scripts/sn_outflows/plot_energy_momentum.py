@@ -234,7 +234,7 @@ def main():
     axes = [ax1,ax2,ax3,ax4,ax5]
     plot_energ_for_all_rad(axes,'etot',df_energ)
     for ax in axes:
-        ax.set_ylim([6E48,5E51])
+        ax.set_ylim([1.5E49,5E51])
     ax1.set_ylabel('total energy [erg]')
     ax1.yaxis.set_tick_params(which='both', labelbottom=True)
     ax1.set_title('r = 15 pc')
@@ -253,7 +253,7 @@ def main():
     axes = [ax6,ax7,ax8,ax9,ax10]
     plot_energ_for_all_rad(axes,'ekin',df_energ)
     for ax in axes:
-        ax.set_ylim([3E45,5E52])
+        ax.set_ylim([8E45,5E52])
     ax6.set_ylabel('kinetic energy [erg]')
     ax6.yaxis.set_tick_params(which='both', labelbottom=True)
     ax10.legend(fontsize=6.5,loc='lower right')
@@ -267,7 +267,7 @@ def main():
     axes = [ax11,ax12,ax13,ax14,ax15]
     plot_energ_for_all_rad(axes,'etherm',df_energ)
     for ax in axes:
-        ax.set_ylim([2E48,5E51])
+        ax.set_ylim([8E48,5E51])
     ax11.set_ylabel('thermal energy [erg]')
     ax11.yaxis.set_tick_params(which='both', labelbottom=True)
     ax15.legend(fontsize=6.5,loc='lower right')

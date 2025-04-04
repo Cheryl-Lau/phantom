@@ -71,7 +71,7 @@ ax2.set_xlabel('time [Myr]')
 ax2.set_ylabel('thermal pressure [g $\mathrm{cm^{-1}}$ $\mathrm{s^{-2}}$]')
 ax2.set_yscale('log')
 ax2.set_xlim([0,0.38])
-ax2.set_ylim([6E-13,6E-4])
+ax2.set_ylim([6E-13,2E-4])
 ax2.legend(loc='upper right',fontsize=8)
 
 ax3.set_xlabel('time [Myr]')
