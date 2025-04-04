@@ -37,15 +37,15 @@ r_detect = 10. *3.086e+18        # location of detector
 
 r_sn = 0.1 *3.086e+18           # SN ejecta radius 
 E_sn = 1e51                     # SN energy 
-m_sn = 50.0*0.25 *1.989e+33     # SN ejecta mass 
+m_sn = 12.5*0.25 *1.989e+33     # SN ejecta mass 
 vol_sn = 4/3*np.pi*r_sn**3      # volume occupied by SN ejecta 
 
 r_cloud = 12. *3.086e+18        # Cloud radius 
-rho_cloud = 2e-21               # density of cloud around HII region/cavity
+rho_cloud = 1e-21               # density of cloud around HII region/cavity
 p_cloud = get_pressure(rho_cloud,1e1)
 
 r_stag = 4.8 *3.086e+18          # HII region stagnation radius 
-rho_hii = 1e-22
+rho_hii = 1e-23
 p_hii = get_pressure(rho_hii,1e4)
 
 rho_inshell = 1e-19             # density within swept-up shell 
@@ -58,7 +58,7 @@ rho_ffbg = 4e-25               # Medium density for free-field case
 p_ffbg = get_pressure(rho_ffbg,1e3)
 
 nchnl = 1
-omega = nchnl* 4*np.pi*0.1             # solid angle of channell in Sr
+omega = nchnl* 4*np.pi*0.05             # solid angle of channell in Sr
 sout_fac = 1 
 expand_sout = False
 
