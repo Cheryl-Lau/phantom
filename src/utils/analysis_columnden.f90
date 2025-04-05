@@ -27,7 +27,7 @@ module analysis
  integer, parameter :: ntheta = 360/1
  integer, parameter :: nphi = 180/1
  real    :: maxr = 15.
- integer :: isink_src = 14 
+ integer :: isink_src = 6 
  real    :: xyz_src_in(3) = (/ 0.,0.,0. /)
  logical :: use_sink = .true. 
 
@@ -99,13 +99,16 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  over_parts: do ip = 1,npart 
     r = sqrt(mag2(xyzh(1:3,ip)-xyz_src(1:3)))
     if (r > maxr) cycle 
-    x = min(xyzh(1,ip)/r,1.d0)
+    x = min(xyzh(1,ip)/r,1.d0)  !- limit unitvec to [-1,+1]
+    x = max(xyzh(1,ip)/r,-1.d0)
     y = min(xyzh(2,ip)/r,1.d0)
+    y = max(xyzh(2,ip)/r,-1.d0)
     z = min(xyzh(3,ip)/r,1.d0)
+    z = max(xyzh(3,ip)/r,-1.d0)
     phi   = dasin(z)
     theta = atan2(y,x)
 
-    minphi = min(minphi,phi)
+    minphi = min(minphi,phi)   !- record range of theta & phi
     maxphi = max(maxphi,phi)
     mintheta = min(mintheta,theta)
     maxtheta = max(maxtheta,theta)
