@@ -950,7 +950,7 @@ ifeq ($(SETUP), sncavity)
     SETUPFILE=velfield_fromcubes.f90 setup_twosphere_channel.f90
     SRCINJECT=inject_sne_sphng.f90
     ANALYSIS=analysis_momentum_insphere.f90
-    MODFILE=moddump_clear_channels.f90
+    MODFILE=moddump_addsink.f90 
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
     CMACIONIZE=yes
@@ -985,7 +985,7 @@ ifeq ($(SETUP), snturbbox)
 #	 Injecting SN into a turbulence box
     SETUPFILE=velfield_fromcubes.f90 setup_turbbox_sn.f90
     SRCINJECT=inject_sne_sphng.f90
-    ANALYSIS=analysis_binvelocity.f90
+    ANALYSIS=analysis_vel_dispersion.f90
     PERIODIC=yes
     GRAVITY=no 
     ISOTHERMAL=no
