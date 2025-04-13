@@ -25,7 +25,7 @@ module analysis
 
  private
  real    :: centre(3) = (/ 0., 0., 0. /)
- real    :: radius = 15. 
+ real    :: radius = 10. 
 
 contains
 
