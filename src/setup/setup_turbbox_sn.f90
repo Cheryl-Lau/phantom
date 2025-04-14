@@ -126,13 +126,13 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set number of particles (to be updated after set_unifdis)
     !
     npmax = int(size(xyzh(1,:)))
-    np_req = 1.0005e6  ! nint((2.*10.*pc)**3*4e-25/(1e-2*solarm))*1e3    
+    np_req = nint((2.*10.*pc)**3*4e-25/(1e-2*solarm))*1e3    ! 1.0005e6 
     call prompt('Enter total number of particles',np_req,1)
     if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
     !
     ! Particle mass
     !
-    pmass_cgs = 1E-2*solarm  !1E-2*solarm*1e-3
+    pmass_cgs = 1E-2*solarm*1e-3 ! 1E-2*solarm  
     pmass = pmass_cgs/umass
     call prompt('Enter particle mass in units of '//mass_unit,pmass,0.)
     !
@@ -152,7 +152,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! set initial temperature
     !
-    temp = 6.155E+01  ! 1000. 
+    temp = 1000. ! 6.155E+01  
     call prompt('Enter initial temperature in K',temp,0.)
     !
     ! Set timestep and end-time
@@ -166,7 +166,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Set turbulence 
     !
-    rms_mach = 7.
+    rms_mach = 3.
     call prompt('Enter the Mach number of the cloud turbulence',rms_mach,0.)
 
     if (id==master) call write_setupfile(filename)
