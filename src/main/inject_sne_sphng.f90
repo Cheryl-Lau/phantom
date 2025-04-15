@@ -309,7 +309,7 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        print*,'Number of SN particles: ',npartsn
        if (npartsn > nkilled) print*,'adding ',npartsn-nkilled,' extra particles'
        if (npartsn < 6) call fatal('inject_sne_sphng','too few sn particles')
-       if (npartsn > maxnpartsn .and. engkin > 0) then 
+       if (npartsn > maxnpartsn .and. engkin > 0.d0) then 
           call warning('inject_sne_sphng','number of sn particles is beyond pre-computed table range')
           npartsn = maxnpartsn
           print*,'Setting npartsn to ',npartsn 
@@ -323,17 +323,22 @@ subroutine inject_particles(time,dtlast,xyzh,vxyzu,xyzmh_ptmass,vxyz_ptmass,&
        !
        ! Set up velocity profile of sn particles
        !
-       if (gaussian_vprofile) then 
-          aN_scalefactor = 1. ! to avoid compiler warning
-          if (first_sn) then
-             call interp_from_vrprofile(npartsn,massoftype(igas),engkin,a_vrad) 
-             aN_scalefactor = a_vrad*npartsn**(1./2.)  ! Store scale factor for forthcoming sne
-             first_sn = .false.
-          else
-             a_vrad = aN_scalefactor/npartsn**(1./2.)
-          endif
-       elseif (uniform_vprofile) then 
-          vrad = sqrt((2*engkin)/(npartsn*massoftype(igas)))
+       if (engkin > 0.d0) then 
+          if (gaussian_vprofile) then 
+             aN_scalefactor = 1. ! to avoid compiler warning
+             if (first_sn) then
+                call interp_from_vrprofile(npartsn,massoftype(igas),engkin,a_vrad) 
+                aN_scalefactor = a_vrad*npartsn**(1./2.)  ! Store scale factor for forthcoming sne
+                first_sn = .false.
+             else
+                a_vrad = aN_scalefactor/npartsn**(1./2.)
+             endif
+          elseif (uniform_vprofile) then 
+             vrad = sqrt((2*engkin)/(npartsn*massoftype(igas)))
+          endif 
+       else 
+          a_vrad = 0.d0
+          vrad = 0.d0 
        endif 
 
        !
