@@ -126,13 +126,13 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set number of particles (to be updated after set_unifdis)
     !
     npmax = int(size(xyzh(1,:)))
-    np_req = nint((2.*10.*pc)**3*1e-21/(1e-1*solarm))    ! 1.0005e6 
+    np_req = nint((2.*10.*pc)**3*1e-20/(1e0*solarm))    ! 1.0005e6 
     call prompt('Enter total number of particles',np_req,1)
     if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
     !
     ! Particle mass
     !
-    pmass_cgs = 1e-1*solarm ! 1E-2*solarm  
+    pmass_cgs = 1e0*solarm ! 1E-2*solarm  
     pmass = pmass_cgs/umass
     call prompt('Enter particle mass in units of '//mass_unit,pmass,0.)
     !
