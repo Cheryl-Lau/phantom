@@ -854,10 +854,10 @@ subroutine cooling_JoungMacLow_implicit(eni,rhoi,dt,dudti)
     else
        if (numroots == 2) then
           ueq_final = kboltz*TmaxJML / (gmw*mass_proton_cgs*(gamma-1)) / unit_ergg
-          print*,'going to Tmax',rhoi*unit_density 
+!          print*,'going to Tmax',rhoi*unit_density 
        elseif (numroots == 3) then
           ueq_final = ueqs(3)
-          print*,'going to Teq3',rhoi*unit_density 
+!          print*,'going to Teq3',rhoi*unit_density 
        endif
     endif
  endif
