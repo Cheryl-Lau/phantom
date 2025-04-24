@@ -57,7 +57,7 @@ def plot_mollweide(ax,thetaphi_file,vmin_in,vmax_in,time_Myr):
     im = ax.pcolormesh(theta_mesh, phi_mesh, columnden, norm=colors.LogNorm(vmin=vmin_in,vmax=vmax_in), cmap='jet')
     cbar = fig.colorbar(im, ax=ax, shrink=0.6, location='right')
 
-    cbar.ax.set_ylabel(r'column thermal energy $\mathrm{[erg\ cm^{-2}]}$', labelpad=15, rotation=270)
+    cbar.ax.set_ylabel(r'thermal energy $\mathrm{[erg\ sr^{-1}]}$', labelpad=15, rotation=270)
     ax.text(10,1.5,r'$\mathrm{t_{SN}}$ = '+str(abs(round(time_Myr,3)))+' Myr', fontsize=14)
 
     return 
@@ -65,11 +65,11 @@ def plot_mollweide(ax,thetaphi_file,vmin_in,vmax_in,time_Myr):
 
 fig = plt.figure(figsize=(15,15),dpi=200)
 
+vmin = 3e13
+vmax = 5e15
+
 
 ### 2 pc maps ###
-
-vmin = 1e-25
-vmax = 5e-23
 
 ax1 = fig.add_subplot(421, projection='mollweide')
 time_Myr, sdf = read_dump('cloud_20_10_clrsink14_01350')
@@ -90,9 +90,6 @@ plot_mollweide(ax4,'2pc_maps/sky_etherm_cloud_20_10_clrsink14_09570.dat',vmin,vm
 
 
 ### 15 pc maps ###
-
-vmin = 1e-27
-vmax = 7e-25
 
 ax5 = fig.add_subplot(422, projection='mollweide')
 time_Myr, sdf = read_dump('cloud_20_10_clrsink14_01350')

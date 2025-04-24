@@ -49,6 +49,7 @@ def read_dump(dumpfile):
 def plot_mollweide(ax,thetaphi_file,vmin_in,vmax_in,time_Myr):
 
     columnden = np.loadtxt(thetaphi_file)
+    columnden = columnden/umass
 
     theta = np.linspace(-np.pi, np.pi,np.shape(columnden)[1])
     phi = np.linspace(-np.pi/2., np.pi/2.,np.shape(columnden)[0])
@@ -57,7 +58,7 @@ def plot_mollweide(ax,thetaphi_file,vmin_in,vmax_in,time_Myr):
     im = ax.pcolormesh(theta_mesh, phi_mesh, columnden, norm=colors.LogNorm(vmin=vmin_in,vmax=vmax_in), cmap='inferno')
     cbar = fig.colorbar(im, ax=ax, shrink=0.6, location='right')
 
-    cbar.ax.set_ylabel(r'column density $\mathrm{[g\ cm^{-2}]}$', labelpad=15, rotation=270)
+    cbar.ax.set_ylabel(r'mass $\mathrm{[M_\odot\ sr^{-1}]}$', labelpad=15, rotation=270)
     ax.text(10,1.5,r'$\mathrm{t_{SN}}$ = '+str(abs(round(time_Myr,3)))+' Myr', fontsize=14)
 
     return 
@@ -65,11 +66,11 @@ def plot_mollweide(ax,thetaphi_file,vmin_in,vmax_in,time_Myr):
 
 fig = plt.figure(figsize=(15,15),dpi=200)
 
+vmin = 5e1
+vmax = 1e4
+
 
 ### 2 pc maps ###
-
-vmin = 5e-4
-vmax = 5e-2
 
 ax1 = fig.add_subplot(421, projection='mollweide')
 time_Myr, sdf = read_dump('cloud_20_10_clrsink14_01350')
@@ -90,9 +91,6 @@ plot_mollweide(ax4,'2pc_maps/sky_density_cloud_20_10_clrsink14_09570.dat',vmin,v
 
 
 ### 15 pc maps ###
-
-vmin = 5e-5
-vmax = 1e-2 
 
 ax5 = fig.add_subplot(422, projection='mollweide')
 time_Myr, sdf = read_dump('cloud_20_10_clrsink14_01350')
