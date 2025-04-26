@@ -28,7 +28,7 @@ module analysis
  real    :: xyz_sn_in(3) = (/ 0.d0, 0.d0, 0.d0 /) 
  logical :: use_sink  = .true. 
  
- real    :: radius_detect = 4.0
+ real    :: radius_detect = 9.0
  real    :: width_detect  = 1.0 
 
 contains
@@ -48,6 +48,8 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  real    :: pmass,xyz_sn(3),r,r_unitvec(3),radvel,radmomen,u,T,rho,pressure,rampress
  real    :: radvel_cgs,radmomen_cgs,rho_cgs,pressure_cgs,rampress_cgs
  character(len=70) :: filename
+
+ if (isink_sn > nptmass) call fatal('analysis_detectorshell_around_sn','sink no found.')
 
  !- Particle mass
  pmass = massoftype(igas)
