@@ -26,10 +26,10 @@ module analysis
 
  integer :: isink_sn  = 14
  real    :: xyz_sn_in(3) = (/ 0.d0, 0.d0, 0.d0 /) 
- logical :: use_sink  = .false. 
+ logical :: use_sink  = .true. 
  
- real    :: radius_detect = 9.0
- real    :: width_detect  = 1.0 
+ real    :: radius_detect = 2.0
+ real    :: width_detect  = 0.5 
 
 contains
 
