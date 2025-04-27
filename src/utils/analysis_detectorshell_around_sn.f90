@@ -49,13 +49,12 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  real    :: radvel_cgs,radmomen_cgs,rho_cgs,pressure_cgs,rampress_cgs
  character(len=70) :: filename
 
- if (isink_sn > nptmass) call fatal('analysis_detectorshell_around_sn','sink no found.')
-
  !- Particle mass
  pmass = massoftype(igas)
 
  !- Set centre 
  if (use_sink) then 
+    if (isink_sn > nptmass) call fatal('analysis_detectorshell_around_sn','sink no found.')
     xyz_sn = xyzmh_ptmass(1:3,isink_sn)
  else
     xyz_sn = xyz_sn_in 
