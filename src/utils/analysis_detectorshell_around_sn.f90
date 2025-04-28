@@ -28,7 +28,7 @@ module analysis
  real    :: xyz_sn_in(3) = (/ 0.d0, 0.d0, 0.d0 /) 
  logical :: use_sink  = .true. 
  
- real    :: radius_detect = 2.0
+ real    :: radius_detect = 8.0
  real    :: width_detect  = 0.5 
 
 contains
