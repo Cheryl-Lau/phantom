@@ -94,11 +94,12 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
     if (only_highdenpart .and. rho < rholimit_cgs/unit_density) cycle over_part
 
-    ! Get all neigh 
-    call getneigh(node,xyzh(1:3,ip),0.,rad_max,3,listneigh,nneigh,xyzh,xyzcache,neighcachesize,ifirstincell,.false.)
 
     over_rad: do irad = 1,nrad
        rad2_limit = (rad_thresh(irad))**2 
+
+       ! Get all neigh 
+       call getneigh(node,xyzh(1:3,ip),0.,rad_thresh(irad),3,listneigh,nneigh,xyzh,xyzcache,neighcachesize,ifirstincell,.false.)
 
        !- Find mean velocity and density 
        mean_v = 0. 

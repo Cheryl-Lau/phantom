@@ -931,7 +931,7 @@ ifeq ($(SETUP), elongcloud_env_hpc)
 #	 Injecting supernova and radiation into an elongated cloud with envelope - HPC ver
     SETUPFILE=velfield_fromcubes.f90 setup_elongated_envelope.f90
     SRCINJECT=inject_sne_sphng.f90
-    ANALYSIS=analysis_detectorshell_around_sn.f90
+    ANALYSIS=analysis_vel_dispersion.f90
     MODFILE=moddump_addsink.f90 
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
