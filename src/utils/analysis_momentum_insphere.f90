@@ -28,7 +28,7 @@ module analysis
  integer :: isink_src = 14
  real    :: rad_list(nrad) = (/ 4.,7.,10. /) ! radii of spherical surfaces in code units 
  real    :: xyz_src_in(3) = (/ 0., 0., 0. /)            ! Position of feedback source in code units 
- logical :: use_sink = .true. 
+ logical :: use_sink = .false. 
 
 contains
 
