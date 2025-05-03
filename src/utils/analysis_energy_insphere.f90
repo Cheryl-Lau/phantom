@@ -24,9 +24,11 @@ module analysis
 
  private
 
- integer, parameter :: nrad = 5
- real     :: rad_list(nrad) = (/ 15.,30.,45.,60.,75. /) ! radii of spherical surfaces in code units 
- real     :: xyz_src(3) = (/ 0., 0., 0. /)            ! Position of feedback source in code units 
+ integer, parameter :: nrad = 3
+ integer :: isink_src = 14
+ real    :: rad_list(nrad) = (/ 4.,7.,10. /) ! radii of spherical surfaces in code units 
+ real    :: xyz_src_in(3) = (/ 0., 0., 0. /)            ! Position of feedback source in code units 
+ logical :: use_sink = .true. 
 
 contains
 
@@ -34,6 +36,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  use units,    only:udist,utime,unit_energ 
  use io,       only:fatal,warning 
  use part,     only:hfact,rhoh,massoftype,igas
+ use part,     only:xyzmh_ptmass,vxyz_ptmass,nptmass
  use eos,      only:gamma
  use physcon,  only:pi 
  character(len=*), intent(in) :: dumpfile
@@ -42,8 +45,15 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  real,             intent(in) :: particlemass,time
  integer :: irad,ip
  real    :: time_cgs,pmass,rad2,rad_cgs,ek_tot,ek_tot_cgs,ek_part,et_tot,et_tot_cgs,et_part
- real    :: dist2,totenerg_cgs 
+ real    :: dist2,totenerg_cgs,xyz_src(3)
  character(len=70) :: filename
+
+ if (use_sink) then 
+    if (isink_src > nptmass) call fatal('analysis_energy_insphere','requested sink not found')
+    xyz_src = xyzmh_ptmass(1:3,isink_src)
+ else
+    xyz_src = xyz_src_in 
+ endif 
 
  filename = 'energy_insphere_'//TRIM(dumpfile)//'.dat'
  open(unit=2206,file=filename,status='replace')

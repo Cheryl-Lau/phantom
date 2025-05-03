@@ -24,9 +24,11 @@ module analysis
 
  private
 
- integer, parameter :: nrad = 5
- real     :: rad_list(nrad) = (/ 15.,30.,45.,60.,75. /) ! radii of spherical surfaces in code units 
- real     :: xyz_src(3) = (/ 0., 0., 0. /)            ! Position of feedback source in code units 
+ integer, parameter :: nrad = 3
+ integer :: isink_src = 14
+ real    :: rad_list(nrad) = (/ 4.,7.,10. /) ! radii of spherical surfaces in code units 
+ real    :: xyz_src_in(3) = (/ 0., 0., 0. /)            ! Position of feedback source in code units 
+ logical :: use_sink = .true. 
 
 contains
 
@@ -34,6 +36,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  use units,    only:udist,utime,umass,unit_velocity 
  use io,       only:fatal,warning 
  use part,     only:hfact,rhoh,massoftype,igas
+ use part,     only:xyzmh_ptmass,vxyz_ptmass,nptmass
  use eos,      only:gamma
  use physcon,  only:pi,solarm,km,mass_proton_cgs
  character(len=*), intent(in) :: dumpfile
@@ -41,9 +44,16 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  real,             intent(in) :: xyzh(:,:),vxyzu(:,:)
  real,             intent(in) :: particlemass,time
  integer :: irad,ip,nback
- real    :: time_cgs,pmass,rad2,rad_cgs,momen_tot,momen_tot_cgs,momen_part
+ real    :: time_cgs,pmass,rad2,rad_cgs,momen_tot,momen_tot_cgs,momen_part,xyz_src(3)
  real    :: dist2,r_unitvec(3),radvel,momen_kimmcen14,momen_cioffi88,nH,rho_cgs
  character(len=70) :: filename
+
+ if (use_sink) then 
+    if (isink_src > nptmass) call fatal('analysis_momentum_insphere','requested sink not found')
+    xyz_src = xyzmh_ptmass(1:3,isink_src)
+ else
+    xyz_src = xyz_src_in 
+ endif 
 
  filename = 'momentum_insphere_'//TRIM(dumpfile)//'.dat'
  open(unit=2206,file=filename,status='replace')
