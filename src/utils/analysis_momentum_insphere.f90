@@ -26,9 +26,13 @@ module analysis
 
  integer, parameter :: nrad = 3
  integer :: isink_src = 14
- real    :: rad_list(nrad) = (/ 4.,7.,10. /) ! radii of spherical surfaces in code units 
- real    :: xyz_src_in(3) = (/ 0., 0., 0. /)            ! Position of feedback source in code units 
- logical :: use_sink = .false. 
+ real    :: rad_list(nrad) = (/ 4., 7., 10. /)  ! radii of spherical surfaces in code units 
+ real    :: xyz_src_in(3)  = (/ 0., 0., 0. /)   ! Position of feedback source in code units 
+ logical :: use_sink = .true. 
+
+ real    :: cone_omegafrac = 0.3                ! Size of solid angle 
+ real    :: cone_vec(3) = (/ -4., 8., 3. /)     ! Vector of the solid angle cone wrt source 
+ logical :: cone_only = .true.                  ! measure energy within a solid angle only 
 
 contains
 
@@ -46,6 +50,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  integer :: irad,ip,nback
  real    :: time_cgs,pmass,rad2,rad_cgs,momen_tot,momen_tot_cgs,momen_part,xyz_src(3)
  real    :: dist2,r_unitvec(3),radvel,momen_kimmcen14,momen_cioffi88,nH,rho_cgs
+ real    :: cone_unitvec(3),cone_mag,cone_omega,rc(3),rp(3),absrc,absrp,theta_pc,omega,xp,yp,zp 
  character(len=70) :: filename
 
  if (use_sink) then 
@@ -55,7 +60,14 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
     xyz_src = xyz_src_in 
  endif 
 
- filename = 'momentum_insphere_'//TRIM(dumpfile)//'.dat'
+ if (cone_only) then 
+    cone_omega = cone_omegafrac*4.*pi 
+    cone_unitvec = cone_vec/sqrt(mag2(cone_vec))
+    filename = 'momentum_incone_'//TRIM(dumpfile)//'.dat'
+ else 
+    filename = 'momentum_insphere_'//TRIM(dumpfile)//'.dat'
+ endif 
+
  open(unit=2206,file=filename,status='replace')
 
  time_cgs  = time*utime
@@ -84,13 +96,31 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
     momen_tot = 0.
     nback = 0
     do ip = 1,npart
-       dist2 = mag2(xyzh(1:3,ip) - xyz_src(1:3)) 
+       rp = xyzh(1:3,ip) - xyz_src(1:3)
+       dist2 = mag2(rp) 
        if (dist2 < rad2) then 
-          r_unitvec = (xyzh(1:3,ip) - xyz_src(1:3)) / sqrt(dist2)
-          radvel = dot_product(vxyzu(1:3,ip),r_unitvec)
-          if (radvel < 0.) nback = nback + 1 
-          momen_part = pmass*radvel
-          momen_tot = momen_tot + momen_part 
+          r_unitvec = rp / sqrt(dist2)
+
+          if (cone_only) then 
+             rc = cone_unitvec * sqrt(rad2)
+             absrc = sqrt(mag2(rc))
+             absrp = sqrt(mag2(rp))
+             theta_pc = acos(dot_product(rp,rc)/(absrp*absrc))  ! angle between rp and rc 
+             if (theta_pc < pi/2.d0) then                       ! within 90 deg 
+                omega = 2.d0*pi*(1.d0-cos(theta_pc))            ! solid angle subtended by cone of 2.d0*theta_pc 
+                if (omega < cone_omega) then
+                   radvel = dot_product(vxyzu(1:3,ip),r_unitvec)
+                   if (radvel < 0.) nback = nback + 1 
+                   momen_part = pmass*radvel
+                   momen_tot = momen_tot + momen_part 
+                endif 
+             endif 
+          else
+             radvel = dot_product(vxyzu(1:3,ip),r_unitvec)
+             if (radvel < 0.) nback = nback + 1 
+             momen_part = pmass*radvel
+             momen_tot = momen_tot + momen_part 
+          endif 
        endif 
     enddo 
     if (nback > 0) print*,nint(real(nback)/real(npart)*100.d0),'% of the particles went backwards!'
