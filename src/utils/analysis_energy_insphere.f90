@@ -28,10 +28,10 @@ module analysis
  integer :: isink_src = 14
  real    :: rad_list(nrad) = (/ 4., 7., 10. /)  ! radii of spherical surfaces in code units 
  real    :: xyz_src_in(3)  = (/ 0., 0., 0. /)   ! Position of feedback source in code units 
- logical :: use_sink = .true. 
+ logical :: use_sink = .false. 
 
  real    :: cone_omegafrac = 0.3                ! Size of solid angle 
- real    :: cone_vec(3) = (/ -4., 8., 3. /)    ! Vector of the solid angle cone wrt source 
+ real    :: cone_vec(3) = (/ -4., 8., 3. /)     ! Vector of the solid angle cone wrt source 
  logical :: cone_only = .true.                  ! measure energy within a solid angle only 
 
 contains
