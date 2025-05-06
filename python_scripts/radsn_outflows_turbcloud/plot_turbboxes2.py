@@ -49,7 +49,7 @@ def plot_render_u(ax,time_Myr,sdf,xmin,xmax,ymin,ymax,vmin_in,vmax_in):
     '''
     Plot input sdf log col-u on the given ax 
     '''
-    ax = sdf.render('u', ax=ax, xlim=(xmin,xmax), ylim=(ymin,ymax), vmin=vmin_in,vmax=vmax_in, log_scale=True, cmap='gnuplot2', cbar_kws=dict(label=r'column $\rho$-weighted $u$ [$\mathrm{erg/g\ cm}$]',orientation='vertical',shrink=0.7,pad=0.01), dens_weight=True)
+    ax = sdf.render('u', ax=ax, xlim=(xmin,xmax), ylim=(ymin,ymax), vmin=vmin_in,vmax=vmax_in, log_scale=True, cmap='gnuplot2', cbar_kws=dict(label=r'column $\rho$-weighted $u$ [$\mathrm{erg/g\ cm}$]',orientation='vertical',shrink=0.8,pad=0.05), dens_weight=True)
     ax.set_xlabel('x [pc]')
     ax.set_ylabel('y [pc]')
     ax.text(xmin + 0.1*(xmax-xmin), ymin + 0.9*(ymax-ymin), r'$t_\mathrm{SN} = $'+str(round(time_Myr,2))+' Myr', color='lightcyan')
@@ -58,16 +58,8 @@ def plot_render_u(ax,time_Myr,sdf,xmin,xmax,ymin,ymax,vmin_in,vmax_in):
 
 
 
-fig = plt.figure(figsize=(22,7),layout="constrained")
-gs = fig.add_gridspec(2, 5)
-ax_semiconf = fig.add_subplot(gs[:, :2])
-ax_ffcloud = fig.add_subplot(gs[0, 2])
-ax_ffenv = fig.add_subplot(gs[0, 3])
-ax_ffsmear = fig.add_subplot(gs[0, 4])
-ax_tffcloud = fig.add_subplot(gs[1, 2])
-ax_tffenv = fig.add_subplot(gs[1, 3])
-ax_tffsmear = fig.add_subplot(gs[1, 4])
-
+fig1 = plt.figure(figsize=(4.5,4))
+ax_semiconf = fig1.add_subplot(111)
 
 xmin = -10
 xmax = 10
@@ -83,6 +75,22 @@ time_SN = 0.486
 time_Myr, sdf = read_dump('turbcloud_semiconf/cloud_20_10_clrsink14_04500')
 plot_render_u(ax_semiconf,time_Myr-time_SN,sdf,xmin,xmax,ymin,ymax,u_min,u_max)
 ax_semiconf.set_title('Semi-confined SN')
+
+fig1.tight_layout()
+
+plt.savefig('semiconf.png',dpi=200)
+
+
+
+
+fig2 = plt.figure(figsize=(11,6))
+
+ax_ffcloud = fig2.add_subplot(231)
+ax_ffenv = fig2.add_subplot(232)
+ax_ffsmear = fig2.add_subplot(233)
+ax_tffcloud = fig2.add_subplot(234)
+ax_tffenv = fig2.add_subplot(235)
+ax_tffsmear = fig2.add_subplot(236)
 
 
 # ff_cloud 
@@ -132,11 +140,15 @@ plot_render_u(ax_tffsmear,time_Myr-time_SN,sdf,xmin,xmax,ymin,ymax,u_min,u_max)
 ax_tffsmear.set_title(r'Turb FF - $\rho_\mathrm{smear}$')
 
 
-#plot_children(fig)
+
+fig2.tight_layout()
 
 plt.savefig('turbboxes.png',dpi=200)
-plt.savefig('turbboxes.pdf',format='pdf')
-plt.show()
+
+
+
+
+
 
 
 

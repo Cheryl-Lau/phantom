@@ -115,7 +115,7 @@ def plot_change_in_mu(ax_r,ax_rho,sn_loc,t_sn,sdf1,sdf2):
 
     pcm = ax_r.scatter(sdf1['r'], dmu, c=sdf2['T'],norm=matplotlib.colors.LogNorm(vmin=1e1,vmax=1e3), s=1, alpha=0.5)
 
-    ax_r.set_xlim([2e-2,3e+1])
+    ax_r.set_xlim([1.5e-2,4e+1])
     ax_r.set_ylim([1e+30,1e+42])
 
     ax_r.set_xlabel('$r_0$ [pc]')
@@ -142,9 +142,23 @@ def plot_change_in_mu(ax_r,ax_rho,sn_loc,t_sn,sdf1,sdf2):
     return pcm
 
 
+def limit_box(sdf):
+
+    xmin = -10
+    xmax = 10 
+    ymin = -10
+    ymax = 10
+    zmin = -10 
+    zmax = 10
+    iinbox = np.where((sdf['x']>xmin) & (sdf['x']<xmax) & (sdf['y']>ymin) & (sdf['y']<ymax) & (sdf['z']>zmin) & (sdf['z']<zmax))[0]
+
+    sdf = sdf.iloc[iinbox]
+
+    return sdf
 
 
-fig, axes = plt.subplots(nrows=2, ncols=2, subplot_kw=dict(frameon=True), figsize=(9,6))
+
+fig, axes = plt.subplots(nrows=2, ncols=3, subplot_kw=dict(frameon=True), figsize=(10,5.5))
 
 
 # Semi-confined SN 
@@ -153,6 +167,7 @@ ax_r = axes[0,0]
 ax_rho = axes[1,0]
 
 time1, sdf1, sdf1_sinks = read_dump('turbcloud_semiconf/cloud_20_10_clrsink14_01350')
+sdf1 = limit_box(sdf1)
 time2, sdf2, sdf2_sinks = read_dump('turbcloud_semiconf/cloud_20_10_clrsink14_08000')
 t_sn = time2 - time1
 sn_loc = get_sink_loc(14,sdf1_sinks)
@@ -175,6 +190,7 @@ ax_r = axes[0,1]
 ax_rho = axes[1,1]
 
 time1, sdf1, sdf1_sinks = read_dump('turbff_smear/turbffsmear_00000')
+sdf1 = limit_box(sdf1)
 time2, sdf2, sdf2_sinks = read_dump('turbff_smear/turbffsmear_08000')
 t_sn = time2 - time1
 sn_loc = [0,0,0]
@@ -190,7 +206,35 @@ cbar.set_label('Temperature [K]',rotation=270,labelpad=15)
 ax_r.set_title(r'Turb FF - $\rho_\mathrm{smear}$')
 
 
+
+# Turb FF - env 
+
+ax_r = axes[0,2]
+ax_rho = axes[1,2]
+
+time1, sdf1, sdf1_sinks = read_dump('turbff_env2/turbffenv_00000')
+sdf1 = limit_box(sdf1)
+time2, sdf2, sdf2_sinks = read_dump('turbff_env2/turbffenv_00200')
+t_sn = time2 - time1
+sn_loc = [0,0,0]
+
+pcm = plot_change_in_mu(ax_r,ax_rho,sn_loc,t_sn,sdf1,sdf2)
+
+
+cbar = fig.colorbar(pcm, ax=ax_r, cmap='viridis', location='right', shrink=0.9,pad=0.02)
+cbar.set_label('Temperature [K]',rotation=270,labelpad=15)
+cbar = fig.colorbar(pcm, ax=ax_rho, cmap='viridis', location='right', shrink=0.9,pad=0.02)
+cbar.set_label('Temperature [K]',rotation=270,labelpad=15)
+
+ax_r.set_title(r'Turb FF - $\rho_\mathrm{env}$')
+
+
+
+
 fig.tight_layout()
+fig.subplots_adjust(wspace=0.45)
+fig.subplots_adjust(hspace=0.45)
+
 plt.savefig('momentum_change.png',dpi=200)
 plt.show()
 

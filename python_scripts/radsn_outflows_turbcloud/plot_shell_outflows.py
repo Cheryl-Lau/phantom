@@ -28,7 +28,7 @@ def plot_settings(ax,ylabel,ymin,ymax):
     ax.set_ylim([ymin,ymax])
     ax.set_ylabel(ylabel)
 
-    ax.grid(linestyle='--',color='darkgrey',linewidth=0.5)
+    ax.grid(linestyle='--',color='darkgrey',linewidth=0.7)
 
     return 
 
@@ -94,7 +94,7 @@ def get_mesh(sdir,A,Amin,Amax):
 
             df = pd.DataFrame(data, columns=['ip','T','rho','radvel','radmomen','pressure','rampress'])
 
-
+            '''
             # Take the *change* in properties 
             if (it==0):
                 df0 = df 
@@ -103,7 +103,7 @@ def get_mesh(sdir,A,Amin,Amax):
                 df['radmomen'] = df['radmomen'] - df0['radmomen']
                 df['pressure'] = df['pressure'] - df0['pressure']
                 df['rampress'] = df['rampress'] - df0['rampress']
-
+            '''
 
             # Only those which are outflowing and is increased
             iout = np.where((df['radvel'] > 0) & (df['radmomen'] > 0) & (df['pressure'] > 0) & (df['rampress'] > 0))[0]
@@ -142,21 +142,26 @@ def plot_analyt_model(ax,strA,filepath,t_SN):
 
 
 
-'''
-simdir = ['turbcloud_semiconf','turbff_smear','turbff_env','ff_smear','ff_env']
+
+simdir = ['turbcloud_semiconf','turbff_smear','turbff_env2','ff_smear','ff_env3']
 simlabel = ['Semi-confined SN',r'Turb FF - $\rho_\mathrm{smear}$',r'Turb FF - $\rho_\mathrm{env}$',r'FF - $\rho_\mathrm{smear}$',r'FF - $\rho_\mathrm{env}$']
 imfilename = ['outflow_cloud.png','outflow_tffsmear.png','outflow_tffenv.png','outflow_ffsmear.png','outflow_ffenv.png']
 analytmodelfile = ['semi_confined_model.txt','free_field_smear_model.txt','free_field_env_model.txt','free_field_smear_model.txt','free_field_env_model.txt']
-t_SN = [0.003,0.003,0.002,0.009,0]  # Myr 
+t_SN = [0.003,0.003,0.002,0.009,0.001]  # Myr 
+logTmin_all = [1,1,5,1,5]
+logTmax_all = [5,6,9,6,9]
 '''
 simdir = ['turbcloud_semiconf','turbff_smear']
 simlabel = ['Semi-confined SN',r'Turb FF - $\rho_\mathrm{smear}$']
 imfilename = ['outflow_cloud.png','outflow_tffsmear.png']
 analytmodelfile = ['semi_confined_model.txt','free_field_smear_model.txt']
 t_SN = [0.003,0.003]  # Myr
+logTmin_all = [1,1]
+logTmax_all = [4,6]
+'''
 
 
-for sdir, modelfile, label, imfile, tSN in zip(simdir,analytmodelfile,simlabel,imfilename,t_SN):
+for sdir, modelfile, label, imfile, tSN, logTmin, logTmax in zip(simdir,analytmodelfile,simlabel,imfilename,t_SN,logTmin_all,logTmax_all):
 
     modelfile = 'analytical_model/at_6pc/'+modelfile
 
@@ -169,27 +174,27 @@ for sdir, modelfile, label, imfile, tSN in zip(simdir,analytmodelfile,simlabel,i
     vr_min = 5e4
     vr_max = 5e9
     x_mesh, y_mesh, z_mesh = get_mesh(sdir,'radvel',vr_min,vr_max)
-    pcm = ax_vr.pcolormesh(x_mesh, y_mesh, np.log10(z_mesh), shading='nearest', cmap='viridis',vmin=1,vmax=5)
+    pcm = ax_vr.pcolormesh(x_mesh, y_mesh, np.log10(z_mesh), shading='nearest', cmap='viridis',vmin=logTmin,vmax=logTmax)
     plot_analyt_model(ax_vr,'radvel',modelfile,tSN)
     plot_settings(ax_vr,r'$v_r\ \mathrm{[cm\ s^{-1}]}$',vr_min,vr_max)
 
     mu_min = 5e30
     mu_max = 5e42
     x_mesh, y_mesh, z_mesh = get_mesh(sdir,'radmomen',mu_min,mu_max)
-    pcm = ax_mu.pcolormesh(x_mesh, y_mesh, np.log10(z_mesh), shading='nearest', cmap='viridis',vmin=1,vmax=5)
+    pcm = ax_mu.pcolormesh(x_mesh, y_mesh, np.log10(z_mesh), shading='nearest', cmap='viridis',vmin=logTmin,vmax=logTmax)
     plot_settings(ax_mu,r'$\mu_r\ \mathrm{[g\ cm\ s^{-1}]}$',mu_min,mu_max)
 
     ptherm_min = 5e-18
     ptherm_max = 5e0
     x_mesh, y_mesh, z_mesh = get_mesh(sdir,'pressure',ptherm_min,ptherm_max)
-    pcm = ax_ptherm.pcolormesh(x_mesh, y_mesh, np.log10(z_mesh), shading='nearest', cmap='viridis',vmin=1,vmax=5)
+    pcm = ax_ptherm.pcolormesh(x_mesh, y_mesh, np.log10(z_mesh), shading='nearest', cmap='viridis',vmin=logTmin,vmax=logTmax)
     plot_analyt_model(ax_ptherm,'pressure',modelfile,tSN)
     plot_settings(ax_ptherm,r'$p_\mathrm{therm}\ \mathrm{[g\ cm^{-1}\ s^{-2}]}$',ptherm_min,ptherm_max)
 
     pram_min = 5e-18
     pram_max = 5e0
     x_mesh, y_mesh, z_mesh = get_mesh(sdir,'rampress',pram_min,pram_max)
-    pcm = ax_pram.pcolormesh(x_mesh, y_mesh, np.log10(z_mesh), shading='nearest', cmap='viridis',vmin=1,vmax=5)
+    pcm = ax_pram.pcolormesh(x_mesh, y_mesh, np.log10(z_mesh), shading='nearest', cmap='viridis',vmin=logTmin,vmax=logTmax)
     plot_analyt_model(ax_pram,'rampress',modelfile,tSN)
     plot_settings(ax_pram,r'$p_\mathrm{ram}\ \mathrm{[g\ cm^{-1}\ s^{-2}]}$',pram_min,pram_max)
 
@@ -202,7 +207,7 @@ for sdir, modelfile, label, imfile, tSN in zip(simdir,analytmodelfile,simlabel,i
 
     plt.savefig(imfile,dpi=200)
 
-plt.show()
+
 
 
 
