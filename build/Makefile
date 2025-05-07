@@ -931,7 +931,7 @@ ifeq ($(SETUP), elongcloud_env_hpc)
 #	 Injecting supernova and radiation into an elongated cloud with envelope - HPC ver
     SETUPFILE=velfield_fromcubes.f90 setup_elongated_envelope.f90
     SRCINJECT=inject_sne_sphng.f90
-    ANALYSIS=analysis_energy_insphere.f90
+    ANALYSIS=analysis_vel_dispersion.f90
     MODFILE=moddump_addsink.f90 
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
@@ -949,7 +949,7 @@ ifeq ($(SETUP), sncavity)
 #	 Injecting SN into cloud with cavity and channels
     SETUPFILE=velfield_fromcubes.f90 setup_twosphere_channel.f90
     SRCINJECT=inject_sne_sphng.f90
-    ANALYSIS=analysis_energy_insphere.f90
+    ANALYSIS=analysis_theta_energy.f90
     MODFILE=velfield_fromcubes.f90 moddump_add_turbvel.f90 
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
@@ -967,7 +967,7 @@ ifeq ($(SETUP), sncavity_hpc)
 #	 Injecting SN into cloud with cavity and channels
     SETUPFILE=velfield_fromcubes.f90 setup_twosphere_channel.f90
     SRCINJECT=inject_sne_sphng.f90
-    ANALYSIS=analysis_energy_insphere.f90
+    ANALYSIS=analysis_vel_dispersion.f90
     MODFILE=moddump_addsink.f90
     FPPFLAGS= -DPHOTOION
     SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
