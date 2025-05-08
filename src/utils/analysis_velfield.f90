@@ -30,11 +30,11 @@ module analysis
  integer :: npointz = 200  
  real    :: centre_in(3) = (/ 0., 0., 0. /)
 
- real    :: maxr = 8.00
+ real    :: maxr = 6.00
  logical :: use_whole_box = .false. 
 
  integer :: isink_centre = 14 
- logical :: use_sink = .false. 
+ logical :: use_sink = .true. 
 
 contains
 
