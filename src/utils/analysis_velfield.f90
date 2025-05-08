@@ -34,7 +34,7 @@ module analysis
  logical :: use_whole_box = .false. 
 
  integer :: isink_centre = 14 
- logical :: use_sink = .true. 
+ logical :: use_sink = .false. 
 
 contains
 
