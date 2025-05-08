@@ -28,10 +28,13 @@ module analysis
  integer :: npointx = 200   ! number of points on x-axis 
  integer :: npointy = 200   
  integer :: npointz = 200  
- real    :: centre(3) = (/ 20., 0., 0. /)
- 
+ real    :: centre_in(3) = (/ 0., 0., 0. /)
+
  real    :: maxr = 8.00
  logical :: use_whole_box = .false. 
+
+ integer :: isink_centre = 14 
+ logical :: use_sink = .true. 
 
 contains
 
@@ -42,6 +45,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  use kernel,   only:get_kernel,cnormk,radkern2
  use units,    only:udist,utime,unit_velocity,unit_density,unit_pressure,unit_ergg
  use io,       only:fatal,warning 
+  use part,    only:xyzmh_ptmass,vxyz_ptmass,nptmass
  use part,     only:hfact,rhoh,massoftype,igas
  use eos,      only:gamma
  use omp_lib 
@@ -58,7 +62,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  integer :: i,iref,nref,ipointx,ipointy,ipointz
  real    :: time_cgs,pmass,hmean,radneigh 
  real    :: xmin,xmax,ymin,ymax,zmin,zmax,sizex,sizey,sizez,xloc,yloc,zloc,dx,dy,dz
- integer :: ixyz_ref(3,nrefpoint),ixyz_target(3)
+ integer :: ixyz_ref(3,nrefpoint),ixyz_target(3),centre(3) 
  real    :: xyz_ref(3,nrefpoint),vxyz_ref(3,nrefpoint),xyz_target(3),xyz_target_cgs(3) 
  real    :: percentcount,percent 
  real    :: radneighfac,sep
@@ -80,6 +84,14 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
  !- Particle mass
  pmass = massoftype(igas)
+
+ !- Set centre 
+ if (use_sink) then 
+    if (isink_centre > nptmass) call fatal('analysis_velfield','sink not found.') 
+    centre = xyzmh_ptmass(1:3,isink_centre)
+ else 
+    centre = centre_in
+ endif 
 
  !- Build tree 
  allocate(dumxyzh(4,npart))
