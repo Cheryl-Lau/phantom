@@ -29,6 +29,12 @@ module analysis
  real    :: rholimit_cgs     = 1.d-22
  logical :: only_highdenpart = .false. 
 
+ integer :: isink_centre   = 14
+ real    :: box_radius     = 10.
+ real    :: box_centre(3)  = (/ 0.,0.,0. /)
+ logical :: use_sink       = .true. 
+ logical :: only_inbox     = .true.
+
 contains
 
 subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
@@ -38,6 +44,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  use units,    only:udist,utime,umass,unit_velocity,unit_density,unit_pressure,unit_ergg
  use io,       only:fatal,warning 
  use part,     only:hfact,rhoh,massoftype,igas
+ use part,     only:xyzmh_ptmass,vxyz_ptmass,nptmass
  use eos,      only:gamma
  use physcon,  only:gg,pi
  character(len=*), intent(in) :: dumpfile
@@ -51,6 +58,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  real    :: logr_min,dlogr,rad 
  real    :: rad_thresh(nrad)
  real    :: sigma_v_allrad(nrad),virial_term_allrad(nrad),rho_avg_allrad(nrad)
+ real    :: xmin_box,xmax_box,ymin_box,ymax_box,zmin_box,zmax_box,centre(3)
  real,   allocatable :: dumxyzh(:,:)
  character(len=70) :: filename
 
@@ -71,6 +79,19 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  dumxyzh = xyzh
  call set_linklist(npart,npart,dumxyzh,vxyzu)
 
+ !- Set boundaries if requested 
+ if (only_inbox) then 
+    if (use_sink) then
+       if (isink_centre > nptmass) call fatal('analysis_velfield','sink not found.') 
+       centre = xyzmh_ptmass(1:3,isink_centre)
+    else
+       centre = box_centre
+    endif 
+    xmin_box = centre(1) - box_radius; xmax_box = centre(1) + box_radius 
+    ymin_box = centre(2) - box_radius; ymax_box = centre(2) + box_radius 
+    zmin_box = centre(3) - box_radius; zmax_box = centre(3) + box_radius 
+ endif 
+
  open(unit=2026,file='velocity_dispersion_'//TRIM(dumpfile)//'.dat',status='replace')
  open(unit=2027,file='virial_term_'//TRIM(dumpfile)//'.dat',status='replace')
  open(unit=2028,file='density_sizescale_'//TRIM(dumpfile)//'.dat',status='replace')
@@ -84,6 +105,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  !- Loop over each length-scale 
  !$omp parallel do default(none) shared(npart,pmass,xyzh,vxyzu,rad_thresh,rholimit_cgs) &
  !$omp shared(node,hfact,rad_max,xyzcache,ifirstincell,only_highdenpart) &
+ !$omp shared(only_inbox,xmin_box,xmax_box,ymin_box,ymax_box,zmin_box,zmax_box) &
  !$omp shared(umass,udist,unit_velocity,unit_density) &
  !$omp private(ip,rho,nneigh,irad,rad2_limit,mean_v,sigma_v,mean_rho,n,ineigh,ip_neigh,dist2) &
  !$omp private(sigma_v_allrad,virial_term_allrad,rho_avg_allrad) &
@@ -94,6 +116,11 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
     if (only_highdenpart .and. rho < rholimit_cgs/unit_density) cycle over_part
 
+    if (only_inbox) then 
+       if (xyzh(1,ip) < xmin_box .or. xyzh(1,ip) > xmax_box) cycle over_part
+       if (xyzh(2,ip) < ymin_box .or. xyzh(2,ip) > ymax_box) cycle over_part
+       if (xyzh(3,ip) < zmin_box .or. xyzh(3,ip) > zmax_box) cycle over_part
+    endif 
 
     over_rad: do irad = 1,nrad
        rad2_limit = (rad_thresh(irad))**2 
