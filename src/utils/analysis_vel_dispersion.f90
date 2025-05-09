@@ -32,7 +32,7 @@ module analysis
  integer :: isink_centre   = 14
  real    :: box_radius     = 10.
  real    :: box_centre(3)  = (/ 0.,0.,0. /)
- logical :: use_sink       = .true. 
+ logical :: use_sink       = .false. 
  logical :: only_inbox     = .true.
 
 contains
