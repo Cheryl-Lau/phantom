@@ -996,6 +996,21 @@ ifeq ($(SETUP), snturbbox)
     NCELLSMAX=4*maxp
 endif
 
+ifeq ($(SETUP), gravturbbox)
+#	 Injecting SN into a turbulence box with self-gravity
+    SETUPFILE=velfield_fromcubes.f90 setup_turbbox_sn.f90
+    SRCINJECT=inject_sne_sphng.f90
+    ANALYSIS=analysis_bindensity.f90
+    MODFILE=moddump_addsink.f90
+    PERIODIC=yes
+    GRAVITY=yes
+    ISOTHERMAL=no
+    IND_TIMESTEPS=yes
+    KNOWN_SETUP=yes
+    MAXP=6000000
+    NCELLSMAX=4*maxp
+endif
+
 ifeq ($(SETUP), mhdvortex)
 #   Balsara (2004) MHD vortex
     PERIODIC=yes
