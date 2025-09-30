@@ -2008,7 +2008,8 @@ SRCPOTS= extern_corotate.f90 \
          extern_densprofile.f90 \
          extern_staticsine.f90 \
          extern_gwinspiral.f90 \
-         externalforces.F90
+         extern_starcluster.f90 \
+         externalforces.F90  
 endif
 ifeq (X$(SRCPOT), X)
 SRCPOT=${SRCPOTS}

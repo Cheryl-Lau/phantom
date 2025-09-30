@@ -66,12 +66,13 @@ module externalforces
    iext_staticsine    = 13, &
    iext_gwinspiral    = 14, &
    iext_discgravity   = 15, &
-   iext_corot_binary  = 16
+   iext_corot_binary  = 16, &
+   iext_starcluster   = 17
 
  !
  ! Human-readable labels for these
  !
- integer, parameter, public  :: iexternalforce_max = 16
+ integer, parameter, public  :: iexternalforce_max = 17
  character(len=*), parameter, public :: externalforcetype(iexternalforce_max) = (/ &
     'star                 ', &
     'corotate             ', &
@@ -88,7 +89,8 @@ module externalforces
     'static sinusoid      ', &
     'grav. wave inspiral  ', &
     'disc gravity         ', &
-    'corotating binary    '/)
+    'corotating binary    ', &
+    'star cluster         '/)
 
 contains
 !-----------------------------------------------------------------------
@@ -113,6 +115,7 @@ subroutine externalforce(iexternalforce,xi,yi,zi,hi,ti,fextxi,fextyi,fextzi,phi,
  use extern_Bfield,      only:get_externalB_force
  use extern_staticsine,  only:staticsine_force
  use extern_gwinspiral,  only:get_gw_force_i
+ use extern_starcluster, only:starcluster_force
  use units,              only:udist,umass,utime
  use physcon,            only:pc,pi,gg
  use io,                 only:fatal
@@ -405,6 +408,14 @@ subroutine externalforce(iexternalforce,xi,yi,zi,hi,ti,fextxi,fextyi,fextzi,phi,
     pos = (/xi,yi,zi/)
     call get_centrifugal_force(pos,fextxi,fextyi,fextzi,phi)
 
+
+ case(iext_starcluster)
+!
+!-- Potential within a stellar cluster
+!
+    call starcluster_force(xi,yi,zi,fextxi,fextyi,fextzi,phi)
+
+
  case default
 !
 !--external forces should not be called if iexternalforce = 0
@@ -546,9 +557,10 @@ subroutine update_externalforce(iexternalforce,ti,dmdt)
                              xyzmh_ptmass,vxyz_ptmass
  use extern_gwinspiral, only:gw_still_inspiralling,get_gw_force
  use extern_binary,     only:update_binary
+ use extern_starcluster,only:update_Mcore_Mclust
  integer, intent(in) :: iexternalforce
  real,    intent(in) :: ti,dmdt
- logical             :: stopped_now
+ logical             :: stopped_now,selfgrav
 
  select case(iexternalforce)
  case(iext_binary,iext_corot_binary)
@@ -563,6 +575,13 @@ subroutine update_externalforce(iexternalforce,ti,dmdt)
     call gw_still_inspiralling(npart,xyzh,vxyzu,nptmass,xyzmh_ptmass,vxyz_ptmass,stopped_now)
     call get_gw_force()
     if (stopped_now) call warn('externalforces','Stars have merged. Disabling GW inspiral',2)
+ case(iext_starcluster)
+#ifdef GRAVITY
+    selfgrav = .true. 
+#else
+    selfgrav = .false. 
+#endif 
+    call update_Mcore_Mclust(ti,selfgrav) 
  end select
 
 end subroutine update_externalforce
@@ -647,6 +666,7 @@ subroutine write_options_externalforces(iunit,iexternalforce)
  use extern_Bfield,        only:write_options_externB
  use extern_staticsine,    only:write_options_staticsine
  use extern_gwinspiral,    only:write_options_gwinspiral
+ use extern_starcluster,   only:write_options_starcluster 
  integer, intent(in) :: iunit,iexternalforce
  character(len=80) :: string
 
@@ -688,6 +708,8 @@ subroutine write_options_externalforces(iunit,iexternalforce)
     call write_options_staticsine(iunit)
  case(iext_gwinspiral)
     call write_options_gwinspiral(iunit)
+ case(iext_starcluster)
+    call write_options_starcluster(iunit)
  end select
 
 end subroutine write_options_externalforces
@@ -753,6 +775,7 @@ subroutine read_options_externalforces(name,valstring,imatch,igotall,ierr,iexter
  use extern_Bfield,        only:read_options_externB
  use extern_staticsine,    only:read_options_staticsine
  use extern_gwinspiral,    only:read_options_gwinspiral
+ use extern_starcluster,   only:read_options_starcluster 
  character(len=*), intent(in)    :: name,valstring
  logical,          intent(out)   :: imatch,igotall
  integer,          intent(out)   :: ierr
@@ -760,7 +783,7 @@ subroutine read_options_externalforces(name,valstring,imatch,igotall,ierr,iexter
  integer, save :: ngot = 0
  logical :: igotallcorotate,igotallbinary,igotallprdrag
  logical :: igotallltforce,igotallspiral,igotallexternB
- logical :: igotallstaticsine,igotallgwinspiral
+ logical :: igotallstaticsine,igotallgwinspiral,igotallstarcluster
  character(len=30), parameter :: tag = 'externalforces'
 
  imatch            = .true.
@@ -773,6 +796,7 @@ subroutine read_options_externalforces(name,valstring,imatch,igotall,ierr,iexter
  igotallltforce    = .true.
  igotallstaticsine = .true.
  igotallgwinspiral = .true.
+ igotallstarcluster = .true. 
 
  !call read_inopt(db,'iexternalforce',iexternalforce,min=0,max=9,required=true)
  !if (imatch) ngot = ngot + 1
@@ -822,13 +846,15 @@ subroutine read_options_externalforces(name,valstring,imatch,igotall,ierr,iexter
        call read_options_staticsine(name,valstring,imatch,igotallstaticsine,ierr)
     case(iext_gwinspiral)
        call read_options_gwinspiral(name,valstring,imatch,igotallgwinspiral,ierr)
+    case(iext_starcluster)
+       call read_options_starcluster(name,valstring,imatch,igotallstarcluster,ierr)
     end select
  end select
  igotall = (ngot >= 1      .and. igotallcorotate   .and. &
             igotallbinary  .and. igotallprdrag     .and. &
             igotallspiral  .and. igotallltforce    .and. &
             igotallexternB .and. igotallstaticsine .and. &
-            igotallgwinspiral)
+            igotallgwinspiral .and. igotallstarcluster)
 
  !--make sure mass is read where relevant
  select case(iexternalforce)
@@ -850,10 +876,12 @@ subroutine initialise_externalforces(iexternalforce,ierr)
  use extern_densprofile,   only:load_extern_densityprofile
  use extern_Bfield,        only:check_externB_settings
  use extern_gwinspiral,    only:initialise_gwinspiral
+ use extern_starcluster,   only:init_starcluster
  use units,                only:G_is_unity,c_is_unity,get_G_code,get_c_code
  use part,                 only:npart,nptmass
  integer, intent(in)  :: iexternalforce
  integer, intent(out) :: ierr
+ logical :: selfgrav
 
  ierr = 0
  select case(iexternalforce)
@@ -872,6 +900,13 @@ subroutine initialise_externalforces(iexternalforce,ierr)
                   var='iexternalforce',ival=iexternalforce)
        ierr = ierr + 1
     endif
+ case(iext_starcluster)
+#ifdef GRAVITY
+    selfgrav = .true. 
+#else 
+    selfgrav = .false. 
+#endif 
+    call init_starcluster(selfgrav,ierr)
  case default
     if (iexternalforce <= 0 .or. iexternalforce > iexternalforce_max) then
        call error('externalforces','externalforce not implemented',var='iexternalforce',ival=iexternalforce)
@@ -880,7 +915,8 @@ subroutine initialise_externalforces(iexternalforce,ierr)
  end select
 
  select case(iexternalforce)
- case(iext_star,iext_binary,iext_corot_binary,iext_prdrag,iext_spiral,iext_lensethirring,iext_einsteinprec,iext_gnewton)
+ case(iext_star,iext_binary,iext_corot_binary,iext_prdrag,iext_spiral,iext_lensethirring,&
+     &iext_einsteinprec,iext_gnewton,iext_starcluster)
     !
     !--check that G=1 in code units
     !
