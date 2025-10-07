@@ -1011,6 +1011,18 @@ ifeq ($(SETUP), gravturbbox)
     NCELLSMAX=4*maxp
 endif
 
+ifeq ($(SETUP), binaryincluster)
+#	 Binary pair at the centre of a cluster 
+    SETUPFILE=velfield_fromcubes.f90 setup_binaryincluster.f90
+    PERIODIC=no
+    GRAVITY=yes
+    ISOTHERMAL=no
+    IND_TIMESTEPS=yes
+    KNOWN_SETUP=yes
+    MAXP=6000000
+    NCELLSMAX=4*maxp
+endif
+
 ifeq ($(SETUP), mhdvortex)
 #   Balsara (2004) MHD vortex
     PERIODIC=yes

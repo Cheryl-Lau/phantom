@@ -80,6 +80,11 @@ module ptmass
  real, parameter :: dtfacphi  = 0.05
  real, parameter :: dtfacphi2 = dtfacphi*dtfacphi
 
+ ! option to disable position update for certain sink(s)
+ logical, public :: pin_sink     = .false.
+ logical, public :: pin_all      = .false. 
+ integer, public :: isink_to_pin = 1
+
  ! parameters to control output regarding sink particles
  logical, private, parameter :: record_created  = .false.  ! verbose tracking of why sinks are not created
  logical, private            :: write_one_ptfile = .true.  ! default logical to determine if we are writing one or nptmass data files
@@ -790,8 +795,9 @@ subroutine update_ptmass(dptmass,xyzmh_ptmass,vxyz_ptmass,fxyz_ptmass,nptmass)
  real,    intent(inout) :: vxyz_ptmass(:,:)
  real,    intent(inout) :: fxyz_ptmass(:,:)
  integer, intent(in)    :: nptmass
-
+ integer                :: iptmass
  real                   :: newptmass(nptmass),newptmass1(nptmass)
+ real                   :: newptmass1i
 
  ! Add angular momentum of sink particle using old properties (taken about the origin)
  xyzmh_ptmass(ispinx,1:nptmass) =xyzmh_ptmass(ispinx,1:nptmass)+xyzmh_ptmass(4,1:nptmass) &
@@ -806,10 +812,24 @@ subroutine update_ptmass(dptmass,xyzmh_ptmass,vxyz_ptmass,fxyz_ptmass,nptmass)
  ! Calculate new masses
  newptmass(1:nptmass)           =xyzmh_ptmass(4,1:nptmass)+dptmass(idmsi,1:nptmass)
  newptmass1(1:nptmass)          =1./newptmass(1:nptmass)
- ! Update position and accreted mass
- xyzmh_ptmass(1,1:nptmass)      =(dptmass(idxmsi,1:nptmass)+xyzmh_ptmass(1,1:nptmass)*xyzmh_ptmass(4,1:nptmass))*newptmass1
- xyzmh_ptmass(2,1:nptmass)      =(dptmass(idymsi,1:nptmass)+xyzmh_ptmass(2,1:nptmass)*xyzmh_ptmass(4,1:nptmass))*newptmass1
- xyzmh_ptmass(3,1:nptmass)      =(dptmass(idzmsi,1:nptmass)+xyzmh_ptmass(3,1:nptmass)*xyzmh_ptmass(4,1:nptmass))*newptmass1
+ ! Update position 
+ if (.not.pin_sink) then 
+    xyzmh_ptmass(1,1:nptmass)   =(dptmass(idxmsi,1:nptmass)+xyzmh_ptmass(1,1:nptmass)*xyzmh_ptmass(4,1:nptmass))*newptmass1
+    xyzmh_ptmass(2,1:nptmass)   =(dptmass(idymsi,1:nptmass)+xyzmh_ptmass(2,1:nptmass)*xyzmh_ptmass(4,1:nptmass))*newptmass1
+    xyzmh_ptmass(3,1:nptmass)   =(dptmass(idzmsi,1:nptmass)+xyzmh_ptmass(3,1:nptmass)*xyzmh_ptmass(4,1:nptmass))*newptmass1
+ else !- pin specified sinks' location
+    if (.not.pin_all) then 
+       do iptmass = 1,nptmass
+          if (iptmass /= isink_to_pin) then 
+             newptmass1i = newptmass1(iptmass)
+             xyzmh_ptmass(1,iptmass) =(dptmass(idxmsi,iptmass)+xyzmh_ptmass(1,iptmass)*xyzmh_ptmass(4,iptmass))*newptmass1i
+             xyzmh_ptmass(2,iptmass) =(dptmass(idymsi,iptmass)+xyzmh_ptmass(2,iptmass)*xyzmh_ptmass(4,iptmass))*newptmass1i
+             xyzmh_ptmass(3,iptmass) =(dptmass(idzmsi,iptmass)+xyzmh_ptmass(3,iptmass)*xyzmh_ptmass(4,iptmass))*newptmass1i
+          endif 
+       enddo 
+    endif 
+ endif 
+ ! update accreted mass 
  xyzmh_ptmass(imacc, 1:nptmass) = xyzmh_ptmass(imacc,1:nptmass)+dptmass(idmsi,    1:nptmass)
  ! Add angular momentum contribution from the gas particles
  xyzmh_ptmass(ispinx,1:nptmass) =xyzmh_ptmass(ispinx,1:nptmass)+dptmass(idspinxsi,1:nptmass)

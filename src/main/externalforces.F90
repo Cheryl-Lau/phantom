@@ -415,7 +415,6 @@ subroutine externalforce(iexternalforce,xi,yi,zi,hi,ti,fextxi,fextyi,fextzi,phi,
 !
     call starcluster_force(xi,yi,zi,fextxi,fextyi,fextzi,phi)
 
-
  case default
 !
 !--external forces should not be called if iexternalforce = 0
@@ -560,7 +559,7 @@ subroutine update_externalforce(iexternalforce,ti,dmdt)
  use extern_starcluster,only:update_Mcore_Mclust
  integer, intent(in) :: iexternalforce
  real,    intent(in) :: ti,dmdt
- logical             :: stopped_now,selfgrav
+ logical             :: stopped_now
 
  select case(iexternalforce)
  case(iext_binary,iext_corot_binary)
@@ -576,12 +575,7 @@ subroutine update_externalforce(iexternalforce,ti,dmdt)
     call get_gw_force()
     if (stopped_now) call warn('externalforces','Stars have merged. Disabling GW inspiral',2)
  case(iext_starcluster)
-#ifdef GRAVITY
-    selfgrav = .true. 
-#else
-    selfgrav = .false. 
-#endif 
-    call update_Mcore_Mclust(ti,selfgrav) 
+    call update_Mcore_Mclust(ti) 
  end select
 
 end subroutine update_externalforce
@@ -881,7 +875,6 @@ subroutine initialise_externalforces(iexternalforce,ierr)
  use part,                 only:npart,nptmass
  integer, intent(in)  :: iexternalforce
  integer, intent(out) :: ierr
- logical :: selfgrav
 
  ierr = 0
  select case(iexternalforce)
@@ -901,12 +894,7 @@ subroutine initialise_externalforces(iexternalforce,ierr)
        ierr = ierr + 1
     endif
  case(iext_starcluster)
-#ifdef GRAVITY
-    selfgrav = .true. 
-#else 
-    selfgrav = .false. 
-#endif 
-    call init_starcluster(selfgrav,ierr)
+    call init_starcluster(ierr)
  case default
     if (iexternalforce <= 0 .or. iexternalforce > iexternalforce_max) then
        call error('externalforces','externalforce not implemented',var='iexternalforce',ival=iexternalforce)

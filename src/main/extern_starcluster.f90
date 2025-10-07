@@ -26,7 +26,7 @@ module extern_starcluster
 
  real,    public :: Rcore  = 0.1 
  real,    public :: Rclust = 0.5
- real,    public :: Mcore  = 1e2
+ real,    public :: Mcore  = 2e2
  real,    public :: Mclust = 1e3 
 
  real,    public :: dMfrac = 5.d-3
@@ -50,12 +50,12 @@ contains
 !  Calculate Mcore_phi and Mclust_phi to be used in the potential 
 !+
 !-----------------------------------------------------------------
-subroutine init_starcluster(selfgrav,ierr)
+subroutine init_starcluster(ierr)
  use part,  only:npart,xyzh,vxyzu,isdead_or_accreted
  use part,  only:nptmass,xyzmh_ptmass,vxyz_ptmass
  use part,  only:massoftype,npartoftype,igas
+ use dim,   only:gravity
  use io,    only:warning 
- logical, intent(in)  :: selfgrav
  integer, intent(out) :: ierr 
  integer :: ip,isink,io_file
  real    :: xi,yi,zi,r2
@@ -112,7 +112,7 @@ subroutine init_starcluster(selfgrav,ierr)
  else 
     Mcore_phi  = Mcore 
     Mclust_phi = Mclust 
-    if (selfgrav) then 
+    if (gravity) then 
        !- If particles are already subjected to self-gravity, the mass terms in the
        !  potential only represent the extra 'hidden' mass which are not explicityly
        !  modelled in the simulation, serve to control the boundness of the gas. 
@@ -126,6 +126,8 @@ subroutine init_starcluster(selfgrav,ierr)
  print*,'Mcore_phi: ',Mcore_phi,'; Mclust_phi: ',Mclust_phi
  open(2020,file='Mcore_Mclust_evol.dat',status='replace',iostat=io_file)
  if (io_file /= 0) ierr = 1 
+ write(2020,'(3A20)') 'time','Mcore_phi','Mclust_phi'
+ write(2020,'(3E20.10)') 0.d0, Mcore_phi, Mclust_phi
  
  !-Init energy mem 
  ekin0   = 0.d0 
@@ -147,9 +149,8 @@ end subroutine init_starcluster
 !  Called from subroutine update_externalforce every substep
 !+
 !-----------------------------------------------------------------
-subroutine update_Mcore_Mclust(time,selfgrav)
+subroutine update_Mcore_Mclust(time)
  real,    intent(in) :: time
- logical, intent(in) :: selfgrav
  real    :: ekin,etherm,epot
  real    :: tol = 1.d-1
  real    :: alpha_uppthresh = 2.d0
@@ -162,7 +163,7 @@ subroutine update_Mcore_Mclust(time,selfgrav)
  !- Check if energies have changed since last read 
  recalc_Mcore_Mclust = .false.
  if (check_now) then 
-    call compute_energies(selfgrav,ekin,etherm,epot)
+    call compute_energies(ekin,etherm,epot)
     if (abs(ekin-ekin0) > tol .or. abs(etherm-etherm0) > tol .or. abs(epot-epot0) > tol) then 
        recalc_Mcore_Mclust = .true. 
        ekin0   = ekin
@@ -179,9 +180,10 @@ subroutine update_Mcore_Mclust(time,selfgrav)
        Mcore_phi = Mcore_phi - dMcore_phi
        Mclust_phi = Mclust_phi - dMclust_phi
     endif 
+    write(2020,'(3E20.10)') time, Mcore_phi, Mclust_phi
  endif 
 
- write(2020,*) time, Mcore_phi, Mclust_phi
+! write(2020,'(3E20.10)') time, Mcore_phi, Mclust_phi
 
  icall = icall + 1 
 
@@ -190,11 +192,10 @@ end subroutine update_Mcore_Mclust
 !
 ! Compute kinetic, thermal, potential energy 
 !
-subroutine compute_energies(selfgrav,ekin,etherm,epot)
- use dim,   only:maxvxyzu
+subroutine compute_energies(ekin,etherm,epot)
+ use dim,   only:maxvxyzu,gravity
  use part,  only:npart,xyzh,vxyzu,massoftype,igas
  use part,  only:poten
- logical, intent(in)  :: selfgrav
  real   , intent(out) :: ekin,etherm,epot 
  integer :: ip 
  real    :: pmass,xi,yi,zi,vxi,vyi,vzi,v2i
@@ -215,7 +216,7 @@ subroutine compute_energies(selfgrav,ekin,etherm,epot)
     ekin = ekin + pmass*v2i
     if (maxvxyzu >= 4) etherm = etherm + vxyzu(4,ip)*pmass 
     epot = epot + cluster_potential(xi,yi,zi)*pmass 
-    if (selfgrav) epot = epot + poten(ip)
+    if (gravity) epot = epot + poten(ip)
  enddo 
  ekin = 5.d-1*ekin 
 
@@ -287,9 +288,9 @@ subroutine write_options_starcluster(iunit)
  call write_inopt(Mcore,'Mcore','Mass in cluster core',iunit)
  call write_inopt(Mclust,'Mclust','Mass in outer cluster',iunit)
  call write_inopt(Rcore,'Rcore','Radius of cluster core',iunit)
- call write_inopt(Mclust,'Rclust','Radius of whole cluster',iunit)
+ call write_inopt(Rclust,'Rclust','Radius of whole cluster',iunit)
  call write_inopt(dMfrac,'dMfrac','Step size as fraction of Mcore/Mclust',iunit)
- call write_inopt(Mclust,'vary_potential','Vary potential to keep cluster virialized',iunit)
+ call write_inopt(vary_potential,'vary_potential','Vary potential to keep cluster virialized',iunit)
 
 end subroutine write_options_starcluster
 
