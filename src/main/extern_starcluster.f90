@@ -26,10 +26,10 @@ module extern_starcluster
 
  real,    public :: Rcore  = 0.1 
  real,    public :: Rclust = 0.5
- real,    public :: Mcore  = 2e2
+ real,    public :: Mcore  = 1.2e2
  real,    public :: Mclust = 1e3 
 
- real,    public :: dMfrac = 5.d-3
+ real,    public :: dMfrac = 1.d-2
 
  integer, public :: update_mass_freq = 50       ! update Mcore_phi & Mclust_phi every x-th call
  logical, public :: actual_mass_only = .false.  ! only account for mass present in the sim
@@ -41,6 +41,7 @@ module extern_starcluster
  private
 
  integer :: icall = 1
+ integer :: nzeromass = 0
  real    :: Mcore_phi,Mclust_phi,dMcore_phi,dMclust_phi
  real    :: ekin0,etherm0,epot0,Rcore2,Rclust2
  
@@ -57,7 +58,7 @@ subroutine init_starcluster(ierr)
  use dim,   only:gravity
  use io,    only:warning 
  integer, intent(out) :: ierr 
- integer :: ip,isink,io_file
+ integer :: ip,isink,io_potfile,io_energfile
  real    :: xi,yi,zi,r2
  real    :: Mgas_core,Mgas_clust,Msink_core,Msink_clust 
 
@@ -119,13 +120,15 @@ subroutine init_starcluster(ierr)
        print*,'Mcore and Mclust subtracted to account for self-grav'
        Mcore_phi  = Mcore_phi - Mgas_core - Msink_core 
        Mclust_phi = Mclust_phi - Mgas_clust - Msink_clust 
+       Mcore_phi  = max(Mcore_phi,0.)
+       Mclust_phi = max(Mclust_phi,0.)
     endif    
  endif 
  
  !-File to write Mcore_phi and Mclust_phi 
  print*,'Mcore_phi: ',Mcore_phi,'; Mclust_phi: ',Mclust_phi
- open(2020,file='Mcore_Mclust_evol.dat',status='replace',iostat=io_file)
- if (io_file /= 0) ierr = 1 
+ open(2020,file='Mcore_Mclust_evol.dat',status='replace',iostat=io_potfile)
+ if (io_potfile /= 0) ierr = 1 
  write(2020,'(3A20)') 'time','Mcore_phi','Mclust_phi'
  write(2020,'(3E20.10)') 0.d0, Mcore_phi, Mclust_phi
  
@@ -133,6 +136,11 @@ subroutine init_starcluster(ierr)
  ekin0   = 0.d0 
  etherm0 = 0.d0 
  epot0   = 0.d0
+
+ !-File to record the computed energies 
+ open(2030,file='extern_starcluster_energies.dat',status='replace',iostat=io_energfile)
+ if (io_energfile /= 0) ierr = 1 
+ write(2030,'(4A20)') 'time','ekin','etherm','epot'
 
  !-Step in Mcore and Mclust 
  if (vary_potential) then 
@@ -150,10 +158,11 @@ end subroutine init_starcluster
 !+
 !-----------------------------------------------------------------
 subroutine update_Mcore_Mclust(time)
+ use io, only:fatal 
  real,    intent(in) :: time
  real    :: ekin,etherm,epot
- real    :: tol = 1.d-1
- real    :: alpha_uppthresh = 2.d0
+ real    :: tol = 1.d1
+ real    :: alpha_uppthresh = 1.5d0
  real    :: alpha_lowthresh = 1.d0
  logical :: check_now,recalc_Mcore_Mclust
 
@@ -164,6 +173,8 @@ subroutine update_Mcore_Mclust(time)
  recalc_Mcore_Mclust = .false.
  if (check_now) then 
     call compute_energies(ekin,etherm,epot)
+    write(2030,'(4E20.10)') time, ekin, etherm, epot 
+ 
     if (abs(ekin-ekin0) > tol .or. abs(etherm-etherm0) > tol .or. abs(epot-epot0) > tol) then 
        recalc_Mcore_Mclust = .true. 
        ekin0   = ekin
@@ -173,12 +184,19 @@ subroutine update_Mcore_Mclust(time)
  endif 
 
  if (recalc_Mcore_Mclust) then 
-    if (2.d0*ekin/epot > alpha_uppthresh) then      !- unbound 
+    if (2.d0*ekin/abs(epot) > alpha_uppthresh) then      !- unbound 
        Mcore_phi = Mcore_phi + dMcore_phi
        Mclust_phi = Mclust_phi + dMclust_phi
-    elseif (2.d0*ekin/epot < alpha_lowthresh) then  !- bound 
+    elseif (2.d0*ekin/abs(epot) < alpha_lowthresh) then  !- bound 
        Mcore_phi = Mcore_phi - dMcore_phi
        Mclust_phi = Mclust_phi - dMclust_phi
+       Mcore_phi  = max(Mcore_phi,0.)
+       Mclust_phi = max(Mclust_phi,0.)
+
+       if (Mclust_phi <= 0 .or. Mcore_phi <= 0) then 
+          nzeromass = nzeromass + 1 
+          if (nzeromass > 50) call fatal('extern_starcluster','Particles are doomed to collapse')
+       endif 
     endif 
     write(2020,'(3E20.10)') time, Mcore_phi, Mclust_phi
  endif 
