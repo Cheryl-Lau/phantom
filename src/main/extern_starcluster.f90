@@ -29,7 +29,7 @@ module extern_starcluster
  real,    public :: Mcore  = 1.2e2
  real,    public :: Mclust = 1e3 
 
- real,    public :: dMfrac = 1.d-2
+ real,    public :: dMfrac = 5.d-3
 
  integer, public :: update_mass_freq = 50       ! update Mcore_phi & Mclust_phi every x-th call
  logical, public :: actual_mass_only = .false.  ! only account for mass present in the sim
@@ -211,36 +211,62 @@ end subroutine update_Mcore_Mclust
 ! Compute kinetic, thermal, potential energy 
 !
 subroutine compute_energies(ekin,etherm,epot)
- use dim,   only:maxvxyzu,gravity
- use part,  only:npart,xyzh,vxyzu,massoftype,igas
- use part,  only:poten
- real   , intent(out) :: ekin,etherm,epot 
+ use dim,    only:maxvxyzu,gravity
+ use part,   only:npart,xyzh,vxyzu,massoftype,igas,poten,nptmass,xyzmh_ptmass
+ use part,   only:epot_sinksink
+ real,   intent(out) :: ekin,etherm,epot 
  integer :: ip 
- real    :: pmass,xi,yi,zi,vxi,vyi,vzi,v2i
+ real    :: pmass,xi,yi,zi,hi,vxi,vyi,vzi,v2i,epot_sinks,ekin_sinks 
 
  pmass = massoftype(igas)
 
  ekin = 0.d0 
  etherm = 0.d0 
  epot = 0.d0
+
  do ip = 1,npart
     xi  = xyzh(1,ip)
     yi  = xyzh(2,ip)
     zi  = xyzh(3,ip)
+    hi  = xyzh(4,ip)
+
+    !--Kinetic energy 
     vxi = vxyzu(1,ip)
     vyi = vxyzu(2,ip)
     vzi = vxyzu(3,ip)
     v2i = vxi*vxi + vyi*vyi + vzi*vzi
-    ekin = ekin + pmass*v2i
+    ekin = ekin + 5.d-1*pmass*v2i
+
+    !--Thermal energy 
     if (maxvxyzu >= 4) etherm = etherm + vxyzu(4,ip)*pmass 
+
+    !--Potential energy 
     epot = epot + cluster_potential(xi,yi,zi)*pmass 
     if (gravity) epot = epot + poten(ip)
  enddo 
- ekin = 5.d-1*ekin 
+
+ !--Kinetic energy from sinks 
+ if (nptmass > 0) then 
+    call get_ekin_from_sinks(ekin_sinks)
+    ekin = ekin + ekin_sinks 
+ endif 
+
+ !--Potential energy from sinks 
+ if (nptmass > 0) then
+    call get_accel_from_sinks(xi,yi,zi,hi,epot_sinks)
+    epot = epot + pmass*epot_sinks 
+ endif
+ if (nptmass > 1) then 
+    epot = epot + epot_sinksink
+ endif 
 
 end subroutine compute_energies 
 
-
+!
+! Cluster potential that corresponds to density distribution 
+! \rho \propto r^{-3/2};   r < Rcore 
+!              r^{-2};     Rcore < r < Rclust 
+!
 real function cluster_potential(xi,yi,zi)
  real,  intent(in) :: xi,yi,zi
  real   :: r2,r
@@ -259,6 +285,68 @@ real function cluster_potential(xi,yi,zi)
 
 end function cluster_potential
 
+
+!
+! Kinetic energy of sinks 
+!
+subroutine get_ekin_from_sinks(ekin_sinks)
+ use part, only:nptmass,xyzmh_ptmass,vxyz_ptmass
+ real, intent(out) :: ekin_sinks 
+ integer :: isink 
+ real    :: msink,vx,vy,vz,v2
+
+ ekin_sinks = 0. 
+
+ do isink = 1,nptmass 
+    msink = xyzmh_ptmass(4,isink)
+    vx = vxyz_ptmass(1,isink)
+    vy = vxyz_ptmass(2,isink)
+    vz = vxyz_ptmass(3,isink)
+    v2 = vx**2 + vy**2 + vz**2 
+    ekin_sinks = ekin_sinks + 5.d-1*msink*v2 
+ enddo 
+
+end subroutine get_ekin_from_sinks 
+
+!
+! Copy of subroutine get_accel_sink_gas from module ptmass 
+! but only for getting the potential exerted by sinks 
+!
+subroutine get_accel_from_sinks(xi,yi,zi,hi,epot_sinks)
+ use part,     only:nptmass,xyzmh_ptmass
+ use kernel,   only:kernel_softening,radkern
+ real, intent(in)  :: xi,yi,zi,hi
+ real, intent(out) :: epot_sinks 
+ integer :: isink 
+ real    :: dx,dy,dz,r,r2,msink,hsoft,qi,q2i,psoft,fsoft
+
+ epot_sinks = 0. 
+
+ do isink = 1,nptmass
+    dx     = xi - xyzmh_ptmass(1,isink)
+    dy     = yi - xyzmh_ptmass(2,isink)
+    dz     = zi - xyzmh_ptmass(3,isink)
+    r2    = dx**2 + dy**2 + dz**2 
+
+    msink  = xyzmh_ptmass(4,isink)
+    if (msink < 0.0) cycle
+
+    hsoft  = xyzmh_ptmass(6,isink)
+    if (hsoft > 0.0) hsoft = max(hsoft,hi)
+
+    if (r2 < (radkern*hsoft)**2) then  !-within softening length 
+       q2i = r2/hsoft**2 
+       qi  = sqrt(q2i)
+       call kernel_softening(q2i,qi,psoft,fsoft) 
+       epot_sinks = epot_sinks + msink*psoft/hsoft  ! potential (spline-softened)
+
+    else !-no softening needed 
+       r = sqrt(r2)
+       epot_sinks = epot_sinks - msink/r   ! potential (GM/r)
+    endif 
+ enddo 
+
+end subroutine get_accel_from_sinks
 
 !-----------------------------------------------------------------
 !+
