@@ -324,7 +324,9 @@ subroutine compute_energies(t)
 #ifdef GR
           epoti = 0.
 #else
+          epoti = 0. 
           call externalforce(iexternalforce,xi,yi,zi,hi,t,dumx,dumy,dumz,epoti,ii=i)
+          !print*,'phi in energies',epoti 
           call externalforce_vdependent(iexternalforce,xyzh(1:3,i),vxyzu(1:3,i),fdum,epoti)
 #endif
           epot = epot + pmassi*epoti

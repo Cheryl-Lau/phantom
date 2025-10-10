@@ -25,11 +25,11 @@ module extern_starcluster
  implicit none
 
  real,    public :: Rcore  = 0.1 
- real,    public :: Rclust = 0.5
+ real,    public :: Rclust = 1.0
  real,    public :: Mcore  = 1.2e2
  real,    public :: Mclust = 1e3 
 
- real,    public :: dMfrac = 5.d-3
+ real,    public :: dMfrac = 1.d-2
 
  integer, public :: update_mass_freq = 50       ! update Mcore_phi & Mclust_phi every x-th call
  logical, public :: actual_mass_only = .false.  ! only account for mass present in the sim
@@ -161,9 +161,9 @@ subroutine update_Mcore_Mclust(time)
  use io, only:fatal 
  real,    intent(in) :: time
  real    :: ekin,etherm,epot
- real    :: tol = 1.d1
- real    :: alpha_uppthresh = 1.5d0
- real    :: alpha_lowthresh = 1.d0
+ real    :: tol = 1.d4
+ real    :: alpha_uppthresh = 1.2
+ real    :: alpha_lowthresh = 0.8
  logical :: check_now,recalc_Mcore_Mclust
 
  check_now = .false. 
@@ -185,10 +185,10 @@ subroutine update_Mcore_Mclust(time)
 
  if (recalc_Mcore_Mclust) then 
     if (2.d0*ekin/abs(epot) > alpha_uppthresh) then      !- unbound 
-       Mcore_phi = Mcore_phi + dMcore_phi
+       Mcore_phi  = Mcore_phi + dMcore_phi
        Mclust_phi = Mclust_phi + dMclust_phi
     elseif (2.d0*ekin/abs(epot) < alpha_lowthresh) then  !- bound 
-       Mcore_phi = Mcore_phi - dMcore_phi
+       Mcore_phi  = Mcore_phi - dMcore_phi
        Mclust_phi = Mclust_phi - dMclust_phi
        Mcore_phi  = max(Mcore_phi,0.)
        Mclust_phi = max(Mclust_phi,0.)
@@ -201,8 +201,6 @@ subroutine update_Mcore_Mclust(time)
     write(2020,'(3E20.10)') time, Mcore_phi, Mclust_phi
  endif 
 
-! write(2020,'(3E20.10)') time, Mcore_phi, Mclust_phi
-
  icall = icall + 1 
 
 end subroutine update_Mcore_Mclust
@@ -213,10 +211,10 @@ end subroutine update_Mcore_Mclust
 subroutine compute_energies(ekin,etherm,epot)
  use dim,    only:maxvxyzu,gravity
  use part,   only:npart,xyzh,vxyzu,massoftype,igas,poten,nptmass,xyzmh_ptmass
- use part,   only:epot_sinksink
+ use part,   only:epot_sinksink,isdead_or_accreted
  real,   intent(out) :: ekin,etherm,epot 
  integer :: ip 
- real    :: pmass,xi,yi,zi,hi,vxi,vyi,vzi,v2i,epot_sinks,ekin_sinks 
+ real    :: pmass,xi,yi,zi,hi,vxi,vyi,vzi,v2i,phi,epot_sinks,ekin_sinks 
 
  pmass = massoftype(igas)
 
@@ -225,37 +223,42 @@ subroutine compute_energies(ekin,etherm,epot)
  epot = 0.d0
 
  do ip = 1,npart
-    xi  = xyzh(1,ip)
-    yi  = xyzh(2,ip)
-    zi  = xyzh(3,ip)
-    hi  = xyzh(4,ip)
+    if (.not.isdead_or_accreted(xyzh(4,ip))) then 
+       xi  = xyzh(1,ip)
+       yi  = xyzh(2,ip)
+       zi  = xyzh(3,ip)
+       hi  = xyzh(4,ip)
 
-    !--Kinetic energy 
-    vxi = vxyzu(1,ip)
-    vyi = vxyzu(2,ip)
-    vzi = vxyzu(3,ip)
-    v2i = vxi*vxi + vyi*vyi + vzi*vzi
-    ekin = ekin + 5.d-1*pmass*v2i
+       !--Kinetic energy 
+       vxi = vxyzu(1,ip)
+       vyi = vxyzu(2,ip)
+       vzi = vxyzu(3,ip)
+       v2i = vxi*vxi + vyi*vyi + vzi*vzi
+       ekin = ekin + 5.d-1*pmass*v2i
 
-    !--Thermal energy 
-    if (maxvxyzu >= 4) etherm = etherm + vxyzu(4,ip)*pmass 
+       !--Thermal energy 
+       if (maxvxyzu >= 4) etherm = etherm + vxyzu(4,ip)*pmass 
 
-    !--Potential energy 
-    epot = epot + cluster_potential(xi,yi,zi)*pmass 
-    if (gravity) epot = epot + poten(ip)
+       !--Potential energy 
+       call cluster_potential(xi,yi,zi,phi)
+       epot = epot + phi*pmass 
+       if (gravity) then 
+          epot = epot + poten(ip)
+       endif 
+       if (nptmass > 0) then
+          call get_accel_from_sinks(xi,yi,zi,hi,epot_sinks)
+          epot = epot + pmass*epot_sinks 
+       endif
+    endif 
  enddo 
 
- !--Kinetic energy from sinks 
+ !--Kinetic energy of sinks 
  if (nptmass > 0) then 
-    call get_ekin_from_sinks(ekin_sinks)
+    call get_ekin_of_sinks(ekin_sinks)
     ekin = ekin + ekin_sinks 
  endif 
 
- !--Potential energy from sinks 
- if (nptmass > 0) then
-    call get_accel_from_sinks(xi,yi,zi,hi,epot_sinks)
-    epot = epot + pmass*epot_sinks 
- endif
+ !--Potential energy of sinks 
  if (nptmass > 1) then 
     epot = epot + epot_sinksink
  endif 
@@ -267,29 +270,33 @@ end subroutine compute_energies
 ! \rho \propto r^{-3/2};   r < Rcore 
 !              r^{-2};     Rcore < r < Rclust 
 !
-real function cluster_potential(xi,yi,zi)
- real,  intent(in) :: xi,yi,zi
+subroutine cluster_potential(xi,yi,zi,phi)
+ use io, only:fatal 
+ real,   intent(in)  :: xi,yi,zi
+ real,   intent(out) :: phi 
  real   :: r2,r
 
- r2 = xi**2 + yi**2 + zi**2 
+ r2  = xi**2 + yi**2 + zi**2 
 
  if (r2 < Rcore2) then 
-    r = sqrt(r2)
-    cluster_potential = -3.d0*Mcore_phi*Rcore**(-1.5d0) * (Rcore**(0.5d0)- 2.d0/3.d0*r**(0.5d0)) &
-                      & - Mclust_phi * (log(Rclust)-log(Rcore))/(Rclust-Rcore)
+    r   = sqrt(r2)
+    phi = -3.*Mcore_phi*Rcore**(-1.5) * (Rcore**(0.5)- 2./3.*r**(0.5)) &
+        & - Mclust_phi * (log(Rclust)-log(Rcore))/(Rclust-Rcore)
  elseif (r2 < Rclust2) then 
-    r = sqrt(r2)
-    cluster_potential = -((Mcore_phi - Mclust_phi*Rcore/(Rclust-Rcore))*1.d0/r + Mclust_phi/(Rclust-Rcore)) &
-                      & - Mclust_phi/(Rclust-Rcore) * (log(Rclust)-log(r))
+    r   = sqrt(r2)
+    phi = -((Mcore_phi - Mclust_phi*Rcore/(Rclust-Rcore))*1./r + Mclust_phi/(Rclust-Rcore)) &
+        & - Mclust_phi/(Rclust-Rcore) * (log(Rclust)-log(r))
+ else 
+    phi = -1.*tiny(phi)
  endif 
 
-end function cluster_potential
+end subroutine cluster_potential
 
 
 !
 ! Kinetic energy of sinks 
 !
-subroutine get_ekin_from_sinks(ekin_sinks)
+subroutine get_ekin_of_sinks(ekin_sinks)
  use part, only:nptmass,xyzmh_ptmass,vxyz_ptmass
  real, intent(out) :: ekin_sinks 
  integer :: isink 
@@ -299,6 +306,7 @@ subroutine get_ekin_from_sinks(ekin_sinks)
 
  do isink = 1,nptmass 
     msink = xyzmh_ptmass(4,isink)
+    if (msink < 0.) cycle 
     vx = vxyz_ptmass(1,isink)
     vy = vxyz_ptmass(2,isink)
     vz = vxyz_ptmass(3,isink)
@@ -306,7 +314,7 @@ subroutine get_ekin_from_sinks(ekin_sinks)
     ekin_sinks = ekin_sinks + 5.d-1*msink*v2 
  enddo 
 
-end subroutine get_ekin_from_sinks 
+end subroutine get_ekin_of_sinks 
 
 !
 ! Copy of subroutine get_accel_sink_gas from module ptmass 
@@ -323,13 +331,13 @@ subroutine get_accel_from_sinks(xi,yi,zi,hi,epot_sinks)
  epot_sinks = 0. 
 
  do isink = 1,nptmass
-    dx     = xi - xyzmh_ptmass(1,isink)
-    dy     = yi - xyzmh_ptmass(2,isink)
-    dz     = zi - xyzmh_ptmass(3,isink)
-    r2    = dx**2 + dy**2 + dz**2 
-
     msink  = xyzmh_ptmass(4,isink)
     if (msink < 0.0) cycle
+
+    dx = xi - xyzmh_ptmass(1,isink)
+    dy = yi - xyzmh_ptmass(2,isink)
+    dz = zi - xyzmh_ptmass(3,isink)
+    r2 = dx**2 + dy**2 + dz**2 
 
     hsoft  = xyzmh_ptmass(6,isink)
     if (hsoft > 0.0) hsoft = max(hsoft,hi)
@@ -377,7 +385,8 @@ subroutine starcluster_force(xi,yi,zi,fxi,fyi,fzi,phi)
     fzi = 0.d0
  endif 
 
- phi = cluster_potential(xi,yi,zi)
+ !--Get phi 
+ call cluster_potential(xi,yi,zi,phi)
 
 end subroutine starcluster_force
 

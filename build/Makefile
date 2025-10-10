@@ -1015,7 +1015,7 @@ ifeq ($(SETUP), binaryincluster)
 #	 Binary pair at the centre of a cluster 
     SETUPFILE=velfield_fromcubes.f90 setup_binaryincluster.f90
     PERIODIC=no
-    GRAVITY=yes
+    GRAVITY=yes 
     ISOTHERMAL=no
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
