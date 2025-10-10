@@ -58,7 +58,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use centreofmass, only:reset_centreofmass
  use options,      only:nfulldump,nmaxdumps,icooling,iexternalforce,ishock_heating,ipdv_heating
  use kernel,       only:hfact_default
-  use domain,      only:i_belong
+ use domain,       only:i_belong
  use ptmass,       only:icreate_sinks,pin_sink,pin_all,isink_to_pin 
  use options,      only:iexternalforce
  use cooling,      only:Tfloor
@@ -91,9 +91,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
  !--Default values for the input params 
  totmass_req      = 1d2
- pmass            = 1d-2
+ pmass            = 1d-4
  r_sphere         = 0.15
- mach             = 60.0
+ mach             = 35.0 
  angvel_cgs       = 1d-12 
  cs_cgs           = 2.19d4  ! 8K assuming mu = 2.31 & gamma = 5/3
  nptmass_clust    = 50
@@ -101,20 +101,20 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  pin_cen_sink     = .false.
 
  !--Check for existence of the .in and .setup files
- filein=trim(fileprefix)//'.in'
+ filein = trim(fileprefix)//'.in'
  inquire(file=filein,exist=inexists)
- fileset=trim(fileprefix)//'.setup'
+ fileset = trim(fileprefix)//'.setup'
  inquire(file=fileset,exist=setexists)
 
  !--Read values from .setup
  if (setexists) then
     call read_setupfile(fileset,ierr)
     if (ierr /= 0) then
-       if (id==master) call write_setupfile(fileset)
+       if (id == master) call write_setupfile(fileset)
        stop
     endif
     !--Prompt to get inputs and write to file
- elseif (id==master) then
+ elseif (id == master) then
     print "(a,/)",trim(fileset)//' not found: using interactive setup'
     call get_input_from_prompts()
     call write_setupfile(fileset)
@@ -125,7 +125,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  angvel  = angvel_cgs*utime
 
  !--Set sphere 
- npart_req  = nint(totmass_req/pmass)
+ npart_req = nint(totmass_req/pmass)
  if (npart_req > size(xyzh(1,:))) call fatal('setup_binaryincluster','npart_req exceeded limit')
  call set_sphere('closepacked',id,master,0.,r_sphere,psep,hfact_default,npart,xyzh,nptot=npart_total, &
                  exactN=.true.,np_requested=npart_req,mask=i_belong)
@@ -197,62 +197,66 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  nptmass = nptmass_clust 
 
  !--Place central massive sink 
- isink = 1
- xyzmh_ptmass(1:3,isink) = (/ 0.,0.,0. /)
- if (binary_cen_sink) then 
-    sep      = 100*au/udist                     ! binary separation 
-    mbinary  = 8. * 2.                          ! total mass of the binary 
-    angmom   = 2.5d-1 * sqrt(mbinary**3 * sep)  ! for equal mass pairs 
-    xyzmh_ptmass(4,isink)  = mbinary ! mass 
-    xyzmh_ptmass(5,isink)  = sep     ! h_acc 
-    xyzmh_ptmass(6,isink)  = sep     ! h_soft 
-    xyzmh_ptmass(8,isink)  = 0.      ! spinx 
-    xyzmh_ptmass(9,isink)  = 0.      ! spiny 
-    xyzmh_ptmass(10,isink) = angmom  ! spinz 
- else 
-    h_acc = 5*au/udist 
-    xyzmh_ptmass(4,isink)  = 8. * 2. ! mass
-    xyzmh_ptmass(5,isink)  = h_acc   ! h_acc
-    xyzmh_ptmass(6,isink)  = h_acc   ! h_soft 
-    xyzmh_ptmass(8,isink)  = 0.      ! spinx 
-    xyzmh_ptmass(9,isink)  = 0.      ! spiny 
-    xyzmh_ptmass(10,isink) = 0.      ! spinz 
+ if (nptmass > 0) then 
+    isink = 1
+    xyzmh_ptmass(1:3,isink) = (/ 0.,0.,0. /)
+    if (binary_cen_sink) then 
+       sep      = 100*au/udist                     ! binary separation 
+       mbinary  = 8. * 2.                          ! total mass of the binary 
+       angmom   = 2.5d-1 * sqrt(mbinary**3 * sep)  ! for equal mass pairs 
+       xyzmh_ptmass(4,isink)  = mbinary ! mass 
+       xyzmh_ptmass(5,isink)  = sep     ! h_acc 
+       xyzmh_ptmass(6,isink)  = sep     ! h_soft 
+       xyzmh_ptmass(8,isink)  = 0.      ! spinx 
+       xyzmh_ptmass(9,isink)  = 0.      ! spiny 
+       xyzmh_ptmass(10,isink) = angmom  ! spinz 
+    else 
+       h_acc = 5*au/udist 
+       xyzmh_ptmass(4,isink)  = 8. * 2. ! mass
+       xyzmh_ptmass(5,isink)  = h_acc   ! h_acc
+       xyzmh_ptmass(6,isink)  = h_acc   ! h_soft 
+       xyzmh_ptmass(8,isink)  = 0.      ! spinx 
+       xyzmh_ptmass(9,isink)  = 0.      ! spiny 
+       xyzmh_ptmass(10,isink) = 0.      ! spinz 
+   endif 
  endif 
 
  !--Place the rest of the sinks 
- uppmass_innersink   = 8.                 ! range of stellar masses in inner regions 
- lowmass_innersink   = 4. 
- uppmass_outersink   = 5.                 ! range of stellar masses in outer regions 
- lowmass_outersink   = 2. 
- r_thresh2           = (0.4*r_sphere)**2  ! where to divide the regions 
+ if (nptmass > 1) then 
+    uppmass_innersink   = 8.                 ! range of stellar masses in inner regions 
+    lowmass_innersink   = 4. 
+    uppmass_outersink   = 5.                 ! range of stellar masses in outer regions 
+    lowmass_outersink   = 2. 
+    r_thresh2           = (0.4*r_sphere)**2  ! where to divide the regions 
 
- do isink = 2,nptmass_clust
-    call gen_random_pos(r_sphere,x,y,z)
-    r2 = x**2 + y**2 + z**2 
-    if (r2 < r_thresh2) then 
-       call gen_random_mass(lowmass_innersink,uppmass_innersink,mass)
-    else 
-       call gen_random_mass(lowmass_outersink,uppmass_outersink,mass)
-    endif 
-    h_acc = 5*au/udist
-    xyzmh_ptmass(1,isink)  = x 
-    xyzmh_ptmass(2,isink)  = y 
-    xyzmh_ptmass(3,isink)  = z 
-    xyzmh_ptmass(4,isink)  = mass 
-    xyzmh_ptmass(5,isink)  = h_acc 
-    xyzmh_ptmass(6,isink)  = h_acc 
-    xyzmh_ptmass(8,isink)  = 0.      ! spinx 
-    xyzmh_ptmass(9,isink)  = 0.      ! spiny 
-    xyzmh_ptmass(10,isink) = 0.      ! spinz 
- enddo 
+    do isink = 2,nptmass_clust
+       call gen_random_pos(r_sphere,x,y,z)
+       r2 = x**2 + y**2 + z**2 
+       if (r2 < r_thresh2) then 
+          call gen_random_mass(lowmass_innersink,uppmass_innersink,mass)
+       else 
+          call gen_random_mass(lowmass_outersink,uppmass_outersink,mass)
+       endif 
+       h_acc = 5*au/udist
+       xyzmh_ptmass(1,isink)  = x 
+       xyzmh_ptmass(2,isink)  = y 
+       xyzmh_ptmass(3,isink)  = z 
+       xyzmh_ptmass(4,isink)  = mass 
+       xyzmh_ptmass(5,isink)  = h_acc 
+       xyzmh_ptmass(6,isink)  = h_acc 
+       xyzmh_ptmass(8,isink)  = 0.      ! spinx 
+       xyzmh_ptmass(9,isink)  = 0.      ! spiny 
+       xyzmh_ptmass(10,isink) = 0.      ! spinz 
+    enddo 
+ endif 
 
  !--Set options for input file, if .in file does not exist
  if (.not.inexists) then
-    tmax      = 5.*t_ff
-    dtmax     = 0.01*t_ff
-    nout      = 100
+    tmax      = 10.*t_ff
+    dtmax     = 0.005*t_ff
+    nout      = 10
     nfulldump = 1
-    nmaxdumps = 100
+    nmaxdumps = 500
     dtwallmax = 1800.    ! s
     iverbose  = 1
 
