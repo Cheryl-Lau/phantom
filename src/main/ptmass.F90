@@ -36,9 +36,10 @@ module ptmass
 !   infile_utils, io, io_summary, kdtree, kernel, linklist, mpiutils,
 !   options, part, units
 !
- use dim,  only:maxptmass
- use part, only:nsinkproperties,gravity,is_accretable
- use io,   only:iscfile,iskfile,id,master
+ use dim,      only:maxptmass
+ use options,  only:iexternalforce
+ use part,     only:nsinkproperties,gravity,is_accretable
+ use io,       only:iscfile,iskfile,id,master
  implicit none
  character(len=80), parameter, public :: &  ! module version
     modid="$Id$"
@@ -456,15 +457,24 @@ subroutine ptmass_predictor(nptmass,dt,xyzmh_ptmass,vxyz_ptmass,fxyz_ptmass)
 
  !$omp parallel do schedule(static) default(none) &
  !$omp shared(nptmass,dt,xyzmh_ptmass,vxyz_ptmass,fxyz_ptmass) &
+ !$omp shared(pin_sink,pin_all,isink_to_pin) &
  !$omp private(i,vxhalfi,vyhalfi,vzhalfi)
  do i=1,nptmass
     if (xyzmh_ptmass(4,i) > 0.) then
        vxhalfi = vxyz_ptmass(1,i) + 0.5*dt*fxyz_ptmass(1,i)
        vyhalfi = vxyz_ptmass(2,i) + 0.5*dt*fxyz_ptmass(2,i)
        vzhalfi = vxyz_ptmass(3,i) + 0.5*dt*fxyz_ptmass(3,i)
-       xyzmh_ptmass(1,i) = xyzmh_ptmass(1,i) + dt*vxhalfi
-       xyzmh_ptmass(2,i) = xyzmh_ptmass(2,i) + dt*vyhalfi
-       xyzmh_ptmass(3,i) = xyzmh_ptmass(3,i) + dt*vzhalfi
+       if (.not.pin_sink) then 
+          xyzmh_ptmass(1,i) = xyzmh_ptmass(1,i) + dt*vxhalfi
+          xyzmh_ptmass(2,i) = xyzmh_ptmass(2,i) + dt*vyhalfi
+          xyzmh_ptmass(3,i) = xyzmh_ptmass(3,i) + dt*vzhalfi
+       else 
+          if (.not.pin_all .and. i /= isink_to_pin) then 
+             xyzmh_ptmass(1,i) = xyzmh_ptmass(1,i) + dt*vxhalfi
+             xyzmh_ptmass(2,i) = xyzmh_ptmass(2,i) + dt*vyhalfi
+             xyzmh_ptmass(3,i) = xyzmh_ptmass(3,i) + dt*vzhalfi
+          endif 
+       endif 
        vxyz_ptmass(1,i) = vxhalfi
        vxyz_ptmass(2,i) = vyhalfi
        vxyz_ptmass(3,i) = vzhalfi
@@ -1477,7 +1487,13 @@ subroutine merge_sinks(time,nptmass,xyzmh_ptmass,vxyz_ptmass,fxyz_ptmass,merge_i
              mij  = mi + mj
              mij1 = 1.0/mij
              ! Update quantities
-             xyzmh_ptmass(1:3,i)    = (xyzmh_ptmass(1:3,i)*mi + xyzmh_ptmass(1:3,j)*mj)*mij1
+             if (.not.pin_sink) then 
+                xyzmh_ptmass(1:3,i)    = (xyzmh_ptmass(1:3,i)*mi + xyzmh_ptmass(1:3,j)*mj)*mij1
+             else
+                if (.not.pin_all .and. i /= isink_to_pin) then 
+                   xyzmh_ptmass(1:3,i)    = (xyzmh_ptmass(1:3,i)*mi + xyzmh_ptmass(1:3,j)*mj)*mij1
+                endif 
+             endif 
              xyzmh_ptmass(4,i)      = mij
              xyzmh_ptmass(imacc,i)  = xyzmh_ptmass(imacc,i)  + xyzmh_ptmass(imacc,j)
              xyzmh_ptmass(ispinx,i) = xyzmh_ptmass(ispinx,i) + xyzmh_ptmass(ispinx,j) + mj*(yj*vzj - zj*vyj)
@@ -1721,6 +1737,11 @@ subroutine write_options_ptmass(iunit)
  call write_inopt(f_acc,'f_acc','particles < f_acc*h_acc accreted without checks',iunit)
  call write_inopt(r_merge_uncond,'r_merge_uncond','sinks will unconditionally merge within this separation',iunit)
  call write_inopt(r_merge_cond,'r_merge_cond','sinks will merge if bound within this radius',iunit)
+ if (iexternalforce == 17) then 
+    call write_inopt(pin_sink,'pin_sink','pin sink particle(s)',iunit)
+    call write_inopt(pin_all,'pin_all','pin all sink particles',iunit)
+    call write_inopt(isink_to_pin,'isink_to_pin','sink to pin',iunit)
+ endif 
 
 end subroutine write_options_ptmass
 
@@ -1790,6 +1811,12 @@ subroutine read_options_ptmass(name,valstring,imatch,igotall,ierr)
     read(valstring,*,iostat=ierr) r_merge_cond
     if (r_merge_cond > 0. .and. r_merge_cond < r_merge_uncond) call fatal(label,'0 < r_merge_cond < r_merge_uncond')
     ngot = ngot + 1
+ case('pin_sink')
+    read(valstring,*,iostat=ierr) pin_sink
+ case('pin_all')
+    read(valstring,*,iostat=ierr) pin_all
+ case('isink_to_pin')
+    read(valstring,*,iostat=ierr) isink_to_pin
  case default
     imatch = .false.
  end select
