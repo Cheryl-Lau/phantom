@@ -92,9 +92,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !--Default values for the input params 
  totmass_req      = 1d2
  pmass            = 1d-4
- r_sphere         = 0.15
- mach             = 35.0 
- angvel_cgs       = 1d-12 
+ r_sphere         = 0.1
+ mach             = 40.0 
+ angvel_cgs       = 5d-12 
  cs_cgs           = 2.19d4  ! 8K assuming mu = 2.31 & gamma = 5/3
  nptmass_clust    = 50
  binary_cen_sink  = .true. 
@@ -227,7 +227,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     lowmass_innersink   = 4. 
     uppmass_outersink   = 5.                 ! range of stellar masses in outer regions 
     lowmass_outersink   = 2. 
-    r_thresh2           = (0.4*r_sphere)**2  ! where to divide the regions 
+    r_thresh2           = (0.5*r_sphere)**2  ! where to divide the regions 
 
     do isink = 2,nptmass_clust
        call gen_random_pos(r_sphere,x,y,z)
@@ -252,7 +252,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
  !--Set options for input file, if .in file does not exist
  if (.not.inexists) then
-    tmax      = 10.*t_ff
+    tmax      = 1.*t_ff
     dtmax     = 0.005*t_ff
     nout      = 10
     nfulldump = 1

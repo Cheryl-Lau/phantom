@@ -25,13 +25,13 @@ module extern_starcluster
  implicit none
 
  real,    public :: Rcore  = 0.1 
- real,    public :: Rclust = 1.0
+ real,    public :: Rclust = 0.5
  real,    public :: Mcore  = 1.2e2
  real,    public :: Mclust = 1e3 
 
- real,    public :: dMfrac = 1.d-2
+ real,    public :: dMfrac = 5.d-3
 
- integer, public :: update_mass_freq = 50       ! update Mcore_phi & Mclust_phi every x-th call
+ integer, public :: update_mass_freq = 100      ! update Mcore_phi & Mclust_phi every x-th call
  logical, public :: actual_mass_only = .false.  ! only account for mass present in the sim
  logical, public :: vary_potential   = .true.   ! vary potential to keep cluster virialized
 
