@@ -34,6 +34,7 @@ module setup
  real    :: totmass_req,pmass,r_sphere
  real    :: mach,angvel_cgs,cs_cgs
  logical :: binary_cen_sink,pin_cen_sink
+ logical :: isotherm = .true.   ! isothermal; otherwise adiabatic 
 
  integer :: iseed = -12345
 
@@ -85,6 +86,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  logical :: setexists,inexists
  character(len=120) :: filex,filey,filez
  character(len=100) :: filein,fileset,cwd
+
+ if (isotherm .and. maxvxyzu >= 4) call fatal('setup_binaryincluster','set ISOTHERMAL=yes in Makefile')
+ if (maxvxyzu == 3 .and. .not.isotherm) call fatal('setup_binaryincluster','set isotherm=.true. in setup')
 
  !--Set units
  call set_units(dist=pc,mass=solarm,G=1.)
@@ -191,7 +195,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  temp    = 10.
  polyk   = kboltz*temp/(gmw*mass_proton_cgs)*(utime/udist)**2
  u       = polyk/(gamma-1.)
- vxyzu(4,1:npart) = u
+ if (maxvxyzu >= 4) vxyzu(4,1:npart) = u
 
  !--Set sinks 
  nptmass = nptmass_clust 
@@ -260,10 +264,16 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     dtwallmax = 1800.    ! s
     iverbose  = 1
 
-    ieos           = 2   ! adiabatic 
-    icooling       = 7   ! cooling curve 
-    ipdv_heating   = 1
-    ishock_heating = 1
+    if (isotherm) then 
+       ieos           = 1
+       icooling       = 0
+    else 
+       ieos           = 2
+       icooling       = 7
+       ipdv_heating   = 1
+       ishock_heating = 1
+    endif 
+
     iexternalforce = 17  ! varying cluster potential
     icreate_sinks  = 0
 
