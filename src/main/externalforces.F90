@@ -556,7 +556,7 @@ subroutine update_externalforce(iexternalforce,ti,dmdt)
                              xyzmh_ptmass,vxyz_ptmass
  use extern_gwinspiral, only:gw_still_inspiralling,get_gw_force
  use extern_binary,     only:update_binary
- use extern_starcluster,only:update_Mcore_Mclust
+ use extern_starcluster,only:update_Mclust
  integer, intent(in) :: iexternalforce
  real,    intent(in) :: ti,dmdt
  logical             :: stopped_now
@@ -575,7 +575,7 @@ subroutine update_externalforce(iexternalforce,ti,dmdt)
     call get_gw_force()
     if (stopped_now) call warn('externalforces','Stars have merged. Disabling GW inspiral',2)
  case(iext_starcluster)
-    call update_Mcore_Mclust(ti) 
+    call update_Mclust(ti) 
  end select
 
 end subroutine update_externalforce

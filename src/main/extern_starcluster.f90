@@ -9,142 +9,118 @@ module extern_starcluster
 ! This module contains routines to model the potential of a stellar cluster
 ! with a massive object at the centre 
 !
-! :References: Bonnell et al., 2001, MNRAS, 324, 573–579
+! :References: 
 !
 ! :Owner: Cheryl Lau 
 !
 ! :Runtime parameters:
-!   - Mcore       : *Total mass within the cluster core*
-!   - Mclust      : *Total mass within the outer cluster*
-!   - Rcore       : *Radius of cluster core*
-!   - Rclust      : *Radius of whole cluster*
-!   - dMfrac      : *Step size as fraction of Mcore and Mclust*
+!   - Mclust            : *Total mass within the outer cluster*
+!   - Rcore             : *Radius of cluster core*
+!   - dMfrac            : *Step size as fraction of Mclust*
+!   - vary_potential    : *Option to vary Mclust to keep cloud virialized*
 !
-! :Dependencies: infile_utils, io, part 
+! :Dependencies: infile_utils, io, part, dim, physcon, 
 !
  implicit none
 
  real,    public :: Rcore  = 0.1 
- real,    public :: Rclust = 0.5
- real,    public :: Mcore  = 1.2e2
  real,    public :: Mclust = 1e3 
 
  real,    public :: dMfrac = 5.d-3
 
- integer, public :: update_mass_freq = 100      ! update Mcore_phi & Mclust_phi every x-th call
+ integer, public :: update_mass_freq = 100      ! update Mclust_phi every x-th call
  logical, public :: actual_mass_only = .false.  ! only account for mass present in the sim
  logical, public :: vary_potential   = .true.   ! vary potential to keep cluster virialized
 
- public :: starcluster_force,init_starcluster,update_Mcore_Mclust
+ public :: starcluster_force,init_starcluster,update_Mclust
  public :: write_options_starcluster,read_options_starcluster
 
  private
 
  integer :: icall = 1
  integer :: nzeromass = 0
- real    :: Mcore_phi,Mclust_phi,dMcore_phi,dMclust_phi
- real    :: ekin0,etherm0,epot0,Rcore2,Rclust2
+ real    :: Mclust_phi,dMclust_phi
+ real    :: ekin0,etherm0,epot0
  
+ !--Storage for cluster profiles 
+ integer, parameter :: nRmax = 100000
+ integer :: nR 
+ real    :: r_profile(nRmax),rho_profile(nRmax)
+ real    :: phi_profile(nRmax),force_profile(nRmax)
+
+ !--Flags for checking and debugging 
+ logical :: print_Mclust  = .true.  
+ logical :: print_energy  = .true. 
+ logical :: print_profile = .true. 
+
 contains
 !-----------------------------------------------------------------
 !+
-!  Calculate Mcore_phi and Mclust_phi to be used in the potential 
+!  Calculate initial Mclust_phi to be used in the potential 
 !+
 !-----------------------------------------------------------------
 subroutine init_starcluster(ierr)
- use part,  only:npart,xyzh,vxyzu,isdead_or_accreted
- use part,  only:nptmass,xyzmh_ptmass,vxyz_ptmass
+ use part,  only:npart,nptmass,xyzmh_ptmass,vxyz_ptmass
  use part,  only:massoftype,npartoftype,igas
  use dim,   only:gravity
  use io,    only:warning 
  integer, intent(out) :: ierr 
  integer :: ip,isink,io_potfile,io_energfile
- real    :: xi,yi,zi,r2
- real    :: Mgas_core,Mgas_clust,Msink_core,Msink_clust 
+ real    :: sigma,j,j2,phi0,W0,Rclust
+ real    :: Mgas_clust,Msink_clust 
 
  ierr = 0
 
- Rcore2  = Rcore**2 
- Rclust2 = Rclust**2 
-
- !- Find actual mass contained within Rcore and Rclust 
- Mgas_core   = 0.d0 
- Mgas_clust  = 0.d0
- Msink_core  = 0.d0 
- Msink_clust = 0.d0 
- gas: do ip = 1,npart
-    if (.not.isdead_or_accreted(xyzh(4,ip))) then 
-       xi = xyzh(1,ip)
-       yi = xyzh(2,ip)
-       zi = xyzh(3,ip)
-       r2 = xi**2 + yi**2 + zi**2 
-       if (r2 < Rcore2) then 
-          Mgas_core = Mgas_core + massoftype(igas)
-       elseif (r2 < Rclust2) then 
-          Mgas_clust = Mgas_clust + massoftype(igas)
-       else 
-          call warning('extern_starcluster','Particle is beyond cluster radius')
-          print*, 'particle id: ',ip
-       endif 
-    endif 
- enddo gas 
+ !--Find total mass present in the simulation 
+ Mgas_clust  = npart * massoftype(igas)
+ Msink_clust = 0.
  sinks: do isink = 1,nptmass
     if (xyzmh_ptmass(4,isink) > 0) then  !- not merged 
-       xi = xyzmh_ptmass(1,isink)
-       yi = xyzmh_ptmass(2,isink)
-       zi = xyzmh_ptmass(3,isink)
-       r2 = xi**2 + yi**2 + zi**2 
-       if (r2 < Rcore2) then 
-          Msink_core = Msink_core + xyzmh_ptmass(4,isink)
-       elseif (r2 < Rclust2) then 
-          Msink_clust = Msink_clust + xyzmh_ptmass(4,isink) 
-       else 
-          call warning('extern_starcluster','Sink is beyond cluster radius')
-          print*,'sink id',isink 
-       endif 
+       Msink_clust = Msink_clust + xyzmh_ptmass(4,isink) 
     endif 
  enddo sinks 
- print*, 'Mass contained in Rcore: ',Mgas_core+Msink_core
- print*, 'Mass contained between Rcore and Rclust: ',Mgas_clust+Msink_clust 
+ print*, 'Mass contained in simulation: ',Mgas_clust+Msink_clust 
 
  if (actual_mass_only) then 
-    Mcore_phi  = Mgas_core + Msink_core
     Mclust_phi = Mgas_clust + Msink_clust 
  else 
-    Mcore_phi  = Mcore 
     Mclust_phi = Mclust 
     if (gravity) then 
        !- If particles are already subjected to self-gravity, the mass terms in the
        !  potential only represent the extra 'hidden' mass which are not explicityly
        !  modelled in the simulation, serve to control the boundness of the gas. 
-       print*,'Mcore and Mclust subtracted to account for self-grav'
-       Mcore_phi  = Mcore_phi - Mgas_core - Msink_core 
+       print*,'Mclust subtracted to account for self-grav'
        Mclust_phi = Mclust_phi - Mgas_clust - Msink_clust 
-       Mcore_phi  = max(Mcore_phi,0.)
        Mclust_phi = max(Mclust_phi,0.)
     endif    
  endif 
  
- !-File to write Mcore_phi and Mclust_phi 
- print*,'Mcore_phi: ',Mcore_phi,'; Mclust_phi: ',Mclust_phi
- open(2020,file='Mcore_Mclust_evol.dat',status='replace',iostat=io_potfile)
- if (io_potfile /= 0) ierr = 1 
- write(2020,'(3A20)') 'time','Mcore_phi','Mclust_phi'
- write(2020,'(3E20.10)') 0.d0, Mcore_phi, Mclust_phi
- 
+
+ !-File to write Mclust_phi, phi0, W0, sigma 
+ if (print_Mclust) then 
+    open(2020,file='Mclust_phi0_evol.dat',status='replace',iostat=io_potfile)
+    if (io_potfile /= 0) ierr = 1 
+    write(2020,'(5A20)') 'time','Mclust_phi','phi0','W0','sigma'
+ endif 
+
+ !--Compute cluster potential for the first time 
+ call cluster_profile(phi0,W0,Rclust,sigma)
+ if (print_Mclust) write(2020,'(5E20.10)') 0.d0, Mclust_phi, phi0, W0, sigma 
+
  !-Init energy mem 
  ekin0   = 0.d0 
  etherm0 = 0.d0 
  epot0   = 0.d0
 
  !-File to record the computed energies 
- open(2030,file='extern_starcluster_energies.dat',status='replace',iostat=io_energfile)
- if (io_energfile /= 0) ierr = 1 
- write(2030,'(4A20)') 'time','ekin','etherm','epot'
+ if (print_energy) then 
+    open(2030,file='extern_starcluster_energies.dat',status='replace',iostat=io_energfile)
+    if (io_energfile /= 0) ierr = 1 
+    write(2030,'(4A20)') 'time','ekin','etherm','epot'
+ endif 
 
- !-Step in Mcore and Mclust 
+ !-Step in Mclust 
  if (vary_potential) then 
-    dMcore_phi  = Mcore_phi*dMfrac
     dMclust_phi = Mclust_phi*dMfrac
  endif 
 
@@ -152,58 +128,60 @@ end subroutine init_starcluster
 
 !-----------------------------------------------------------------
 !+
-!  Check whether or not Mcore and Mclust needs to be varied
+!  Check whether or not Mclust needs to be varied
 !  to keep the cluster core virialized
 !  Called from subroutine update_externalforce every substep
 !+
 !-----------------------------------------------------------------
-subroutine update_Mcore_Mclust(time)
+subroutine update_Mclust(time)
  use io, only:fatal 
  real,    intent(in) :: time
- real    :: ekin,etherm,epot
+ real    :: ekin,etherm,epot,phi0,W0,Rclust,sigma
  real    :: tol = 1.d4
  real    :: alpha_uppthresh = 1.2
  real    :: alpha_lowthresh = 0.8
- logical :: check_now,recalc_Mcore_Mclust
+ logical :: check_now,recalc_Mclust
 
  check_now = .false. 
  if (vary_potential .and. mod(icall,update_mass_freq) == 0) check_now = .true. 
 
  !- Check if energies have changed since last read 
- recalc_Mcore_Mclust = .false.
+ recalc_Mclust = .false.
  if (check_now) then 
     call compute_energies(ekin,etherm,epot)
-    write(2030,'(4E20.10)') time, ekin, etherm, epot 
+    if (print_energy) write(2030,'(4E20.10)') time, ekin, etherm, epot 
  
     if (abs(ekin-ekin0) > tol .or. abs(etherm-etherm0) > tol .or. abs(epot-epot0) > tol) then 
-       recalc_Mcore_Mclust = .true. 
+       recalc_Mclust = .true. 
        ekin0   = ekin
        etherm0 = etherm 
        epot0   = epot 
     endif 
  endif 
 
- if (recalc_Mcore_Mclust) then 
+ if (recalc_Mclust) then 
     if (2.d0*ekin/abs(epot) > alpha_uppthresh) then      !- unbound 
-       Mcore_phi  = Mcore_phi + dMcore_phi
        Mclust_phi = Mclust_phi + dMclust_phi
     elseif (2.d0*ekin/abs(epot) < alpha_lowthresh) then  !- bound 
-       Mcore_phi  = Mcore_phi - dMcore_phi
        Mclust_phi = Mclust_phi - dMclust_phi
-       Mcore_phi  = max(Mcore_phi,0.)
        Mclust_phi = max(Mclust_phi,0.)
 
-       if (Mclust_phi <= 0 .or. Mcore_phi <= 0) then 
+       if (Mclust_phi <= 0.) then 
           nzeromass = nzeromass + 1 
           if (nzeromass > 50) call fatal('extern_starcluster','Particles are doomed to collapse')
        endif 
     endif 
-    write(2020,'(3E20.10)') time, Mcore_phi, Mclust_phi
+
+    !--Recompute cluster profile with current Mclust_phi & sigma  
+    !  and tabulate for later access (stored globally)
+    call cluster_profile(phi0,W0,Rclust,sigma)
+
+    if (print_Mclust) write(2020,'(5E20.10)') time, Mclust_phi, phi0, W0, sigma 
  endif 
 
  icall = icall + 1 
 
-end subroutine update_Mcore_Mclust
+end subroutine update_Mclust
 
 !
 ! Compute kinetic, thermal, potential energy 
@@ -214,7 +192,7 @@ subroutine compute_energies(ekin,etherm,epot)
  use part,   only:epot_sinksink,isdead_or_accreted
  real,   intent(out) :: ekin,etherm,epot 
  integer :: ip 
- real    :: pmass,xi,yi,zi,hi,vxi,vyi,vzi,v2i,phi,epot_sinks,ekin_sinks 
+ real    :: pmass,xi,yi,zi,hi,vxi,vyi,vzi,v2i,fxi,fyi,fzi,phi,epot_sinks,ekin_sinks 
 
  pmass = massoftype(igas)
 
@@ -240,7 +218,7 @@ subroutine compute_energies(ekin,etherm,epot)
        if (maxvxyzu >= 4) etherm = etherm + vxyzu(4,ip)*pmass 
 
        !--Potential energy 
-       call cluster_potential(xi,yi,zi,phi)
+       call starcluster_force(xi,yi,zi,fxi,fyi,fzi,phi)
        epot = epot + phi*pmass 
        if (gravity) then 
           epot = epot + poten(ip)
@@ -264,34 +242,6 @@ subroutine compute_energies(ekin,etherm,epot)
  endif 
 
 end subroutine compute_energies 
-
-!
-! Cluster potential that corresponds to density distribution 
-! \rho \propto r^{-3/2};   r < Rcore 
-!              r^{-2};     Rcore < r < Rclust 
-!
-subroutine cluster_potential(xi,yi,zi,phi)
- use io, only:fatal 
- real,   intent(in)  :: xi,yi,zi
- real,   intent(out) :: phi 
- real   :: r2,r
-
- r2  = xi**2 + yi**2 + zi**2 
-
- if (r2 < Rcore2) then 
-    r   = sqrt(r2)
-    phi = -3.*Mcore_phi*Rcore**(-1.5) * (Rcore**(0.5)- 2./3.*r**(0.5)) &
-        & - Mclust_phi * (log(Rclust)-log(Rcore))/(Rclust-Rcore)
- elseif (r2 < Rclust2) then 
-    r   = sqrt(r2)
-    phi = -((Mcore_phi - Mclust_phi*Rcore/(Rclust-Rcore))*1./r + Mclust_phi/(Rclust-Rcore)) &
-        & - Mclust_phi/(Rclust-Rcore) * (log(Rclust)-log(r))
- else 
-    phi = -1.*tiny(phi)
- endif 
-
-end subroutine cluster_potential
-
 
 !
 ! Kinetic energy of sinks 
@@ -356,39 +306,252 @@ subroutine get_accel_from_sinks(xi,yi,zi,hi,epot_sinks)
 
 end subroutine get_accel_from_sinks
 
+
+
 !-----------------------------------------------------------------
 !+
-!  compute the force on a given particle within a stellar cluster 
+! With current Mclust_phi, computes cluster profile with King models 
+! Produces tabulated density, potential and force as functions of R
+!+
+!-----------------------------------------------------------------
+subroutine cluster_profile(phi0,W0,Rclust,sigma)
+ use part,   only:npart,xyzh,vxyzu
+ use units,  only:unit_density,utime,udist,umass 
+ use io,     only:fatal 
+ real,   intent(out) :: phi0,W0,Rclust,sigma
+ integer :: iR,io_clusterfile
+ real    :: j,j2,k,ve2,R,dWdR,d2WdR2,W,dR,rhomin,phi,rho,dphidr,force
+ real    :: dRmax_dW,dRmax_dR
+ real    :: r_pc,rho_cgs,phi_cgs,force_cgs 
+
+ !--Use current Mclust_phi to compute W0 with Plummer model
+ call get_vel_dispersion(npart,xyzh,vxyzu,sigma,j,j2)
+ phi0 = -Mclust_phi/Rcore 
+ W0   = -2.d0*j2*phi0
+
+ !--Estimate k 
+ ve2  = -2.d0*phi0 
+ k    = (1.d0 - exp(-1.d0*j2*ve2))**(-1)
+
+ !--Initialize 
+ R    = 1.d-3  ! close to 0 
+ dWdR = 1.d-10
+ W    = W0 
+ dR   = 1.d-2
+
+ rhomin = 1.d-27/unit_density
+ phi = -1   ! dummy 
+ rho = 10.  ! dummy 
+ iR  = 0
+
+ scan_over_R: do while (rho > rhomin .and. phi < 0.)
+
+    rho = rho_as_func_of_W(W,W0,k,j)
+
+    d2WdR2 = d2WdR2_poisson(dWdR,R,rho,j2)
+
+    phi = W/(-2.d0*j2)
+    phi = min(phi,0.d0)
+
+    dphidr = dWdR / (-2.d0*j2*Rcore) 
+    force  = -1.d0*dphidr 
+    force  = min(force,0.d0)
+
+    !--Constrain dR and update 
+    dRmax_dR = 1.d-1 * R
+    dRmax_dW = 1.d-2 * abs(W/dWdR)
+    dR = min(dR,dRmax_dR,dRmax_dW)
+    R = R + dR
+
+    !--Recalc for next iteration 
+    dWdR = dWdR + d2WdR2 * dR 
+    W = W + dWdR * dR
+
+    !--Store results in code units 
+    iR = iR + 1 
+    if (iR > nRmax) call fatal('extern_starcluster','number of R entries exceeded limit')
+    r_profile(iR)       = R*Rcore
+    rho_profile(iR)     = rho
+    phi_profile(iR)     = phi
+    force_profile(iR)   = force 
+
+ enddo scan_over_R
+ 
+ !--Current number of entries in profile 
+ nR = iR 
+
+ !--Truncation radius 
+ Rclust = R*Rcore
+
+ !--Write profile to file for checking 
+ if (print_profile) then 
+    open(2050,file='cluster_profile.dat',status='replace',iostat=io_clusterfile)
+    if (io_clusterfile /= 0) call fatal('extern_starcluster','error opening cluster profile file')
+    write(2050,'(4A20)') 'r [pc]','rho [g/cm3]','potential [cm2/s2]','force [cm/s2]'
+    do iR = 1,nR
+       r_pc       = r_profile(iR)
+       rho_cgs    = rho_profile(iR)*unit_density
+       phi_cgs    = phi_profile(iR)*udist**2/utime**2
+       force_cgs  = force_profile(iR)*umass*udist/utime**2
+       write(2050,'(4E20.10)') r_pc, rho_cgs, phi_cgs, force_cgs 
+    enddo 
+    close(2050)
+ endif 
+
+ call fatal('extern_starcluster','force stop')
+
+end subroutine cluster_profile
+
+
+!
+! Computes current sigma, j, and j^2 
+!
+subroutine get_vel_dispersion(npart,xyzh,vxyzu,sigma,j,j2)
+ use part,  only:isdead_or_accreted
+ integer, intent(in)  :: npart 
+ real,    intent(in)  :: xyzh(:,:),vxyzu(:,:)
+ real,    intent(out) :: sigma,j,j2
+ integer :: np_alive,i
+ real    :: vsum,v2sum,v2,v,var 
+
+ vsum     = 0.
+ v2sum    = 0. 
+ np_alive = 0 
+
+ do i = 1,npart 
+    if (.not.isdead_or_accreted(xyzh(4,i))) then 
+       v2 = vxyzu(1,i)**2 + vxyzu(2,i)**2 + vxyzu(3,i)**2
+       v  = sqrt(v2)
+       vsum  = vsum  + v
+       v2sum = v2sum + v2 
+       np_alive = np_alive + 1 
+    endif 
+ enddo 
+ var   = (v2sum - vsum**2/np_alive) / (np_alive-1)
+ sigma = sqrt(var)
+
+ j2 = 1.d0/(2*sigma**2)
+ j  = sqrt(j2)
+
+end subroutine get_vel_dispersion
+
+!
+! Expression for rho(W) derived from distribution function 
+!
+real function rho_as_func_of_W(W,W0,k,j)
+ use physcon, only:pi
+ real, intent(in) :: W,W0,k,j
+ real :: integral 
+
+ !print*,'W,W0,k,j in func',W,W0,k,j
+ integral = simpson_rule_equi(rhoW_integrand,0.d0,W,1000)
+ !print*,'integral',integral 
+ rho_as_func_of_W = 4.d0/3.d0*pi*k*j**(-3)*exp(W-W0)*integral
+
+end function rho_as_func_of_W
+
+!
+! Integrand in the expression of rho(W)
+!
+real function rhoW_integrand(eta)
+ real, intent(in) :: eta
+
+ rhoW_integrand = exp(-1.d0*eta) * eta**(3.d0/2.d0)
+
+end function rhoW_integrand
+
+!
+! Simpson-rule with equidistant spacing
+!
+real function simpson_rule_equi(func,a,b,ninterval)
+ integer, intent(in) :: ninterval    ! number of sub-intervals
+ real,    intent(in) :: a,b          ! boundary values
+ real,    external   :: func         ! the function to be integrated
+ integer :: i
+ real    :: dx,x1,x2,xm,f1,f2,fm,intsum
+
+ dx  = (b-a)/dble(ninterval)
+ x1  = a							! left
+ f1  = func(a)
+ intsum = 0.d0
+ do i = 1,ninterval
+    x2  = a + dble(i)*dx      ! right
+    xm  = 0.5d0*(x1+x2)       ! midpoint
+    f2  = func(x2)
+    fm  = func(xm)
+    intsum = intsum + (f1+4.d0*fm+f2)/6.d0*(x2-x1)  ! Simpson rule
+    x1  = x2
+    f1  = f2                                 ! save for next subinterval
+ enddo
+ simpson_rule_equi = intsum
+
+end function simpson_rule_equi
+
+!
+! Expression for d^2W/dR^2 derived from Poisson equation 
+!
+real function d2WdR2_poisson(dWdR,R,rhoW,j2)
+ use physcon, only:pi
+ real, intent(in) :: dWdR,R,rhoW,j2
+
+ d2WdR2_poisson = -8.d0*pi*j2*Rcore**2*rhoW - 2.d0/R*dWdR 
+
+end function d2WdR2_poisson
+
+
+!-----------------------------------------------------------------
+!+
+!  compute the force/potential on a given particle 
 !+
 !-----------------------------------------------------------------
 subroutine starcluster_force(xi,yi,zi,fxi,fyi,fzi,phi)
  real,    intent(in)  :: xi,yi,zi
  real,    intent(out) :: fxi,fyi,fzi,phi
- real    :: r2,r
- real    :: eps2_soft = 1.d-1
+ real    :: r2i,ri,rho,fr,theta_angle,phi_angle 
 
- r2 = xi*xi + yi*yi + zi*zi + eps2_soft
- 
- if (r2 < Rcore2) then 
-    r = sqrt(r2)
-    fxi = -Mcore_phi*Rcore**(-1.5d0) * xi*r**(-1.5d0)
-    fyi = -Mcore_phi*Rcore**(-1.5d0) * yi*r**(-1.5d0)
-    fzi = -Mcore_phi*Rcore**(-1.5d0) * zi*r**(-1.5d0)
- elseif (r2 < Rclust2) then 
-    r = sqrt(r2)
-    fxi = -(Mcore_phi + Mclust_phi*(r-Rcore)/(Rclust-Rcore)) * xi*r**(-3.d0)
-    fyi = -(Mcore_phi + Mclust_phi*(r-Rcore)/(Rclust-Rcore)) * yi*r**(-3.d0)
-    fzi = -(Mcore_phi + Mclust_phi*(r-Rcore)/(Rclust-Rcore)) * zi*r**(-3.d0)
- else 
-    fxi = 0.d0
-    fyi = 0.d0
-    fzi = 0.d0
- endif 
+ r2i = xi**2 + yi**2 + zi**2 
+ ri  = sqrt(r2i)
 
- !--Get phi 
- call cluster_potential(xi,yi,zi,phi)
+ rho = interp_from_profile(ri,nR,r_profile,rho_profile)
+ phi = interp_from_profile(ri,nR,r_profile,phi_profile)
+ fr  = interp_from_profile(ri,nR,r_profile,force_profile)
+
+ theta_angle = acos(zi/ri)
+ phi_angle   = atan(yi/xi)
+ fxi = fr*sin(theta_angle)*cos(phi_angle)
+ fyi = fr*sin(theta_angle)*sin(phi_angle)
+ fzi = fr*cos(theta_angle)
 
 end subroutine starcluster_force
+
+!
+! Function to extract/interpolate from a tabulated cluster profile
+!
+real function interp_from_profile(ri,nR,rad_profile,A_profile)
+ integer, intent(in) :: nR 
+ real,    intent(in) :: ri
+ real,    intent(in) :: rad_profile(nR),A_profile(nR) 
+ integer :: i,j
+
+ !--Locate the closest entries and bracket ri 
+ ! ([i] closest index; [j] lower bound; [j+1] upper bound around ri)
+ i = minloc(abs(rad_profile(:)-ri),1)
+ j = 0
+ if (i == 1) then
+    j = 1
+ elseif (i == nR) then
+    j = i-1
+ elseif (rad_profile(i) >= ri .and. rad_profile(i-1) < ri) then
+    j = i-1
+ elseif (rad_profile(i) < ri .and. rad_profile(i+1) >= ri) then
+    j = i
+ endif
+ 
+ !--Interpolate 
+ interp_from_profile = A_profile(j) + (ri-rad_profile(j))*(A_profile(j+1)  &
+                     & - A_profile(j))/(rad_profile(j+1)-rad_profile(j))
+
+end function interp_from_profile
 
 
 !-----------------------------------------------------------------------
@@ -400,10 +563,8 @@ subroutine write_options_starcluster(iunit)
  use infile_utils, only:write_inopt
  integer, intent(in) :: iunit
 
- call write_inopt(Mcore,'Mcore','Mass in cluster core',iunit)
  call write_inopt(Mclust,'Mclust','Mass in outer cluster',iunit)
  call write_inopt(Rcore,'Rcore','Radius of cluster core',iunit)
- call write_inopt(Rclust,'Rclust','Radius of whole cluster',iunit)
  call write_inopt(dMfrac,'dMfrac','Step size as fraction of Mcore/Mclust',iunit)
  call write_inopt(vary_potential,'vary_potential','Vary potential to keep cluster virialized',iunit)
 
@@ -427,17 +588,11 @@ subroutine read_options_starcluster(name,valstring,imatch,igotall,ierr)
  igotall = .false.
 
  select case(trim(name))
- case('Mcore')
-    read(valstring,*,iostat=ierr) Mcore
-    ngot = ngot+1
  case('Mclust')
     read(valstring,*,iostat=ierr) Mclust
     ngot = ngot+1
  case('Rcore')
     read(valstring,*,iostat=ierr) Rcore
-    ngot = ngot+1
- case('Rclust')
-    read(valstring,*,iostat=ierr) Rclust
     ngot = ngot+1
  case('dMfrac')
     read(valstring,*,iostat=ierr) dMfrac
@@ -447,7 +602,7 @@ subroutine read_options_starcluster(name,valstring,imatch,igotall,ierr)
     ngot = ngot+1
  end select
 
- igotall = (ngot >= 6)
+ igotall = (ngot >= 4)
 
 end subroutine read_options_starcluster
 
