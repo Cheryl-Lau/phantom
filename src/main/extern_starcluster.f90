@@ -52,6 +52,7 @@ module extern_starcluster
  logical :: print_Mclust  = .true.  
  logical :: print_energy  = .true. 
  logical :: print_profile = .true. 
+ logical :: use_current_sigma = .false. 
 
 contains
 !-----------------------------------------------------------------
@@ -63,7 +64,7 @@ subroutine init_starcluster(ierr)
  use part,  only:npart,nptmass,xyzmh_ptmass,vxyz_ptmass
  use part,  only:massoftype,npartoftype,igas
  use dim,   only:gravity
- use io,    only:warning 
+ use io,    only:warning,fatal 
  integer, intent(out) :: ierr 
  integer :: ip,isink,io_potfile,io_energfile
  real    :: sigma,j,j2,phi0,W0,Rclust
@@ -106,6 +107,8 @@ subroutine init_starcluster(ierr)
  !--Compute cluster potential for the first time 
  call cluster_profile(phi0,W0,Rclust,sigma)
  if (print_Mclust) write(2020,'(5E20.10)') 0.d0, Mclust_phi, phi0, W0, sigma 
+
+! call fatal('extern_starcluster','force stop')
 
  !-Init energy mem 
  ekin0   = 0.d0 
@@ -170,6 +173,8 @@ subroutine update_Mclust(time)
           nzeromass = nzeromass + 1 
           if (nzeromass > 50) call fatal('extern_starcluster','Particles are doomed to collapse')
        endif 
+    else                                                 !- virialized
+       use_current_sigma = .true.  !!!! TESTING !!!!
     endif 
 
     !--Recompute cluster profile with current Mclust_phi & sigma  
@@ -337,7 +342,7 @@ subroutine cluster_profile(phi0,W0,Rclust,sigma)
  R    = 1.d-3  ! close to 0 
  dWdR = 1.d-10
  W    = W0 
- dR   = 1.d-2
+ dR   = 1.d-3
 
  rhomin = 1.d-27/unit_density
  phi = -1   ! dummy 
@@ -359,7 +364,7 @@ subroutine cluster_profile(phi0,W0,Rclust,sigma)
 
     !--Constrain dR and update 
     dRmax_dR = 1.d-1 * R
-    dRmax_dW = 1.d-2 * abs(W/dWdR)
+    dRmax_dW = 1.d-3 * abs(W/dWdR)
     dR = min(dR,dRmax_dR,dRmax_dW)
     R = R + dR
 
@@ -398,7 +403,8 @@ subroutine cluster_profile(phi0,W0,Rclust,sigma)
     close(2050)
  endif 
 
- call fatal('extern_starcluster','force stop')
+ !--Remove particles beyond truncation radius 
+ call truncate_cloud(Rclust,npart,xyzh)
 
 end subroutine cluster_profile
 
@@ -408,6 +414,7 @@ end subroutine cluster_profile
 !
 subroutine get_vel_dispersion(npart,xyzh,vxyzu,sigma,j,j2)
  use part,  only:isdead_or_accreted
+ use units, only:unit_velocity 
  integer, intent(in)  :: npart 
  real,    intent(in)  :: xyzh(:,:),vxyzu(:,:)
  real,    intent(out) :: sigma,j,j2
@@ -429,6 +436,9 @@ subroutine get_vel_dispersion(npart,xyzh,vxyzu,sigma,j,j2)
  enddo 
  var   = (v2sum - vsum**2/np_alive) / (np_alive-1)
  sigma = sqrt(var)
+
+ !--testing 
+ if (.not.use_current_sigma) sigma = 2.3e5/unit_velocity
 
  j2 = 1.d0/(2*sigma**2)
  j  = sqrt(j2)
@@ -552,6 +562,36 @@ real function interp_from_profile(ri,nR,rad_profile,A_profile)
                      & - A_profile(j))/(rad_profile(j+1)-rad_profile(j))
 
 end function interp_from_profile
+
+
+!-----------------------------------------------------------------
+!+
+!  Remove particles beyond the cluster truncated radius 
+!  We assume they are lost to tidal forces from galactic centre 
+!+
+!-----------------------------------------------------------------
+subroutine truncate_cloud(Rclust,npart,xyzh)
+ use part, only:kill_particle 
+ integer, intent(inout) :: npart 
+ real,    intent(inout) :: Rclust 
+ real,    intent(inout) :: xyzh(:,:)
+ integer :: ip
+ real    :: Rclust2,xi,yi,zi,r2i
+ 
+ Rclust2 = Rclust**2
+
+ do ip = 1,npart 
+    xi = xyzh(1,ip)
+    yi = xyzh(2,ip)
+    zi = xyzh(3,ip)
+    r2i = xi**2 + yi**2 + zi**2 
+    if (r2i > Rclust2) then 
+       print*,'particle ',ip,' gone beyond cluster truncation radius'
+       xyzh(4,ip) = 0.d0 
+    endif 
+ enddo 
+
+end subroutine truncate_cloud
 
 
 !-----------------------------------------------------------------------
