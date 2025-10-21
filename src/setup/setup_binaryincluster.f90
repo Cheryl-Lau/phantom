@@ -95,7 +95,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
  !--Default values for the input params 
  totmass_req      = 1d2
- pmass            = 1d-4
+ pmass            = 1d-3
  r_sphere         = 0.1
  mach             = 60.0 
  angvel_cgs       = 1d-12 
