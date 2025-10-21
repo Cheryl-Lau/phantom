@@ -95,7 +95,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
  !--Default values for the input params 
  totmass_req      = 1d2
- pmass            = 1d-3
+ pmass            = 1d-4
  r_sphere         = 0.1
  mach             = 60.0 
  angvel_cgs       = 1d-12 
@@ -256,9 +256,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
  !--Set options for input file, if .in file does not exist
  if (.not.inexists) then
-    tmax      = 5.*t_ff
-    dtmax     = 0.005*t_ff
-    nout      = 1
+    tmax      = 3.*t_ff
+    dtmax     = 1.d-3*t_ff
+    nout      = 10
     nfulldump = 1
     nmaxdumps = 1000
     dtwallmax = 86400   ! s
