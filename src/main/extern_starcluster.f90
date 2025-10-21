@@ -173,8 +173,6 @@ subroutine update_Mclust(time)
           nzeromass = nzeromass + 1 
           if (nzeromass > 50) call fatal('extern_starcluster','Particles are doomed to collapse')
        endif 
-    else                                                 !- virialized
-       use_current_sigma = .true.  !!!! TESTING !!!!
     endif 
 
     !--Recompute cluster profile with current Mclust_phi & sigma  
@@ -385,9 +383,6 @@ subroutine cluster_profile(phi0,W0,Rclust,sigma)
  !--Current number of entries in profile 
  nR = iR 
 
- !--Truncation radius 
- Rclust = R*Rcore
-
  !--Write profile to file for checking 
  if (print_profile) then 
     open(2050,file='cluster_profile.dat',status='replace',iostat=io_clusterfile)
@@ -403,8 +398,9 @@ subroutine cluster_profile(phi0,W0,Rclust,sigma)
     close(2050)
  endif 
 
- !--Remove particles beyond truncation radius 
- call truncate_cloud(Rclust,npart,xyzh)
+ !--Cluster truncation radius 
+ Rclust = R*Rcore
+! call truncate_cloud(Rclust,npart,xyzh)
 
 end subroutine cluster_profile
 
@@ -515,6 +511,7 @@ end function d2WdR2_poisson
 !+
 !-----------------------------------------------------------------
 subroutine starcluster_force(xi,yi,zi,fxi,fyi,fzi,phi)
+ use io,  only:fatal 
  real,    intent(in)  :: xi,yi,zi
  real,    intent(out) :: fxi,fyi,fzi,phi
  real    :: r2i,ri,rho,fr,theta_angle,phi_angle 
@@ -526,11 +523,18 @@ subroutine starcluster_force(xi,yi,zi,fxi,fyi,fzi,phi)
  phi = interp_from_profile(ri,nR,r_profile,phi_profile)
  fr  = interp_from_profile(ri,nR,r_profile,force_profile)
 
- theta_angle = acos(zi/ri)
- phi_angle   = atan(yi/xi)
+ if (ri == 0.d0) then 
+    theta_angle = tiny(theta_angle)
+    phi_angle   = tiny(phi_angle)
+ else 
+    theta_angle = acos(zi/ri)
+    phi_angle   = atan(yi/xi)
+ endif 
+
  fxi = fr*sin(theta_angle)*cos(phi_angle)
  fyi = fr*sin(theta_angle)*sin(phi_angle)
  fzi = fr*cos(theta_angle)
+ if (fxi /= fxi .or. fyi /= fyi .or. fzi /= fzi) call fatal('extern_starcluster','NaN in ext forces')
 
 end subroutine starcluster_force
 
@@ -575,11 +579,12 @@ subroutine truncate_cloud(Rclust,npart,xyzh)
  integer, intent(inout) :: npart 
  real,    intent(inout) :: Rclust 
  real,    intent(inout) :: xyzh(:,:)
- integer :: ip
+ integer :: ip,np_remain
  real    :: Rclust2,xi,yi,zi,r2i
  
  Rclust2 = Rclust**2
 
+ npart = 0
  do ip = 1,npart 
     xi = xyzh(1,ip)
     yi = xyzh(2,ip)
@@ -587,7 +592,9 @@ subroutine truncate_cloud(Rclust,npart,xyzh)
     r2i = xi**2 + yi**2 + zi**2 
     if (r2i > Rclust2) then 
        print*,'particle ',ip,' gone beyond cluster truncation radius'
-       xyzh(4,ip) = 0.d0 
+       call kill_particle(ip)
+    else 
+       npart = npart + 1 
     endif 
  enddo 
 
