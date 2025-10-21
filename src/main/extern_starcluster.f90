@@ -26,7 +26,7 @@ module extern_starcluster
  real,    public :: Rcore  = 0.1 
  real,    public :: Mclust = 1e3 
 
- real,    public :: dMfrac = 1.d-2
+ real,    public :: dMfrac = 5.d-3
 
  integer, public :: update_mass_freq = 100      ! update Mclust_phi every x-th call
  logical, public :: actual_mass_only = .false.  ! only account for mass present in the sim
@@ -39,11 +39,11 @@ module extern_starcluster
 
  integer :: icall = 1
  integer :: nzeromass = 0
- real    :: Mclust_phi,dMclust_phi
+ real    :: Mclust_phi,dMclust_phi,Rclust
  real    :: ekin0,etherm0,epot0
  
  !--Storage for cluster profiles 
- integer, parameter :: nRmax = 100000
+ integer, parameter :: nRmax = 1e6
  integer :: nR 
  real    :: r_profile(nRmax),rho_profile(nRmax)
  real    :: phi_profile(nRmax),force_profile(nRmax)
@@ -52,7 +52,7 @@ module extern_starcluster
  logical :: print_Mclust  = .true.  
  logical :: print_energy  = .true. 
  logical :: print_profile = .true. 
- logical :: use_current_sigma = .false. 
+ logical :: use_current_sigma = .true. 
 
 contains
 !-----------------------------------------------------------------
@@ -105,7 +105,7 @@ subroutine init_starcluster(ierr)
  endif 
 
  !--Compute cluster potential for the first time 
- call cluster_profile(phi0,W0,Rclust,sigma)
+ call cluster_profile(phi0,W0,sigma)
  if (print_Mclust) write(2020,'(5E20.10)') 0.d0, Mclust_phi, phi0, W0, sigma 
 
 ! call fatal('extern_starcluster','force stop')
@@ -177,10 +177,12 @@ subroutine update_Mclust(time)
 
     !--Recompute cluster profile with current Mclust_phi & sigma  
     !  and tabulate for later access (stored globally)
-    call cluster_profile(phi0,W0,Rclust,sigma)
+    call cluster_profile(phi0,W0,sigma)
 
     if (print_Mclust) write(2020,'(5E20.10)') time, Mclust_phi, phi0, W0, sigma 
  endif 
+
+! call fatal('extern_starcluster','force stop')
 
  icall = icall + 1 
 
@@ -317,13 +319,13 @@ end subroutine get_accel_from_sinks
 ! Produces tabulated density, potential and force as functions of R
 !+
 !-----------------------------------------------------------------
-subroutine cluster_profile(phi0,W0,Rclust,sigma)
+subroutine cluster_profile(phi0,W0,sigma)
  use part,   only:npart,xyzh,vxyzu
  use units,  only:unit_density,utime,udist,umass 
  use io,     only:fatal 
- real,   intent(out) :: phi0,W0,Rclust,sigma
+ real,   intent(out) :: phi0,W0,sigma
  integer :: iR,io_clusterfile
- real    :: j,j2,k,ve2,R,dWdR,d2WdR2,W,dR,rhomin,phi,rho,dphidr,force
+ real    :: j,j2,k,ve2,R,dWdR,W,dR,rhomin,phi,rho,dphidr,force
  real    :: dRmax_dW,dRmax_dR
  real    :: r_pc,rho_cgs,phi_cgs,force_cgs 
 
@@ -339,10 +341,10 @@ subroutine cluster_profile(phi0,W0,Rclust,sigma)
  k    = (1.d0 - exp(-1.d0*j2*ve2))**(-1)
 
  !--Initialize 
- R    = 1.d-3  ! close to 0 
- dWdR = 1.d-10
+ R    = 1.d-3
+ dWdR = tiny(dWdR) 
  W    = W0 
- dR   = 1.d-1
+ dR   = 1.d-2
 
  rhomin = 1.d-25/unit_density
  phi = -1   ! dummy 
@@ -351,16 +353,15 @@ subroutine cluster_profile(phi0,W0,Rclust,sigma)
 
  scan_over_R: do while (rho > rhomin .and. phi < 0.)
 
-    rho = rho_as_func_of_W(W,W0,k,j)
-
-    d2WdR2 = d2WdR2_poisson(dWdR,R,rho,j2)
-
     phi = W/(-2.d0*j2)
     phi = min(phi,0.d0)
 
     dphidr = dWdR / (-2.d0*j2*Rcore) 
     force  = -1.d0*dphidr 
-    force  = min(force,0.d0)
+    !force  = min(force,0.d0)
+
+    !--Integrate the 2nd-order ODE to update W & dWdR, also computes rho(W)
+    call Euler(W,dWdR,W0,k,j,j2,dR,R,rho)
 
     !--Constrain dR and update 
     dRmax_dR = 1.d-1 * R
@@ -368,22 +369,20 @@ subroutine cluster_profile(phi0,W0,Rclust,sigma)
     dR = min(dR,dRmax_dR,dRmax_dW)
     R = R + dR
 
-    !--Recalc for next iteration 
-    dWdR = dWdR + d2WdR2 * dR 
-    W = W + dWdR * dR
-
     !--Store results in code units 
-    iR = iR + 1 
     if (iR > nRmax) call fatal('extern_starcluster','number of R entries exceeded limit')
-    r_profile(iR)       = R*Rcore
-    rho_profile(iR)     = rho
-    phi_profile(iR)     = phi
-    force_profile(iR)   = force 
-
+    if (iR > 0) then  ! to skip first entry 
+       r_profile(iR)       = R*Rcore
+       rho_profile(iR)     = rho
+       phi_profile(iR)     = phi
+       force_profile(iR)   = force 
+    endif 
+    iR = iR + 1 
+    
  enddo scan_over_R
  
  !--Current number of entries in profile 
- nR = iR 
+ nR = iR - 1 
 
  !--Write profile to file for checking 
  if (print_profile) then 
@@ -402,10 +401,72 @@ subroutine cluster_profile(phi0,W0,Rclust,sigma)
 
  !--Cluster truncation radius 
  Rclust = R*Rcore
-! call truncate_cloud(Rclust,npart,xyzh)
+ !if (Rclust > 0 .and. npart > 0) call truncate_cloud(npart,xyzh)
 
 end subroutine cluster_profile
 
+!
+! Integrate W and dWdR with Euler method 
+!
+subroutine Euler(W,dWdR,W0,k,j,j2,dR,R,rho)
+ use io, only:fatal 
+ real, intent(in)    :: W0,k,j,j2,dR,R
+ real, intent(inout) :: W,dWdR
+ real, intent(out)   :: rho
+ real :: d2WdR2
+
+ rho = rho_as_func_of_W(W,W0,k,j)
+ d2WdR2 = d2WdR2_poisson(dWdR,R,rho,j2)
+
+ dWdR = dWdR + d2WdR2 * dR 
+ W = W + dWdR * dR
+
+end subroutine Euler
+
+!
+! Integrate W and dWdR with 4th-order Runge-Kutta method 
+!
+subroutine RungeKutta4(W,dWdR,W0,k,j,j2,dR,R,rho)
+ use io, only:fatal 
+ real, intent(in)    :: W0,k,j,j2,dR,R
+ real, intent(inout) :: W,dWdR
+ real, intent(out)   :: rho
+ real :: hdR,W_1,W_2,W_3,dWdR_1,dWdR_2,dWdR_3,dWdR_4,rho_1,rho_2,rho_3
+ real :: d2WdR2_1,d2WdR2_2,d2WdR2_3,d2WdR2_4
+
+ hdR = 5.d-1*dR
+ rho = rho_as_func_of_W(W,W0,k,j)
+
+ dWdR_1   = dWdR
+ d2WdR2_1 = d2WdR2_poisson(dWdR,R,rho,j2)
+
+ W_1    = W + dWdR_1 * hdR
+ dWdR_1 = dWdR + d2WdR2_1 * hdR 
+ dWdR_2 = dWdR_1
+ rho = rho_as_func_of_W(W_1,W0,k,j)
+ d2WdR2_2 = d2WdR2_poisson(dWdR_1,R,rho,j2)
+
+ W_2    = W + dWdR_2 * hdR
+ dWdR_2 = dWdR + d2WdR2_2 * hdR 
+ dWdR_3 = dWdR_2
+ rho = rho_as_func_of_W(W_2,W0,k,j)
+ d2WdR2_3 = d2WdR2_poisson(dWdR_2,R,rho,j2)
+
+ W_3    = W + dWdR_3 * dR
+ dWdR_3 = dWdR + d2WdR2_3 * dR 
+ dWdR_4 = dWdR_3
+ rho = rho_as_func_of_W(W_3,W0,k,j)
+ d2WdR2_4 = d2WdR2_poisson(dWdR_3,R,rho,j2)
+
+ W = W + (dWdR_1 + 2.d0*dWdR_2 + 2.d0*dWdR_3 + dWdR_4) *dR/6.d0
+ dWdR = dWdR + (d2WdR2_1 + 2.d0*d2WdR2_2 + 2.d0*d2WdR2_3 + d2WdR2_4) *dR/6.d0 
+
+ !--Update rho(W)
+ rho = rho_as_func_of_W(W,W0,k,j)
+
+ if (rho /= rho) call fatal('extern_starcluster','likely dR is too big.')
+
+end subroutine RungeKutta4
 
 !
 ! Computes current sigma, j, and j^2 
@@ -521,22 +582,28 @@ subroutine starcluster_force(xi,yi,zi,fxi,fyi,fzi,phi)
  r2i = xi**2 + yi**2 + zi**2 
  ri  = sqrt(r2i)
 
- rho = interp_from_profile(ri,nR,r_profile,rho_profile)
- phi = interp_from_profile(ri,nR,r_profile,phi_profile)
- fr  = interp_from_profile(ri,nR,r_profile,force_profile)
-
- if (ri == 0.d0) then 
-    theta_angle = tiny(theta_angle)
-    phi_angle   = tiny(phi_angle)
+ if (ri > Rclust) then 
+    fxi = 0.d0 
+    fyi = 0.d0 
+    fzi = 0.d0 
+    phi = 0.d0
  else 
-    theta_angle = acos(zi/ri)
-    phi_angle   = atan(yi/xi)
- endif 
+    phi = interp_from_profile(ri,nR,r_profile,phi_profile)
+    fr  = interp_from_profile(ri,nR,r_profile,force_profile)
 
- fxi = fr*sin(theta_angle)*cos(phi_angle)
- fyi = fr*sin(theta_angle)*sin(phi_angle)
- fzi = fr*cos(theta_angle)
- if (fxi /= fxi .or. fyi /= fyi .or. fzi /= fzi) call fatal('extern_starcluster','NaN in ext forces')
+    if (ri == 0.d0) then 
+       theta_angle = tiny(theta_angle)
+       phi_angle   = tiny(phi_angle)
+    else 
+       theta_angle = acos(zi/ri)
+       phi_angle   = atan(yi/xi)
+    endif 
+
+    fxi = fr*sin(theta_angle)*cos(phi_angle)
+    fyi = fr*sin(theta_angle)*sin(phi_angle)
+    fzi = fr*cos(theta_angle)
+    if (fxi /= fxi .or. fyi /= fyi .or. fzi /= fzi) call fatal('extern_starcluster','NaN in ext forces')
+ endif 
 
 end subroutine starcluster_force
 
@@ -576,17 +643,16 @@ end function interp_from_profile
 !  We assume they are lost to tidal forces from galactic centre 
 !+
 !-----------------------------------------------------------------
-subroutine truncate_cloud(Rclust,npart,xyzh)
+subroutine truncate_cloud(npart,xyzh)
  use part, only:kill_particle 
  integer, intent(inout) :: npart 
- real,    intent(inout) :: Rclust 
  real,    intent(inout) :: xyzh(:,:)
  integer :: ip,np_remain
  real    :: Rclust2,xi,yi,zi,r2i
- 
+
  Rclust2 = Rclust**2
 
- npart = 0
+ np_remain = 0
  do ip = 1,npart 
     xi = xyzh(1,ip)
     yi = xyzh(2,ip)
@@ -594,11 +660,12 @@ subroutine truncate_cloud(Rclust,npart,xyzh)
     r2i = xi**2 + yi**2 + zi**2 
     if (r2i > Rclust2) then 
        print*,'particle ',ip,' gone beyond cluster truncation radius'
-       call kill_particle(ip)
+       xyzh(4,ip) = 0.d0 
     else 
-       npart = npart + 1 
+       np_remain = np_remain + 1 
     endif 
  enddo 
+ npart = np_remain 
 
 end subroutine truncate_cloud
 
