@@ -26,7 +26,7 @@ module extern_starcluster
  real,    public :: Rcore  = 0.1 
  real,    public :: Mclust = 1e3 
 
- real,    public :: dMfrac = 5.d-3
+ real,    public :: dMfrac = 1.d-2
 
  integer, public :: update_mass_freq = 100      ! update Mclust_phi every x-th call
  logical, public :: actual_mass_only = .false.  ! only account for mass present in the sim
@@ -117,7 +117,7 @@ subroutine init_starcluster(ierr)
 
  !-File to record the computed energies 
  if (print_energy) then 
-    open(2030,file='extern_starcluster_energies.dat',status='replace',iostat=io_energfile)
+    open(2030,file='starcluster_energies.dat',status='replace',iostat=io_energfile)
     if (io_energfile /= 0) ierr = 1 
     write(2030,'(4A20)') 'time','ekin','etherm','epot'
  endif 
@@ -327,6 +327,8 @@ subroutine cluster_profile(phi0,W0,Rclust,sigma)
  real    :: dRmax_dW,dRmax_dR
  real    :: r_pc,rho_cgs,phi_cgs,force_cgs 
 
+ print*,'Recomputing cluster profile with Mclust = ',Mclust_phi,' solarm'
+
  !--Use current Mclust_phi to compute W0 with Plummer model
  call get_vel_dispersion(npart,xyzh,vxyzu,sigma,j,j2)
  phi0 = -Mclust_phi/Rcore 
@@ -340,9 +342,9 @@ subroutine cluster_profile(phi0,W0,Rclust,sigma)
  R    = 1.d-3  ! close to 0 
  dWdR = 1.d-10
  W    = W0 
- dR   = 1.d-3
+ dR   = 1.d-1
 
- rhomin = 1.d-27/unit_density
+ rhomin = 1.d-25/unit_density
  phi = -1   ! dummy 
  rho = 10.  ! dummy 
  iR  = 0
@@ -362,7 +364,7 @@ subroutine cluster_profile(phi0,W0,Rclust,sigma)
 
     !--Constrain dR and update 
     dRmax_dR = 1.d-1 * R
-    dRmax_dW = 1.d-3 * abs(W/dWdR)
+    dRmax_dW = 1.d-2 * abs(W/dWdR)
     dR = min(dR,dRmax_dR,dRmax_dW)
     R = R + dR
 
