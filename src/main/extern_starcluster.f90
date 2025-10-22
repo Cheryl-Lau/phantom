@@ -28,7 +28,7 @@ module extern_starcluster
 
  real,    public :: dMfrac = 5.d-3
 
- integer, public :: update_mass_freq = 100      ! update Mclust_phi every x-th call
+ integer, public :: update_mass_freq = 10       ! update Mclust_phi every x-th call
  logical, public :: actual_mass_only = .false.  ! only account for mass present in the sim
  logical, public :: vary_potential   = .true.   ! vary potential to keep cluster virialized
 
@@ -96,19 +96,18 @@ subroutine init_starcluster(ierr)
     endif    
  endif 
  
+ !--Compute cluster potential for the first time 
+ call cluster_profile(phi0,W0,sigma)
+
 
  !-File to write Mclust_phi, phi0, W0, sigma 
  if (print_Mclust) then 
     open(2020,file='Mclust_phi0_evol.dat',status='replace',iostat=io_potfile)
     if (io_potfile /= 0) ierr = 1 
     write(2020,'(5A20)') 'time','Mclust_phi','phi0','W0','sigma'
+    write(2020,'(5E20.10)') 0.d0, Mclust_phi, phi0, W0, sigma 
+    close(2020)
  endif 
-
- !--Compute cluster potential for the first time 
- call cluster_profile(phi0,W0,sigma)
- if (print_Mclust) write(2020,'(5E20.10)') 0.d0, Mclust_phi, phi0, W0, sigma 
-
-! call fatal('extern_starcluster','force stop')
 
  !-Init energy mem 
  ekin0   = 0.d0 
@@ -117,9 +116,10 @@ subroutine init_starcluster(ierr)
 
  !-File to record the computed energies 
  if (print_energy) then 
-    open(2030,file='starcluster_energies.dat',status='replace',iostat=io_energfile)
+    open(2030,file='cluster_energies.dat',status='replace',iostat=io_energfile)
     if (io_energfile /= 0) ierr = 1 
     write(2030,'(4A20)') 'time','ekin','etherm','epot'
+    close(2030)
  endif 
 
  !-Step in Mclust 
@@ -139,6 +139,7 @@ end subroutine init_starcluster
 subroutine update_Mclust(time)
  use io, only:fatal 
  real,    intent(in) :: time
+ integer :: io_potfile,io_energfile
  real    :: ekin,etherm,epot,phi0,W0,Rclust,sigma
  real    :: tol = 1.d4
  real    :: alpha_uppthresh = 1.2
@@ -151,8 +152,15 @@ subroutine update_Mclust(time)
  !- Check if energies have changed since last read 
  recalc_Mclust = .false.
  if (check_now) then 
+
     call compute_energies(ekin,etherm,epot)
-    if (print_energy) write(2030,'(4E20.10)') time, ekin, etherm, epot 
+
+    if (print_energy) then 
+       open(2030,file='cluster_energies.dat',position='append',iostat=io_energfile)
+       if (io_energfile /= 0) call fatal('extern_starcluster','error opening cluster_energies.dat')
+       write(2030,'(4E20.10)') time, ekin, etherm, epot 
+       close(2030)
+    endif 
  
     if (abs(ekin-ekin0) > tol .or. abs(etherm-etherm0) > tol .or. abs(epot-epot0) > tol) then 
        recalc_Mclust = .true. 
@@ -179,7 +187,12 @@ subroutine update_Mclust(time)
     !  and tabulate for later access (stored globally)
     call cluster_profile(phi0,W0,sigma)
 
-    if (print_Mclust) write(2020,'(5E20.10)') time, Mclust_phi, phi0, W0, sigma 
+    if (print_Mclust) then
+       open(2020,file='Mclust_phi0_evol.dat',position='append',iostat=io_potfile)
+       if (io_potfile /= 0) call fatal('extern_starcluster','error writing to Mclust_phi0_evol.dat')
+       write(2020,'(5E20.10)') time, Mclust_phi, phi0, W0, sigma 
+       close(2020)
+    endif 
  endif 
 
 ! call fatal('extern_starcluster','force stop')
