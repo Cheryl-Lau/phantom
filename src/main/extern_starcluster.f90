@@ -67,7 +67,7 @@ subroutine init_starcluster(ierr)
  use io,    only:warning,fatal 
  integer, intent(out) :: ierr 
  integer :: ip,isink,io_potfile,io_energfile
- real    :: sigma,j,j2,phi0,W0,Rclust
+ real    :: sigma,j,j2,phi0,W0
  real    :: Mgas_clust,Msink_clust 
 
  ierr = 0
@@ -137,7 +137,8 @@ end subroutine init_starcluster
 !+
 !-----------------------------------------------------------------
 subroutine update_Mclust(time)
- use io, only:fatal 
+ use part,   only:npart,xyzh,vxyzu
+ use io,     only:fatal 
  real,    intent(in) :: time
  integer :: io_potfile,io_energfile
  real    :: ekin,etherm,epot,phi0,W0,Rclust,sigma
@@ -193,6 +194,9 @@ subroutine update_Mclust(time)
        write(2020,'(5E20.10)') time, Mclust_phi, phi0, W0, sigma 
        close(2020)
     endif 
+
+    !--With updated Rclust, truncate the cluster 
+    call truncate_cloud(npart,xyzh,vxyzu)
  endif 
 
 ! call fatal('extern_starcluster','force stop')
@@ -414,7 +418,6 @@ subroutine cluster_profile(phi0,W0,sigma)
 
  !--Cluster truncation radius 
  Rclust = R*Rcore
- !if (Rclust > 0 .and. npart > 0) call truncate_cloud(npart,xyzh)
 
 end subroutine cluster_profile
 
@@ -656,29 +659,58 @@ end function interp_from_profile
 !  We assume they are lost to tidal forces from galactic centre 
 !+
 !-----------------------------------------------------------------
-subroutine truncate_cloud(npart,xyzh)
- use part, only:kill_particle 
+subroutine truncate_cloud(npart,xyzh,vxyzu)
+ use dim,  only:gravity 
+ use part, only:kill_particle,massoftype,igas,poten
  integer, intent(inout) :: npart 
- real,    intent(inout) :: xyzh(:,:)
+ real,    intent(inout) :: xyzh(:,:),vxyzu(:,:)
  integer :: ip,np_remain
- real    :: Rclust2,xi,yi,zi,r2i
+ real    :: Rclust2,pmass,phi_e,ve2
+ real    :: xi,yi,zi,r2i,vxi,vyi,vzi,v2i,vri,ekini,epoti,epot_sinks
+ real    :: v_vec(3),r_uvec(3)
+ logical :: killed
 
  Rclust2 = Rclust**2
+ pmass = massoftype(igas)
+
+ !--Compute escape velocity at truncation radius 
+ phi_e = interp_from_profile(Rclust,nR,r_profile,phi_profile)
+ ve2   = -2.d0*phi_e 
 
  np_remain = 0
  do ip = 1,npart 
+    killed = .false.
     xi = xyzh(1,ip)
     yi = xyzh(2,ip)
     zi = xyzh(3,ip)
     r2i = xi**2 + yi**2 + zi**2 
+    !--check for beyond truncation radius 
     if (r2i > Rclust2) then 
-       print*,'particle ',ip,' gone beyond cluster truncation radius'
-       xyzh(4,ip) = 0.d0 
-    else 
-       np_remain = np_remain + 1 
-    endif 
+       vxi = vxyzu(1,ip)
+       vyi = vxyzu(2,ip)
+       vzi = vxyzu(3,ip)
+       v2i = v_vec(1)**2 + v_vec(2)**2 + v_vec(3)**2
+       v_vec  = (/ vxi,vyi,vzi /)
+       r_uvec = (/ xi,yi,zi /)/sqrt(r2i)
+       vri    = dot_product(v_vec,r_uvec)
+       !--check for beyond escape velocity
+       if (vri > 0.d0 .and. v2i > ve2) then 
+          ekini = 5.d-1*pmass*v2i
+          call get_accel_from_sinks(xi,yi,zi,xyzh(4,ip),epot_sinks)
+          epoti = epot_sinks
+          if (gravity) epoti = epoti + poten(ip)
+          !--check for boundness
+          if (ekini > abs(epoti)) then 
+             print*,'Particle ',ip,'is no longer bound to cluster - killed.'
+             xyzh(4,ip) = 0.d0 
+             call kill_particle(ip)
+             killed = .true. 
+          endif 
+       endif 
+    endif
+    if (.not.killed) np_remain = np_remain + 1 
  enddo 
- npart = np_remain 
+ npart = np_remain
 
 end subroutine truncate_cloud
 
