@@ -101,30 +101,19 @@ subroutine init_starcluster(ierr)
  
 
  !--Get prev Mclust if stored 
-  if (vary_potential) then 
+ if (vary_potential) then 
     inquire(file='Mclust_sigma_evol.dat',exist=iexist)
     if (iexist) then 
-       ans_ok = .false.
-       do while(.not.ans_ok)
-          write(*,'(a)',advance='no') 'Continue from previous Mclust (y/n)? '
-          read(*,'(a)') contMclust_in
-          if (trim(adjustl(contMclust_in)) == 'y') then 
-             ans_ok = .true. 
-             !--get last line stored in prev file 
-             open(2040,file='Mclust_sigma_evol.dat',status='old')
-             do
-                read(2040,'(5E20.10)',iostat=io_readprevM) time_in, Mclust_in, phi0_in, W0_in, sigma_in
-                if (io_readprevM < 0) exit
-             enddo
-             close(2040)
-             print*,'Default value for Mclust: ',Mclust_phi
-             Mclust_phi = Mclust_in 
-             print*,'Now setting Mclust_phi as: ',Mclust_phi 
-          elseif (trim(adjustl(contMclust_in)) == 'n') then 
-             ans_ok = .true. 
-             print*,'Using initial Mclust set by user: ',Mclust_phi
-          endif 
-       enddo 
+       !--get last line stored in prev file 
+       open(2040,file='Mclust_sigma_evol.dat',status='old')
+       do
+          read(2040,'(5E20.10)',iostat=io_readprevM) time_in, Mclust_in, phi0_in, W0_in, sigma_in
+          if (io_readprevM < 0) exit
+       enddo
+       close(2040)
+       print*,'Default value for Mclust: ',Mclust_phi
+       Mclust_phi = Mclust_in 
+       print*,'Now setting Mclust_phi as: ',Mclust_phi 
     endif 
  endif 
 
