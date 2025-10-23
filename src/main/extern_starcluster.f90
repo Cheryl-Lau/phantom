@@ -66,9 +66,12 @@ subroutine init_starcluster(ierr)
  use dim,   only:gravity
  use io,    only:warning,fatal 
  integer, intent(out) :: ierr 
- integer :: ip,isink,io_potfile,io_energfile
+ integer :: ip,isink,io_potfile,io_energfile,io_readprevM
  real    :: sigma,j,j2,phi0,W0
  real    :: Mgas_clust,Msink_clust 
+ real    :: time_in,Mclust_in,phi0_in,W0_in,sigma_in
+ logical :: iexist,ans_ok
+ character(len=20) :: contMclust_in
 
  ierr = 0
 
@@ -96,18 +99,47 @@ subroutine init_starcluster(ierr)
     endif    
  endif 
  
+
+ !--Get prev Mclust if stored 
+  if (vary_potential) then 
+    inquire(file='Mclust_sigma_evol.dat',exist=iexist)
+    if (iexist) then 
+       ans_ok = .false.
+       do while(.not.ans_ok)
+          write(*,'(a)',advance='no') 'Continue from previous Mclust (y/n)? '
+          read(*,'(a)') contMclust_in
+          if (trim(adjustl(contMclust_in)) == 'y') then 
+             ans_ok = .true. 
+             !--get last line stored in prev file 
+             open(2040,file='Mclust_sigma_evol.dat',status='old')
+             do
+                read(2040,'(5E20.10)',iostat=io_readprevM) time_in, Mclust_in, phi0_in, W0_in, sigma_in
+                if (io_readprevM < 0) exit
+             enddo
+             close(2040)
+             print*,'Default value for Mclust: ',Mclust_phi
+             Mclust_phi = Mclust_in 
+             print*,'Now setting Mclust_phi as: ',Mclust_phi 
+          elseif (trim(adjustl(contMclust_in)) == 'n') then 
+             ans_ok = .true. 
+             print*,'Using initial Mclust set by user: ',Mclust_phi
+          endif 
+       enddo 
+    endif 
+ endif 
+
  !--Compute cluster potential for the first time 
  call cluster_profile(phi0,W0,sigma)
 
-
- !-File to write Mclust_phi, phi0, W0, sigma 
+ !--File to write Mclust_phi, phi0, W0, sigma 
  if (print_Mclust) then 
-    open(2020,file='Mclust_phi0_evol.dat',status='replace',iostat=io_potfile)
+    open(2020,file='Mclust_sigma_evol.dat',status='replace',iostat=io_potfile)
     if (io_potfile /= 0) ierr = 1 
     write(2020,'(5A20)') 'time','Mclust_phi','phi0','W0','sigma'
     write(2020,'(5E20.10)') 0.d0, Mclust_phi, phi0, W0, sigma 
     close(2020)
  endif 
+
 
  !-Init energy mem 
  ekin0   = 0.d0 
@@ -189,7 +221,7 @@ subroutine update_Mclust(time)
     call cluster_profile(phi0,W0,sigma)
 
     if (print_Mclust) then
-       open(2020,file='Mclust_phi0_evol.dat',position='append',iostat=io_potfile)
+       open(2020,file='Mclust_sigma_evol.dat',position='append',iostat=io_potfile)
        if (io_potfile /= 0) call fatal('extern_starcluster','error writing to Mclust_phi0_evol.dat')
        write(2020,'(5E20.10)') time, Mclust_phi, phi0, W0, sigma 
        close(2020)
