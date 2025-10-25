@@ -137,7 +137,7 @@ subroutine init_starcluster(ierr)
 
  !-File to record the computed energies 
  if (print_energy) then 
-    open(2030,file='cluster_energies.dat',status='replace',iostat=io_energfile)
+    open(2030,file='energies_evol.dat',status='replace',iostat=io_energfile)
     if (io_energfile /= 0) ierr = 1 
     write(2030,'(4A20)') 'time','ekin','etherm','epot'
     close(2030)
@@ -178,8 +178,8 @@ subroutine update_Mclust(time)
     call compute_energies(ekin,etherm,epot)
 
     if (print_energy) then 
-       open(2030,file='cluster_energies.dat',position='append',iostat=io_energfile)
-       if (io_energfile /= 0) call fatal('extern_starcluster','error opening cluster_energies.dat')
+       open(2030,file='energies_evol.dat',position='append',iostat=io_energfile)
+       if (io_energfile /= 0) call fatal('extern_starcluster','error opening energies_evol.dat')
        write(2030,'(4E20.10)') time, ekin, etherm, epot 
        close(2030)
     endif 
