@@ -28,7 +28,7 @@ module extern_starcluster
 
  real,    public :: dMfrac = 5.d-3
 
- integer, public :: update_mass_freq = 10       ! update Mclust_phi every x-th call
+ integer, public :: update_mass_freq = 50       ! update Mclust_phi every x-th call
  logical, public :: actual_mass_only = .false.  ! only account for mass present in the sim
  logical, public :: vary_potential   = .true.   ! vary potential to keep cluster virialized
 

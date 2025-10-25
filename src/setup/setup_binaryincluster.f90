@@ -95,10 +95,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
  !--Default values for the input params 
  totmass_req      = 1d2
- pmass            = 1d-4
+ pmass            = 1d-3
  r_sphere         = 0.1
- mach             = 60.0 
- angvel_cgs       = 1d-12 
+ mach             = 30.0 
+ angvel_cgs       = 1.5d-12 
  cs_cgs           = 2.19d4  ! 8K assuming mu = 2.31 & gamma = 5/3
  nptmass_clust    = 50
  binary_cen_sink  = .true. 
