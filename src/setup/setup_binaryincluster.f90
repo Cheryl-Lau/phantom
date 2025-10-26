@@ -98,7 +98,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  pmass            = 1d-3
  r_sphere         = 0.1
  mach             = 30.0 
- angvel_cgs       = 1.5d-12 
+ angvel_cgs       = 1.2d-12 
  cs_cgs           = 2.19d4  ! 8K assuming mu = 2.31 & gamma = 5/3
  nptmass_clust    = 50
  binary_cen_sink  = .true. 
@@ -251,12 +251,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        xyzmh_ptmass(8,isink)  = 0.      ! spinx 
        xyzmh_ptmass(9,isink)  = 0.      ! spiny 
        xyzmh_ptmass(10,isink) = 0.      ! spinz 
+       vxyz_ptmass(1,isink)   = -1.d0*angvel*xyzmh_ptmass(2,isink)
+       vxyz_ptmass(2,isink)   = angvel*xyzmh_ptmass(1,isink)
     enddo 
  endif 
 
  !--Set options for input file, if .in file does not exist
  if (.not.inexists) then
-    tmax      = 3.*t_ff
+    tmax      = 1.*t_ff
     dtmax     = 1.d-3*t_ff
     nout      = 10
     nfulldump = 1
