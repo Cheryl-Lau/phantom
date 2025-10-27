@@ -47,7 +47,7 @@ contains
 !+
 !----------------------------------------------------------------
 subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,time,fileprefix)
- use physcon,      only:pi,solarm,pc,au,kboltz,mass_proton_cgs
+ use physcon,      only:pi,solarm,pc,au,kboltz,mass_proton_cgs,gg 
  use dim,          only:maxvxyzu
  use setup_params, only:rhozero,npart_total
  use io,           only:master,fatal,iverbose
@@ -100,7 +100,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  pmass            = 1d-3
  r_sphere         = 0.1
  mach             = 30.0 
- angvel_cgs       = 1.006d-12 
+ angvel_cgs       = 1.d-12 
  cs_cgs           = 2.19d4  ! 8K assuming mu = 2.31 & gamma = 5/3
  nptmass_clust    = 50
  binary_cen_sink  = .true. 
