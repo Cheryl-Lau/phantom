@@ -23,6 +23,7 @@ module setup
 !   - nptmass_clust    : *number of sinks in the cluster*
 !   - binary_cen_sink  : *option to set the central sink as a binary*
 !   - pin_cen_sink     : *option to stop the central sink from moving*
+!   - make_sinks       : *option to create sinks dynamically*
 !
 ! :Dependencies: 
 !
@@ -33,8 +34,8 @@ module setup
  integer :: nptmass_clust
  real    :: totmass_req,pmass,r_sphere
  real    :: mach,angvel_cgs,cs_cgs
- logical :: binary_cen_sink,pin_cen_sink
- logical :: isotherm = .true.   ! isothermal; otherwise adiabatic 
+ logical :: binary_cen_sink,pin_cen_sink,make_sinks
+ logical :: isotherm    = .true.    ! isothermal; otherwise adiabatic 
 
  integer :: iseed = -12345
 
@@ -60,7 +61,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use options,      only:nfulldump,nmaxdumps,icooling,iexternalforce,ishock_heating,ipdv_heating
  use kernel,       only:hfact_default
  use domain,       only:i_belong
- use ptmass,       only:icreate_sinks,pin_sink,pin_all,isink_to_pin 
+ use ptmass,       only:icreate_sinks,rho_crit,rho_crit_cgs,r_crit,h_acc,h_soft_sinksink,h_soft_sinkgas
+ use ptmass,       only:pin_sink,pin_all,isink_to_pin 
  use options,      only:iexternalforce
  use cooling,      only:Tfloor
  use velfield,     only:set_velfield_from_cubes
@@ -80,7 +82,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  character(len=20), parameter     :: filevz = 'cube_v3.dat'
  integer :: ierr,npart_req,i,isink 
  real    :: cs,angvel,totmass,t_ff,psep,rmsmach,v2i,turbfac,turbboxsize,temp,u
- real    :: sep,mbinary,angmom,h_acc
+ real    :: sep,mbinary,angmom,h_acc0
  real    :: lowmass_innersink,lowmass_outersink,uppmass_innersink,uppmass_outersink
  real    :: r_thresh2,r2,mass,x,y,z 
  logical :: setexists,inexists
@@ -98,11 +100,12 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  pmass            = 1d-3
  r_sphere         = 0.1
  mach             = 30.0 
- angvel_cgs       = 1.2d-12 
+ angvel_cgs       = 1.006d-12 
  cs_cgs           = 2.19d4  ! 8K assuming mu = 2.31 & gamma = 5/3
  nptmass_clust    = 50
  binary_cen_sink  = .true. 
  pin_cen_sink     = .false.
+ make_sinks       = .true. 
 
  !--Check for existence of the .in and .setup files
  filein = trim(fileprefix)//'.in'
@@ -215,10 +218,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        xyzmh_ptmass(9,isink)  = 0.      ! spiny 
        xyzmh_ptmass(10,isink) = angmom  ! spinz 
     else 
-       h_acc = 5*au/udist 
+       h_acc0 = 5*au/udist 
        xyzmh_ptmass(4,isink)  = 8. * 2. ! mass
-       xyzmh_ptmass(5,isink)  = h_acc   ! h_acc
-       xyzmh_ptmass(6,isink)  = h_acc   ! h_soft 
+       xyzmh_ptmass(5,isink)  = h_acc0  ! h_acc
+       xyzmh_ptmass(6,isink)  = h_acc0  ! h_soft 
        xyzmh_ptmass(8,isink)  = 0.      ! spinx 
        xyzmh_ptmass(9,isink)  = 0.      ! spiny 
        xyzmh_ptmass(10,isink) = 0.      ! spinz 
@@ -241,13 +244,13 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        else 
           call gen_random_mass(lowmass_outersink,uppmass_outersink,mass)
        endif 
-       h_acc = 5*au/udist
+       h_acc0 = 5*au/udist
        xyzmh_ptmass(1,isink)  = x 
        xyzmh_ptmass(2,isink)  = y 
        xyzmh_ptmass(3,isink)  = z 
        xyzmh_ptmass(4,isink)  = mass 
-       xyzmh_ptmass(5,isink)  = h_acc 
-       xyzmh_ptmass(6,isink)  = h_acc 
+       xyzmh_ptmass(5,isink)  = h_acc0
+       xyzmh_ptmass(6,isink)  = h_acc0
        xyzmh_ptmass(8,isink)  = 0.      ! spinx 
        xyzmh_ptmass(9,isink)  = 0.      ! spiny 
        xyzmh_ptmass(10,isink) = 0.      ! spinz 
@@ -277,11 +280,22 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     endif 
 
     iexternalforce = 17  ! varying cluster potential
-    icreate_sinks  = 0
+
+    if (make_sinks) then 
+       icreate_sinks    = 1
+       h_acc            = 1.d-3
+       r_crit           = 5.0*h_acc
+       rho_crit_cgs     = 1.d-14 
+       rho_crit         = rho_crit_cgs/unit_density
+       h_soft_sinkgas   = h_acc
+       h_soft_sinksink  = h_acc
+    else 
+       icreate_sinks    = 0
+    endif 
 
     if (pin_cen_sink) then 
-       pin_sink      = .true. 
-       isink_to_pin  = 1
+       pin_sink         = .true. 
+       isink_to_pin     = 1
     endif 
  endif 
 
@@ -331,6 +345,7 @@ subroutine get_input_from_prompts()
  call prompt('Enter the number of stars in the cluster',nptmass_clust)
  call prompt('Is the central star a binary',binary_cen_sink)
  call prompt('Do you wish to pin the central star',pin_cen_sink)
+ call prompt('Do you wish to dynamically create sinks during runtime',make_sinks)
 
 end subroutine get_input_from_prompts
 
@@ -358,9 +373,9 @@ subroutine write_setupfile(filename)
  call write_inopt(nptmass_clust,'nptmass_clust','number of sinks in sphere',iunit)
  call write_inopt(binary_cen_sink,'binary_cen_sink','set the central star as a binary',iunit)
  call write_inopt(pin_cen_sink,'pin_cen_sink','pin the central star',iunit)
+ call write_inopt(make_sinks,'make_sinks','dynamically create sink particles',iunit)
 
  close(iunit)
-
 
 end subroutine write_setupfile
 
@@ -391,6 +406,7 @@ subroutine read_setupfile(filename,ierr)
  call read_inopt(nptmass_clust,'nptmass_clust',db,ierr)
  call read_inopt(binary_cen_sink,'binary_cen_sink',db,ierr)
  call read_inopt(pin_cen_sink,'pin_cen_sink',db,ierr)
+ call read_inopt(make_sinks,'make_sinks',db,ierr)
 
  call close_db(db)
 
