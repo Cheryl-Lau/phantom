@@ -17,7 +17,7 @@ module extern_starcluster
 !   - Mclust            : *Total mass within the outer cluster*
 !   - Rcore             : *Radius of cluster core*
 !   - dMfrac            : *Step size as fraction of Mclust*
-!   - vary_potential    : *Option to vary Mclust to keep cloud virialized*
+!   - vary_Mclust       : *Option to vary Mclust to keep cloud virialized*
 !
 ! :Dependencies: infile_utils, io, part, dim, physcon, 
 !
@@ -28,11 +28,11 @@ module extern_starcluster
 
  real,    public :: dMfrac = 5.d-3
 
- integer, public :: update_mass_freq = 50       ! update Mclust_phi every x-th call
+ integer, public :: update_pot_freq = 50        ! update potential every x-th call
  logical, public :: actual_mass_only = .false.  ! only account for mass present in the sim
- logical, public :: vary_potential   = .true.   ! vary potential to keep cluster virialized
+ logical, public :: vary_Mclust      = .false.  ! vary Mclust to keep cluster virialized
 
- public :: starcluster_force,init_starcluster,update_Mclust
+ public :: starcluster_force,init_starcluster,update_potential
  public :: write_options_starcluster,read_options_starcluster
 
  private
@@ -101,7 +101,7 @@ subroutine init_starcluster(ierr)
  
 
  !--Get prev Mclust if stored 
- if (vary_potential) then 
+ if (vary_Mclust) then 
     inquire(file='Mclust_sigma_evol.dat',exist=iexist)
     if (iexist) then 
        !--get last line stored in prev file 
@@ -144,7 +144,7 @@ subroutine init_starcluster(ierr)
  endif 
 
  !-Step in Mclust 
- if (vary_potential) then 
+ if (vary_Mclust) then 
     dMclust_phi = Mclust_phi*dMfrac
  endif 
 
@@ -157,22 +157,22 @@ end subroutine init_starcluster
 !  Called from subroutine update_externalforce every substep
 !+
 !-----------------------------------------------------------------
-subroutine update_Mclust(time)
+subroutine update_potential(time)
  use part,   only:npart,xyzh,vxyzu
  use io,     only:fatal 
  real,    intent(in) :: time
  integer :: io_potfile,io_energfile
  real    :: ekin,etherm,epot,phi0,W0,Rclust,sigma
- real    :: tol = 1.d4
+ real    :: tol = 0!1.d4
  real    :: alpha_uppthresh = 1.2
  real    :: alpha_lowthresh = 0.8
- logical :: check_now,recalc_Mclust
+ logical :: check_now,recalc_potential
 
  check_now = .false. 
- if (vary_potential .and. mod(icall,update_mass_freq) == 0) check_now = .true. 
+ if (mod(icall,update_pot_freq) == 0) check_now = .true. 
 
  !- Check if energies have changed since last read 
- recalc_Mclust = .false.
+ recalc_potential = .false.
  if (check_now) then 
 
     call compute_energies(ekin,etherm,epot)
@@ -185,23 +185,25 @@ subroutine update_Mclust(time)
     endif 
  
     if (abs(ekin-ekin0) > tol .or. abs(etherm-etherm0) > tol .or. abs(epot-epot0) > tol) then 
-       recalc_Mclust = .true. 
+       recalc_potential = .true. 
        ekin0   = ekin
        etherm0 = etherm 
        epot0   = epot 
     endif 
  endif 
 
- if (recalc_Mclust) then 
-    if (2.d0*ekin/abs(epot) > alpha_uppthresh) then      !- unbound 
-       Mclust_phi = Mclust_phi + dMclust_phi
-    elseif (2.d0*ekin/abs(epot) < alpha_lowthresh) then  !- bound 
-       Mclust_phi = Mclust_phi - dMclust_phi
-       Mclust_phi = max(Mclust_phi,0.)
+ if (recalc_potential) then 
+    if (vary_Mclust) then 
+       if (2.d0*ekin/abs(epot) > alpha_uppthresh) then      !- unbound 
+          Mclust_phi = Mclust_phi + dMclust_phi
+       elseif (2.d0*ekin/abs(epot) < alpha_lowthresh) then  !- bound 
+          Mclust_phi = Mclust_phi - dMclust_phi
+          Mclust_phi = max(Mclust_phi,0.)
 
-       if (Mclust_phi <= 0.) then 
-          nzeromass = nzeromass + 1 
-          if (nzeromass > 50) call fatal('extern_starcluster','Particles are doomed to collapse')
+          if (Mclust_phi <= 0.) then 
+             nzeromass = nzeromass + 1 
+             if (nzeromass > 50) call fatal('extern_starcluster','Particles are doomed to collapse')
+          endif 
        endif 
     endif 
 
@@ -220,11 +222,9 @@ subroutine update_Mclust(time)
     call truncate_cloud(npart,xyzh,vxyzu)
  endif 
 
-! call fatal('extern_starcluster','force stop')
-
  icall = icall + 1 
 
-end subroutine update_Mclust
+end subroutine update_potential
 
 !
 ! Compute kinetic, thermal, potential energy 
@@ -359,7 +359,7 @@ end subroutine get_accel_from_sinks
 !-----------------------------------------------------------------
 subroutine cluster_profile(phi0,W0,sigma)
  use part,   only:npart,xyzh,vxyzu
- use units,  only:unit_density,utime,udist,umass 
+ use units,  only:unit_density,unit_velocity,utime,udist,umass 
  use io,     only:fatal 
  real,   intent(out) :: phi0,W0,sigma
  integer :: iR,io_clusterfile
@@ -367,10 +367,13 @@ subroutine cluster_profile(phi0,W0,sigma)
  real    :: dRmax_dW,dRmax_dR
  real    :: r_pc,rho_cgs,phi_cgs,force_cgs 
 
- print*,'Recomputing cluster profile with Mclust = ',Mclust_phi,' solarm'
+ !--Compute current velocity dispersion
+ call get_vel_dispersion(npart,xyzh,vxyzu,sigma,j,j2)
+
+ print*,'Recomputing cluster profile with Mclust = ',Mclust_phi,' solarm;'
+ print*,'sigma = ',sigma*unit_velocity/1.d5,' km/s'
 
  !--Use current Mclust_phi to compute W0 with Plummer model
- call get_vel_dispersion(npart,xyzh,vxyzu,sigma,j,j2)
  phi0 = -Mclust_phi/Rcore 
  W0   = -2.d0*j2*phi0
 
@@ -382,9 +385,9 @@ subroutine cluster_profile(phi0,W0,sigma)
  R    = 1.d-3
  dWdR = tiny(dWdR) 
  W    = W0 
- dR   = 1.d-2
+ dR   = 1.d-2  ! init
 
- rhomin = 1.d-25/unit_density
+ rhomin = 6.77d-23/unit_density
  phi = -1   ! dummy 
  rho = 10.  ! dummy 
  iR  = 0
@@ -396,16 +399,9 @@ subroutine cluster_profile(phi0,W0,sigma)
 
     dphidr = dWdR / (-2.d0*j2*Rcore) 
     force  = -1.d0*dphidr 
-    !force  = min(force,0.d0)
 
     !--Integrate the 2nd-order ODE to update W & dWdR, also computes rho(W)
     call Euler(W,dWdR,W0,k,j,j2,dR,R,rho)
-
-    !--Constrain dR and update 
-    dRmax_dR = 1.d-1 * R
-    dRmax_dW = 1.d-2 * abs(W/dWdR)
-    dR = min(dR,dRmax_dR,dRmax_dW)
-    R = R + dR
 
     !--Store results in code units 
     if (iR > nRmax) call fatal('extern_starcluster','number of R entries exceeded limit')
@@ -416,7 +412,13 @@ subroutine cluster_profile(phi0,W0,sigma)
        force_profile(iR)   = force 
     endif 
     iR = iR + 1 
-    
+
+    !--Constrain dR and update 
+    dRmax_dR = 1.d-1 * R
+    dRmax_dW = 1.d-3 * abs(W/dWdR)
+    dR = min(dRmax_dR,dRmax_dW)
+    R = R + dR
+
  enddo scan_over_R
  
  !--Current number of entries in profile 
@@ -748,7 +750,7 @@ subroutine write_options_starcluster(iunit)
  call write_inopt(Mclust,'Mclust','Mass in outer cluster',iunit)
  call write_inopt(Rcore,'Rcore','Radius of cluster core',iunit)
  call write_inopt(dMfrac,'dMfrac','Step size as fraction of Mcore/Mclust',iunit)
- call write_inopt(vary_potential,'vary_potential','Vary potential to keep cluster virialized',iunit)
+ call write_inopt(vary_Mclust,'vary_Mclust','Vary Mclust to keep cluster virialized',iunit)
 
 end subroutine write_options_starcluster
 
@@ -779,8 +781,8 @@ subroutine read_options_starcluster(name,valstring,imatch,igotall,ierr)
  case('dMfrac')
     read(valstring,*,iostat=ierr) dMfrac
     ngot = ngot+1
- case('vary_potential')
-    read(valstring,*,iostat=ierr) vary_potential
+ case('vary_Mclust')
+    read(valstring,*,iostat=ierr) vary_Mclust 
     ngot = ngot+1
  end select
 
