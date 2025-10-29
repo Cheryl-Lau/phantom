@@ -28,9 +28,10 @@ module extern_starcluster
 
  real,    public :: dMfrac = 5.d-3
 
- integer, public :: update_pot_freq = 50        ! update potential every x-th call
- logical, public :: actual_mass_only = .false.  ! only account for mass present in the sim
- logical, public :: vary_Mclust      = .false.  ! vary Mclust to keep cluster virialized
+ integer, public :: update_pot_freq   = 50        ! update potential every x-th call
+ logical, public :: actual_mass_only  = .false.   ! only account for mass present in the sim
+ logical, public :: vary_Mclust       = .false.   ! vary Mclust to keep cluster virialized
+ logical, public :: use_current_sigma = .true.    ! measure sigma when setting up potential
 
  public :: starcluster_force,init_starcluster,update_potential
  public :: write_options_starcluster,read_options_starcluster
@@ -52,7 +53,6 @@ module extern_starcluster
  logical :: print_Mclust  = .true.  
  logical :: print_energy  = .true. 
  logical :: print_profile = .true. 
- logical :: use_current_sigma = .true. 
 
 contains
 !-----------------------------------------------------------------
@@ -163,13 +163,13 @@ subroutine update_potential(time)
  real,    intent(in) :: time
  integer :: io_potfile,io_energfile
  real    :: ekin,etherm,epot,phi0,W0,Rclust,sigma
- real    :: tol = 0!1.d4
+ real    :: tol = 1.d3
  real    :: alpha_uppthresh = 1.2
  real    :: alpha_lowthresh = 0.8
  logical :: check_now,recalc_potential
 
  check_now = .false. 
- if (mod(icall,update_pot_freq) == 0) check_now = .true. 
+ if (use_current_sigma .and. mod(icall,update_pot_freq) == 0) check_now = .true. 
 
  !- Check if energies have changed since last read 
  recalc_potential = .false.

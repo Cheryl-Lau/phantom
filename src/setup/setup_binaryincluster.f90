@@ -99,10 +99,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  totmass_req      = 1d2
  pmass            = 1d-3
  r_sphere         = 0.1
- mach             = 20.0 
+ mach             = 25.0 
  angvel_cgs       = 1.006d-12 
  cs_cgs           = 2.19d4  ! 8K assuming mu = 2.31 & gamma = 5/3
- nptmass_clust    = 50
+ nptmass_clust    = 20
  binary_cen_sink  = .true. 
  pin_cen_sink     = .false.
  make_sinks       = .true. 
@@ -261,7 +261,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
  !--Set options for input file, if .in file does not exist
  if (.not.inexists) then
-    tmax      = 1.*t_ff
+    tmax      = 2.*t_ff
     dtmax     = 1.d-3*t_ff
     nout      = 10
     nfulldump = 1
@@ -285,7 +285,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        icreate_sinks    = 1
        h_acc            = 1.d-3
        r_crit           = 5.0*h_acc
-       rho_crit_cgs     = 1.d-14 
+       rho_crit_cgs     = 1.d-15 
        rho_crit         = rho_crit_cgs/unit_density
        h_soft_sinkgas   = h_acc
        h_soft_sinksink  = h_acc
