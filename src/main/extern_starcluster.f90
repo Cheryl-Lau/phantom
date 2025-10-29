@@ -31,7 +31,7 @@ module extern_starcluster
  integer, public :: update_pot_freq   = 50        ! update potential every x-th call
  logical, public :: actual_mass_only  = .false.   ! only account for mass present in the sim
  logical, public :: vary_Mclust       = .false.   ! vary Mclust to keep cluster virialized
- logical, public :: use_current_sigma = .true.    ! measure sigma when setting up potential
+ logical, public :: use_current_sigma = .false.   ! update potential with current sigma 
 
  public :: starcluster_force,init_starcluster,update_potential
  public :: write_options_starcluster,read_options_starcluster
@@ -169,7 +169,7 @@ subroutine update_potential(time)
  logical :: check_now,recalc_potential
 
  check_now = .false. 
- if (use_current_sigma .and. mod(icall,update_pot_freq) == 0) check_now = .true. 
+ if (mod(icall,update_pot_freq) == 0) check_now = .true. 
 
  !- Check if energies have changed since last read 
  recalc_potential = .false.
@@ -209,17 +209,19 @@ subroutine update_potential(time)
 
     !--Recompute cluster profile with current Mclust_phi & sigma  
     !  and tabulate for later access (stored globally)
-    call cluster_profile(phi0,W0,sigma)
+    if (vary_Mclust .or. use_current_sigma) then 
+       call cluster_profile(phi0,W0,sigma)
 
-    if (print_Mclust) then
-       open(2020,file='Mclust_sigma_evol.dat',position='append',iostat=io_potfile)
-       if (io_potfile /= 0) call fatal('extern_starcluster','error writing to Mclust_phi0_evol.dat')
-       write(2020,'(5E20.10)') time, Mclust_phi, phi0, W0, sigma 
-       close(2020)
+       if (print_Mclust) then
+          open(2020,file='Mclust_sigma_evol.dat',position='append',iostat=io_potfile)
+          if (io_potfile /= 0) call fatal('extern_starcluster','error writing to Mclust_phi0_evol.dat')
+          write(2020,'(5E20.10)') time, Mclust_phi, phi0, W0, sigma 
+          close(2020)
+       endif 
+
+       !--With updated Rclust, truncate the cluster 
+       call truncate_cloud(npart,xyzh,vxyzu)
     endif 
-
-    !--With updated Rclust, truncate the cluster 
-    call truncate_cloud(npart,xyzh,vxyzu)
  endif 
 
  icall = icall + 1 
@@ -536,7 +538,7 @@ subroutine get_vel_dispersion(npart,xyzh,vxyzu,sigma,j,j2)
  sigma = sqrt(var)
 
  !--testing 
- if (.not.use_current_sigma) sigma = 2.3e5/unit_velocity
+ !if (.not.use_current_sigma) sigma = 2.3e5/unit_velocity
 
  j2 = 1.d0/(2*sigma**2)
  j  = sqrt(j2)
