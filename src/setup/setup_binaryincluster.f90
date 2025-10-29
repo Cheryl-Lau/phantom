@@ -37,7 +37,7 @@ module setup
  logical :: binary_cen_sink,pin_cen_sink,make_sinks
  logical :: isotherm    = .true.    ! isothermal; otherwise adiabatic 
 
- integer :: iseed = -12345
+ integer :: iseed = -123456
 
 contains
 
@@ -99,7 +99,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  totmass_req      = 1d2
  pmass            = 1d-3
  r_sphere         = 0.1
- mach             = 25.0 
+ mach             = 24.5 
  angvel_cgs       = 1.006d-12 
  cs_cgs           = 2.19d4  ! 8K assuming mu = 2.31 & gamma = 5/3
  nptmass_clust    = 20
@@ -302,17 +302,19 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 end subroutine setpart
 
 
-subroutine gen_random_pos(maxr,x,y,z)
+subroutine gen_random_pos(rmax,x,y,z)
  use random, only:ran2
- real, intent(in)  :: maxr 
+ real, intent(in)  :: rmax 
  real, intent(out) :: x,y,z
- real :: r
+ real :: r,rmin
 
- r = maxr + 1 
- do while (r > maxr)
-    x = 2.*(ran2(iseed)-0.5) *maxr 
-    y = 2.*(ran2(iseed)-0.5) *maxr 
-    z = 2.*(ran2(iseed)-0.5) *maxr 
+ rmin = 0.1*rmax  ! not too close to origin
+
+ r = rmax + 1  ! dummy 
+ do while (r > rmax .or. r < rmin)
+    x = 2.*(ran2(iseed)-0.5) *rmax 
+    y = 2.*(ran2(iseed)-0.5) *rmax
+    z = 2.*(ran2(iseed)-0.5) *rmax
     r = sqrt(x**2 + y**2 + z**2) 
  enddo 
 
