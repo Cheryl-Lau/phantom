@@ -99,10 +99,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  totmass_req      = 1d2
  pmass            = 1d-3
  r_sphere         = 0.2
- mach             = 2.5
+ mach             = 2.
  angvel_cgs       = 1.006d-12 
  cs_cgs           = 2.19d4  ! 8K assuming mu = 2.31 & gamma = 5/3
- nptmass_clust    = 60
+ nptmass_clust    = 55
  binary_cen_sink  = .true. 
  pin_cen_sink     = .false.
  make_sinks       = .true. 
@@ -308,7 +308,7 @@ subroutine gen_random_pos(rmax,x,y,z)
  real, intent(out) :: x,y,z
  real :: r,rmin
 
- rmin = 0.25*rmax  ! not too close to origin
+ rmin = 0.2*rmax  ! not too close to origin
 
  r = rmax + 1  ! dummy 
  do while (r > rmax .or. r < rmin)
