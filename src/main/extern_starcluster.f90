@@ -50,9 +50,10 @@ module extern_starcluster
  real    :: phi_profile(nRmax),force_profile(nRmax)
 
  !--Flags for checking and debugging 
- logical :: print_Mclust  = .true.  
+ logical :: print_Mclust  = .false.  
  logical :: print_energy  = .true. 
  logical :: print_profile = .true. 
+ logical :: print_forces  = .false. 
 
 contains
 !-----------------------------------------------------------------
@@ -66,7 +67,7 @@ subroutine init_starcluster(ierr)
  use dim,   only:gravity
  use io,    only:warning,fatal 
  integer, intent(out) :: ierr 
- integer :: ip,isink,io_potfile,io_energfile,io_readprevM
+ integer :: ip,isink,io_potfile,io_energfile,io_readprevM,io_forcefile
  real    :: sigma,j,j2,phi0,W0
  real    :: Mgas_clust,Msink_clust 
  real    :: time_in,Mclust_in,phi0_in,W0_in,sigma_in
@@ -146,6 +147,13 @@ subroutine init_starcluster(ierr)
  !-Step in Mclust 
  if (vary_Mclust) then 
     dMclust_phi = Mclust_phi*dMfrac
+ endif 
+
+ if (print_forces) then 
+    open(2060,file='extpot_forces.dat',status='replace',iostat=io_forcefile)
+    if (io_forcefile /= 0) ierr = 1 
+    write(2060,'(7A20)') 'x','y','z','fx','fy','fz','phi'
+    close(2060)
  endif 
 
 end subroutine init_starcluster 
@@ -632,18 +640,26 @@ subroutine starcluster_force(xi,yi,zi,fxi,fyi,fzi,phi)
     phi = interp_from_profile(ri,nR,r_profile,phi_profile)
     fr  = interp_from_profile(ri,nR,r_profile,force_profile)
 
-    if (ri == 0.d0) then 
-       theta_angle = tiny(theta_angle)
-       phi_angle   = tiny(phi_angle)
+    if (ri < tiny(ri)) then 
+       fxi = 0.d0 
+       fyi = 0.d0 
+       fzi = 0.d0 
     else 
        theta_angle = acos(zi/ri)
-       phi_angle   = atan(yi/xi)
+       phi_angle   = atan2(yi,xi)
+       fxi = fr*sin(theta_angle)*cos(phi_angle)
+       fyi = fr*sin(theta_angle)*sin(phi_angle)
+       fzi = fr*cos(theta_angle)
     endif 
-
-    fxi = fr*sin(theta_angle)*cos(phi_angle)
-    fyi = fr*sin(theta_angle)*sin(phi_angle)
-    fzi = fr*cos(theta_angle)
     if (fxi /= fxi .or. fyi /= fyi .or. fzi /= fzi) call fatal('extern_starcluster','NaN in ext forces')
+ endif 
+
+ if (print_forces) then 
+    !$omp critical
+    open(2060,file='extpot_forces.dat',position='append')
+    write(2060,'(7E20.10)') xi, yi, zi, fxi, fyi, fzi, phi 
+    close(2060)
+    !$omp end critical 
  endif 
 
 end subroutine starcluster_force
