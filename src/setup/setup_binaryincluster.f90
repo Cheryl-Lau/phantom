@@ -100,7 +100,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  pmass            = 1d-3
  r_sphere         = 0.2
  mach             = 20.
- angvel_cgs       = 3.d-14 
+ angvel_cgs       = 3.d-14
  cs_cgs           = 2.19d4  ! 8K assuming mu = 2.31 & gamma = 5/3
  nptmass_clust    = 50
  binary_cen_sink  = .true. 
@@ -218,7 +218,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        xyzmh_ptmass(9,isink)  = 0.      ! spiny 
        xyzmh_ptmass(10,isink) = angmom  ! spinz 
     else 
-       h_acc0 = 5*au/udist 
+       h_acc0 = 5.d0*au/udist 
        xyzmh_ptmass(4,isink)  = 8. * 2. ! mass
        xyzmh_ptmass(5,isink)  = h_acc0  ! h_acc
        xyzmh_ptmass(6,isink)  = h_acc0  ! h_soft 
@@ -244,7 +244,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        else 
           call gen_random_mass(lowmass_outersink,uppmass_outersink,mass)
        endif 
-       h_acc0 = 5*au/udist
+       h_acc0 = 5.d0*au/udist
        xyzmh_ptmass(1,isink)  = x 
        xyzmh_ptmass(2,isink)  = y 
        xyzmh_ptmass(3,isink)  = z 
@@ -283,8 +283,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
     if (make_sinks) then 
        icreate_sinks    = 1
-       h_acc            = 1.d-3
-       r_crit           = 5.0*h_acc
+       h_acc            = 5.d0*au/udist
+       r_crit           = 5.d0*h_acc
        rho_crit_cgs     = 1.d-15 
        rho_crit         = rho_crit_cgs/unit_density
        h_soft_sinkgas   = h_acc
