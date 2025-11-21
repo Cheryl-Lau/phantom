@@ -96,10 +96,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  call set_units(dist=pc,mass=solarm,G=1.)
 
  !--Default values for the input params 
- totmass_req      = 1d2
- pmass            = 1d-3
+ totmass_req      = 1d0
+ pmass            = 1d-5
  r_sphere         = 0.2
- mach             = 20.
+ mach             = 112.
  angvel_cgs       = 3.d-14
  cs_cgs           = 2.19d4  ! 8K assuming mu = 2.31 & gamma = 5/3
  nptmass_clust    = 50
