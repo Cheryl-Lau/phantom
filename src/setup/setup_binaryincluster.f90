@@ -99,8 +99,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  totmass_req      = 1d0
  pmass            = 1d-5
  r_sphere         = 0.2
- mach             = 112.
- angvel_cgs       = 3.d-14
+ mach             = 90.
+ angvel_cgs       = 3.d-13
  cs_cgs           = 2.19d4  ! 8K assuming mu = 2.31 & gamma = 5/3
  nptmass_clust    = 50
  binary_cen_sink  = .true. 
@@ -262,10 +262,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !--Set options for input file, if .in file does not exist
  if (.not.inexists) then
     tmax      = 2.*t_ff
-    dtmax     = 1.d-3*t_ff
+    dtmax     = 1.d-4*t_ff
     nout      = 10
     nfulldump = 1
-    nmaxdumps = 1000
+    nmaxdumps = 2000
     dtwallmax = 86400   ! s
     iverbose  = 1
 
