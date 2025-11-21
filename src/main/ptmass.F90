@@ -641,13 +641,14 @@ subroutine ptmass_accrete(is,nptmass,xi,yi,zi,hi,vxi,vyi,vzi,fxi,fyi,fzi, &
  ifail    = 0
  !
  ! Verify particle is 'accretable'
+ !
  if (.not. is_accretable(itypei) ) then
     if (present(nfaili)) nfaili = 5
     if (iverbose >= 1 .and. iofailreason) &
        write(iprint,"(/,a)") 'ptmass_accrete: FAILED: particle is not an accretable type'
     return
  endif
- !
+
  sinkloop : do i=is,nptmass
     hacc = xyzmh_ptmass(ihacc,i)
     mpt  = xyzmh_ptmass(4,i)
