@@ -62,7 +62,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use eos,          only:polyk2,ieos,gmw
  use part,         only:igas,abundance,set_particle_type
  use part,         only:nptmass,xyzmh_ptmass,vxyz_ptmass,ihacc,ihsoft
- use ptmass,       only:icreate_sinks,rho_crit_cgs,r_crit,h_acc,h_soft_sinksink,h_soft_sinkgas
+ use ptmass,       only:icreate_sinks,rho_crit,rho_crit_cgs,r_crit,h_acc,h_soft_sinksink,h_soft_sinkgas
  use ptmass,       only:r_merge_cond,r_merge_uncond
  use timestep,     only:dtmax,tmax,dtwallmax,C_cour,C_force,C_cool,tolv,nout
  use options,      only:nfulldump,nmaxdumps,icooling,alpha,alphau
