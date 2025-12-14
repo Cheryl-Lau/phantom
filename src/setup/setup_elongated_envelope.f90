@@ -372,11 +372,11 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  inquire(file=infilename,exist=in_iexist)
  if (.not.in_iexist) then
     tmax      = 1.0*t_ff
-    dtmax     = 1d-5*t_ff
+    dtmax     = 1d-4*t_ff
     nout      = 10
     nfulldump = 1
     nmaxdumps = 1000
-    dtwallmax = 1800.  ! s
+    dtwallmax = 0.d0
     iverbose  = 1
 
     ieos      = 2    ! adiabatic eos with P = (gamma-1)*rho*u
@@ -391,32 +391,13 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Sinks settings
     !
     if (make_sinks) then
-       icreate_sinks = 1
-       rho_crit_cgs = 1.E-16           ! density above which sink particles are created
-       h_acc_cgs    = 0.005*pc         ! accretion radius for new sink particles
-       h_soft_sinksink_cgs = 0.005*pc  ! softening length between sink particles
-       h_soft_sinkgas_cgs  = 0.        ! softening length for new sink particles
-
-       !- Check if rho_crit is sensible [10^5 times the initial MC density (Bate et al 1995)]
-       rho_crit_cgs_recomm = 1.d5*rho_cloud_cgs
-       if (abs(log10(rho_crit_cgs_recomm)-log10(rho_crit_cgs))/log10(rho_crit_cgs_recomm) > 0.1) then
-          print*,'Recommend setting rho_crit_cgs to ',rho_crit_cgs_recomm,' instead'
-          proceed = 'n'
-          call prompt('Do you wish to continue?',proceed)
-          if (trim(adjustl(proceed)) == 'n') then
-             stop 'Edit rho_crit_cgs and rerun'
-          elseif (trim(adjustl(proceed)) /= 'y') then
-             stop 'Invalid input'
-          endif
-       endif
-
-       !- convert to code units
-       h_acc           = h_acc_cgs/udist
-       r_crit          = 2.*h_acc
-       r_merge_cond    = 2.*h_acc
-       h_soft_sinksink = h_soft_sinksink_cgs/udist
-       h_soft_sinkgas  = h_soft_sinkgas_cgs/udist
-
+       icreate_sinks    = 1
+       h_acc            = 5.d0*au/udist
+       r_crit           = 5.d0*h_acc
+       rho_crit_cgs     = 1.d-15 
+       rho_crit         = rho_crit_cgs/unit_density
+       h_soft_sinkgas   = h_acc
+       h_soft_sinksink  = 0.d0
     else
        icreate_sinks = 0
     endif
