@@ -152,7 +152,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !- Settings for the cloud
     np_cloud = 1E6
     call prompt('Enter the approximate number of particles in the cloud',np_cloud,0,npmax)
-    rho_cloud_cgs = 1E-21
+    rho_cloud_cgs = 1E-20
     call prompt('Enter the density of the cloud in g/cm^3',rho_cloud_cgs,0.)
 
     !- Settings for the envelope
