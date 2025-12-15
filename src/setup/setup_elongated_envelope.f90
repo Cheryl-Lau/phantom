@@ -373,7 +373,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  if (.not.in_iexist) then
     tmax      = 1.0*t_ff
     dtmax     = 1d-4*t_ff
-    nout      = 10
+    nout      = 1
     nfulldump = 1
     nmaxdumps = 1000
     dtwallmax = 0.d0
@@ -381,6 +381,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
     ieos      = 2    ! adiabatic eos with P = (gamma-1)*rho*u
     gmw       = gmw_in
+    C_cool    = 0.5 
     icooling  = 7
     Tfloor    = 3.
     ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
@@ -392,8 +393,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     if (make_sinks) then
        icreate_sinks    = 1
-       h_acc            = 5.d0*au/udist
-       r_crit           = 5.d0*h_acc
+       h_acc            = 100.*au/udist
+       r_crit           = 2.*h_acc
        rho_crit_cgs     = 1.d-15 
        rho_crit         = rho_crit_cgs/unit_density
        h_soft_sinkgas   = h_acc
