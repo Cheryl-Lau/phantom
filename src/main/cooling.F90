@@ -871,6 +871,7 @@ subroutine cooling_JoungMacLow_implicit(eni,rhoi,dt,dudti)
  deni = eni - ueq_final
 
  if (abs(deni) > 0.) then
+     if (abs(dudti) < tiny(dudti)) dudti = tiny(dudti)
      tau = abs(deni/dudti)
      eni_new = ueq_final + deni*exp(-dt/tau)
      dudti = -(eni-eni_new)/dt

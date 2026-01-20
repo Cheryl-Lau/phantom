@@ -1117,7 +1117,7 @@ subroutine step_extern(npart,ntypes,dtsph,dtextforce,xyzh,vxyzu,fext,fxyzu,time,
  use damping,        only:calc_damp,apply_damp
  use ptmass_radiation,only:get_rad_accel_from_ptmass,isink_radiation
  use cooling,        only:energ_cooling,cooling_implicit,part_nocooling,ipart_nocooling, &
-                          npartnocool
+                          npartnocool,ufloor,Tfloor
 #ifdef NUCLEATION
  use part,           only:nucleation
  use dust_formation, only:evolve_dust
@@ -1236,7 +1236,7 @@ subroutine step_extern(npart,ntypes,dtsph,dtextforce,xyzh,vxyzu,fext,fxyzu,time,
     !$omp shared(npart,xyzh,vxyzu,fext,abundance,iphase,ntypes,massoftype) &
     !$omp shared(eos_vars,dust_temp) &
     !$omp shared(dt,hdt,timei,iexternalforce,extf_is_velocity_dependent,cooling_implicit) &
-    !$omp shared(part_nocooling,npartnocool,ipart_nocooling) &
+    !$omp shared(part_nocooling,npartnocool,ipart_nocooling,ufloor,Tfloor) &
     !$omp shared(xyzmh_ptmass,vxyz_ptmass,idamp,damp_fac) &
     !$omp shared(nptmass,f_acc,nsubsteps,C_force,divcurlv,dphotflag,dphot0) &
     !$omp shared(abundc,abundo,abundsi,abunde) &
@@ -1366,6 +1366,14 @@ subroutine step_extern(npart,ntypes,dtsph,dtextforce,xyzh,vxyzu,fext,fxyzu,time,
              ! COOLING
              !
              if (cooling_implicit) then
+                !
+                ! floor eni 
+                !
+                if (ufloor > 0.d0 .and. vxyzu(4,i) < ufloor) then 
+                   vxyzu(4,i) = ufloor 
+                   print*,'u below ufloor, resetting it to ',ufloor,' (',Tfloor,' K)'
+                endif 
+
                 if (h2chemistry) then
                    !
                    ! Call cooling routine, requiring total density, some distance measure and
