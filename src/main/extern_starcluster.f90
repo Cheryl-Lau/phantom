@@ -101,25 +101,27 @@ subroutine init_starcluster(ierr)
  endif 
  
 
- !--Get prev Mclust if stored 
- if (vary_Mclust) then 
-    inquire(file='Mclust_sigma_evol.dat',exist=iexist)
-    if (iexist) then 
-       !--get last line stored in prev file 
-       open(2040,file='Mclust_sigma_evol.dat',status='old')
-       do
-          read(2040,'(5E20.10)',iostat=io_readprevM) time_in, Mclust_in, phi0_in, W0_in, sigma_in
-          if (io_readprevM < 0) exit
-       enddo
-       close(2040)
-       print*,'Default value for Mclust: ',Mclust_phi
-       Mclust_phi = Mclust_in 
-       print*,'Now setting Mclust_phi as: ',Mclust_phi 
-    endif 
+ !--Get prev Mclust and sigma if stored 
+ inquire(file='Mclust_sigma_evol.dat',exist=iexist)
+ if (iexist) then 
+    !--get last line stored in prev file 
+    open(2040,file='Mclust_sigma_evol.dat',status='old')
+    do
+       read(2040,'(5E20.10)',iostat=io_readprevM) time_in, Mclust_in, phi0_in, W0_in, sigma_in
+       if (io_readprevM < 0) exit
+    enddo
+    close(2040)
+    print*,'Default value for Mclust: ',Mclust_phi
+    Mclust_phi = Mclust_in 
+    print*,'Now setting Mclust_phi as: ',Mclust_phi 
+
+    print*,'Fix sigma at: ',sigma_in
  endif 
 
+
  !--Compute cluster potential for the first time 
- call cluster_profile(phi0,W0,sigma)
+ call cluster_profile(phi0,W0,sigma,sigma_in)
+
 
  !--File to write Mclust_phi, phi0, W0, sigma 
  if (print_Mclust) then 
@@ -367,18 +369,23 @@ end subroutine get_accel_from_sinks
 ! Produces tabulated density, potential and force as functions of R
 !+
 !-----------------------------------------------------------------
-subroutine cluster_profile(phi0,W0,sigma)
+subroutine cluster_profile(phi0,W0,sigma,sigma_in)
  use part,   only:npart,xyzh,vxyzu
  use units,  only:unit_density,unit_velocity,utime,udist,umass 
  use io,     only:fatal 
+ real,   intent(in), optional :: sigma_in
  real,   intent(out) :: phi0,W0,sigma
  integer :: iR,io_clusterfile
  real    :: j,j2,k,ve2,R,dWdR,W,dR,rhomin,phi,rho,dphidr,force
  real    :: dRmax_dW,dRmax_dR
  real    :: r_pc,rho_cgs,phi_cgs,force_cgs 
 
- !--Compute current velocity dispersion
- call get_vel_dispersion(npart,xyzh,vxyzu,sigma,j,j2)
+ if (present(sigma_in)) then 
+    sigma = sigma_in
+ else 
+    ! Use current velocity dispersion
+    call get_vel_dispersion(npart,xyzh,vxyzu,sigma,j,j2)
+ endif 
 
  print*,'Recomputing cluster profile with Mclust = ',Mclust_phi,' solarm;'
  print*,'sigma = ',sigma*unit_velocity/1.d5,' km/s'
