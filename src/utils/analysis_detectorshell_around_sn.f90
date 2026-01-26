@@ -24,11 +24,11 @@ module analysis
 
  private
 
- integer :: isink_sn  = 14
+ integer :: isink_sn  = 6
  real    :: xyz_sn_in(3) = (/ 0.d0, 0.d0, 0.d0 /) 
- logical :: use_sink  = .false. 
+ logical :: use_sink  = .true. 
  
- real    :: radius_detect = 6.0
+ real    :: radius_detect = 8.0
  real    :: width_detect  = 1.0 
 
 contains
