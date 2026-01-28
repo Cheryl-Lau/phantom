@@ -152,14 +152,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! set initial temperature
     !
-    temp = 10. ! 6.155E+01  
+    temp = 1000.d0  
     call prompt('Enter initial temperature in K',temp,0.)
     !
     ! Set timestep and end-time
     !
     Myr = 1d6*years
-    dtmax_cgs = 1e-2*Myr 
-    tmax_cgs  = 0.5*Myr
+    dtmax_cgs = 1e-3*Myr 
+    tmax_cgs  = 0.1*Myr 
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)
@@ -321,8 +321,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  ! Set runtime parameters
  !
  ieos      = 2     ! adiabatic eos
- nout      = 10
- nmaxdumps = 100
+ nout      = 1
+ nmaxdumps = 1000
  nfulldump = 1
  Tfloor    = 3.
  ufloor    = kboltz*Tfloor/(gmw*mass_proton_cgs*(gamma-1.))/unit_ergg
