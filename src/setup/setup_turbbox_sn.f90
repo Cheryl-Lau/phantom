@@ -16,7 +16,7 @@ module setup
 !   - dist_unit      : *distance unit (e.g. au)*
 !   - mass_unit      : *mass unit (e.g. solarm)*
 !   - np_req         : *requested number of particles*
-!   - pmass          : *particle mass in code units*
+!   - rho_cgs_req    : *requested box density in cgs units*
 !   - rhozero        : *density of box in code units*
 !   - cs0            : *initial sound speed in code units*
 !   - tmax           : *end time of simulation in code units*
@@ -33,7 +33,7 @@ module setup
  private
 
  integer :: np_req
- real    :: pmass,temp,rms_mach 
+ real    :: rho_cgs_req,temp,rms_mach 
  real    :: xmini,xmaxi,ymini,ymaxi,zmini,zmaxi
  real(kind=8)       :: udist,umass
  character(len=20)  :: dist_unit,mass_unit
@@ -48,8 +48,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use dim,          only:maxvxyzu
  use io,           only:master,fatal,warning
  use boundary,     only:xmin,ymin,zmin,xmax,ymax,zmax,dxbound,dybound,dzbound,set_boundary
- use part,         only:set_particle_type,igas
- use physcon,      only:pi,mass_proton_cgs,kboltz,years,pc,solarm,micron
+ use part,         only:set_particle_type,igas,nptmass,xyzmh_ptmass,vxyz_ptmass,ihacc,ihsoft
+ use physcon,      only:pi,mass_proton_cgs,kboltz,years,pc,solarm
  use units,        only:set_units,unit_density,unit_velocity,unit_ergg,utime,select_unit
  use eos,          only:gmw,ieos
  use part,         only:periodic
@@ -61,7 +61,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use prompting,    only:prompt
  use velfield,     only:set_velfield_from_cubes
  use datafiles,    only:find_phantom_datafile
- use inject,       only:inject_sn,sink_progenitor,frackin,fractherm 
+ use inject,       only:inject_sn,sink_progenitor,one_sink_progenitor,isink_progenitor,frackin,fractherm 
+ use ptmass,       only:pin_sink,pin_all,isink_to_pin 
  integer,           intent(in)    :: id
  integer,           intent(inout) :: npart
  integer,           intent(out)   :: npartoftype(:)
@@ -78,10 +79,10 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  character(len=20), parameter     :: filevz = 'cube_v3.dat'
  integer, parameter :: maxrow = 1E7
  real    :: xyzh_raw(4,maxrow)
- real    :: vol_box,boxlength,boxsize_fromfile,boxsize_toscale,deltax
- real    :: boxsize_sample,rho_sample,rho_sample_cgs,rho_fracdiff,rhozero_cgs
- real    :: totmass,cs0_cgs,pmass_cgs,u0,u0_cgs,tmax_cgs,dtmax_cgs
- real    :: centre(3),radius
+ real    :: vol_box,vol_cgs,boxlength,boxsize_fromfile,boxsize_toscale,deltax
+ real    :: boxsize_sample,rho_sample,rho_sample_cgs,rho_fracdiff,rhozero_cgs,totmass_cgs_req
+ real    :: totmass,cs0_cgs,pmass,pmass_cgs,u0,u0_cgs,tmax_cgs,dtmax_cgs
+ real    :: centre(3),radius,Myr
  real    :: t_ff,rmsmach,v2i,turbfac,turbboxsize,mean_v,sigma_v,cs0
  integer :: i,ierr,io_file,ix,npmax,npart_sample
  logical :: iexist
@@ -123,23 +124,22 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call set_units(dist=udist,mass=umass,G=1.d0)
 
     !
+    ! Set requested box density 
+    !
+    rho_cgs_req = 4e-25
+    call prompt('enter box density',rho_cgs_req,0.d0)
+    !
     ! Set number of particles (to be updated after set_unifdis)
     !
     npmax = int(size(xyzh(1,:)))
-    np_req = nint((2.*10.*pc)**3*1e-20/(1e0*solarm))    ! 1.0005e6 
+    np_req = 1e6 
     call prompt('Enter total number of particles',np_req,1)
     if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
-    !
-    ! Particle mass
-    !
-    pmass_cgs = 1e0*solarm ! 1E-2*solarm  
-    pmass = pmass_cgs/umass
-    call prompt('Enter particle mass in units of '//mass_unit,pmass,0.)
     !
     ! Boundaries 
     ! 
     centre = (/ 0.,0.,0. /)
-    radius = 10. 
+    radius = 22.5 
     xmini = centre(1) - radius ; xmaxi = centre(1) + radius
     ymini = centre(2) - radius ; ymaxi = centre(2) + radius
     zmini = centre(3) - radius ; zmaxi = centre(3) + radius
@@ -157,8 +157,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Set timestep and end-time
     !
-    dtmax_cgs = 3.15360E+12   ! 1E-2 Myr
-    tmax_cgs  = 1e3*dtmax_cgs
+    Myr = 1d6*years
+    dtmax_cgs = 1e-2*Myr 
+    tmax_cgs  = 0.5*Myr
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)
@@ -166,7 +167,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Set turbulence 
     !
-    rms_mach = 18.
+    rms_mach = 0.
     call prompt('Enter the Mach number of the cloud turbulence',rms_mach,0.)
 
     if (id==master) call write_setupfile(filename)
@@ -185,6 +186,16 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  boxlength = abs(xmaxi-xmini)
  call set_boundary(xmini,xmaxi,ymini,ymaxi,zmini,zmaxi)
  print*,'boundaries before: ',xmini,xmaxi,ymini,ymaxi,zmini,zmaxi
+
+ !
+ ! Calculate particle mass
+ !
+ vol_cgs = (xmaxi-xmini)*(ymaxi-ymini)*(zmaxi-zmini) *pc**3
+ totmass_cgs_req = rho_cgs_req*vol_cgs
+ pmass_cgs = totmass_cgs_req/real(np_req)
+ pmass = pmass_cgs/umass
+ print*,'vol_cgs,totmass_cgs_req,pmass_cgs,pmass,real(np_req),umass',vol_cgs,totmass_cgs_req,pmass_cgs,pmass,real(np_req),umass
+
  !
  ! Set particle distribution
  !
@@ -208,6 +219,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  ! Calculate density
  !
+ print*,'pmass npart',pmass,npart 
  totmass = pmass*npart 
  vol_box = abs(xmaxi-xmini)*abs(ymaxi-ymini)*abs(zmaxi-zmini)
  rhozero = totmass/vol_box 
@@ -320,12 +332,27 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  ishock_heating = 1
 
  !
+ ! Manually place a sink at origin 
+ !
+ nptmass                      = 1
+ xyzmh_ptmass(:,:)            = 0.
+ xyzmh_ptmass(1:3,nptmass)    = 0.
+ xyzmh_ptmass(4,nptmass)      = 10.*solarm/umass
+ xyzmh_ptmass(ihacc,nptmass)  = 0.005*pc/udist
+ xyzmh_ptmass(ihsoft,nptmass) = 0.005*pc/udist
+ vxyz_ptmass                  = 0.
+ 
+ !
  ! Set SN injection parameters 
  ! 
  inject_sn = .false.
- sink_progenitor = .false.
+ sink_progenitor = .true.
+ one_sink_progenitor = .true.
+ isink_progenitor = 1
  frackin = 1.0
  fractherm = 0.0
+ pin_sink = .true. 
+ isink_to_pin = 1
 
  !- Print summary - for checking
  open(unit=2050,file='turbbox_properties.txt',status='replace')
@@ -389,7 +416,7 @@ subroutine write_setupfile(filename)
  !
  write(iunit,"(/,a)") '# setup'
  call write_inopt(np_req,'np_req','total number of particles requested',iunit)
- call write_inopt(pmass,'pmass','particle mass',iunit)
+ call write_inopt(rho_cgs_req,'rho_cgs_req','box density',iunit)
  call write_inopt(temp,'temp','initial sound speed',iunit)
  call write_inopt(dtmax,'dtmax','timestep in code units',iunit)
  call write_inopt(tmax,'tmax','end-time in code units',iunit)
@@ -436,7 +463,7 @@ subroutine read_setupfile(filename,ierr)
  ! other parameters
  !
  call read_inopt(np_req,'np_req',db,min=8,errcount=nerr)
- call read_inopt(pmass,'pmass',db,min=0.,errcount=nerr)
+ call read_inopt(rho_cgs_req,'rho_cgs_req',db,min=0.,errcount=nerr)
  call read_inopt(temp,'temp',db,min=0.,errcount=nerr)
  call read_inopt(dtmax,'dtmax',db,min=0.,errcount=nerr)
  call read_inopt(tmax,'tmax',db,min=0.,errcount=nerr)
