@@ -159,7 +159,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     Myr = 1d6*years
     dtmax_cgs = 1e-3*Myr 
-    tmax_cgs  = 0.1*Myr 
+    tmax_cgs  = 1.*Myr 
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)
@@ -194,7 +194,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  totmass_cgs_req = rho_cgs_req*vol_cgs
  pmass_cgs = totmass_cgs_req/real(np_req)
  pmass = pmass_cgs/umass
- print*,'vol_cgs,totmass_cgs_req,pmass_cgs,pmass,real(np_req),umass',vol_cgs,totmass_cgs_req,pmass_cgs,pmass,real(np_req),umass
 
  !
  ! Set particle distribution
@@ -219,7 +218,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  ! Calculate density
  !
- print*,'pmass npart',pmass,npart 
  totmass = pmass*npart 
  vol_box = abs(xmaxi-xmini)*abs(ymaxi-ymini)*abs(zmaxi-zmini)
  rhozero = totmass/vol_box 
@@ -321,7 +319,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  ! Set runtime parameters
  !
  ieos      = 2     ! adiabatic eos
- nout      = 1
+ nout      = 10
  nmaxdumps = 1000
  nfulldump = 1
  Tfloor    = 3.
