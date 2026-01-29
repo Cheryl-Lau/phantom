@@ -992,7 +992,7 @@ ifeq ($(SETUP), snturbbox)
     ISOTHERMAL=no
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
-    MAXP=6000000
+    MAXP=10000000
     NCELLSMAX=4*maxp
 endif
 
