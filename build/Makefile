@@ -985,7 +985,7 @@ ifeq ($(SETUP), snturbbox)
 #	 Injecting SN into a turbulence box
     SETUPFILE=velfield_fromcubes.f90 setup_turbbox_sn.f90
     SRCINJECT=inject_sne_sphng.f90
-    ANALYSIS=analysis_vel_dispersion.f90
+    ANALYSIS=analysis_detectorshell_around_sn.f90
     MODFILE=moddump_addsink.f90
     PERIODIC=yes
     GRAVITY=no
