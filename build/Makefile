@@ -987,7 +987,7 @@ ifeq ($(SETUP), snturbbox)
     SRCINJECT=inject_sne_sphng.f90
     ANALYSIS=analysis_detectorshell_around_sn.f90
     MODFILE=moddump_addsink.f90
-    PERIODIC=no
+    PERIODIC=yes 
     GRAVITY=no
     ISOTHERMAL=no
     IND_TIMESTEPS=yes
