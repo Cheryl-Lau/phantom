@@ -158,8 +158,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set timestep and end-time
     !
     Myr = 1d6*years
-    dtmax_cgs = 1e-3*Myr 
-    tmax_cgs  = 1.*Myr 
+    dtmax_cgs = 1e-4*Myr 
+    tmax_cgs  = 1.35*Myr 
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)
@@ -343,12 +343,12 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  ! Set SN injection parameters 
  ! 
- inject_sn = .false.
+ inject_sn = .true.
  sink_progenitor = .true.
  one_sink_progenitor = .true.
  isink_progenitor = 1
- frackin = 1.0
- fractherm = 0.0
+ frackin = 0.0
+ fractherm = 1.0
  pin_sink = .true. 
  isink_to_pin = 1
 
