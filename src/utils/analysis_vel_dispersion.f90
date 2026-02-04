@@ -25,12 +25,12 @@ module analysis
 
  integer, parameter :: nrad  = 50
  real    :: rad_min = 1.d-2
- real    :: rad_max = 1.d+1
+ real    :: rad_max = 3.d+1
  real    :: rholimit_cgs     = 1.d-22
  logical :: only_highdenpart = .false. 
 
  integer :: isink_centre   = 1
- real    :: box_radius     = 20.
+ real    :: box_radius     = 70.
  real    :: box_centre(3)  = (/ 0.,0.,0. /)
  logical :: use_sink       = .false. 
  logical :: only_inbox     = .true.
