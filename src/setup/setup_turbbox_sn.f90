@@ -132,14 +132,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set number of particles (to be updated after set_unifdis)
     !
     npmax = int(size(xyzh(1,:)))
-    np_req = 1e6 
+    np_req = 5e6 
     call prompt('Enter total number of particles',np_req,1)
     if (np_req > npmax) call fatal('setup_unifdis_cmi','number of particles exceeded limit')
     !
     ! Boundaries 
     ! 
     centre = (/ 0.,0.,0. /)
-    radius = 22.5 
+    radius = 70.d0 
     xmini = centre(1) - radius ; xmaxi = centre(1) + radius
     ymini = centre(2) - radius ; ymaxi = centre(2) + radius
     zmini = centre(3) - radius ; zmaxi = centre(3) + radius
@@ -158,8 +158,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     ! Set timestep and end-time
     !
     Myr = 1d6*years
-    dtmax_cgs = 1e-4*Myr 
-    tmax_cgs  = 1.35*Myr 
+    dtmax_cgs = 1e-3*Myr 
+    tmax_cgs  = 1.*Myr 
     dtmax = dtmax_cgs/utime
     tmax  = tmax_cgs/utime
     call prompt('Enter timestep in code units',dtmax,0.)
@@ -343,7 +343,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !
  ! Set SN injection parameters 
  ! 
- inject_sn = .true.
+ inject_sn = .false.
  sink_progenitor = .true.
  one_sink_progenitor = .true.
  isink_progenitor = 1
