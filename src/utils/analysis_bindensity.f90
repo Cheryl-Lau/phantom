@@ -10,7 +10,7 @@ module analysis
 !
 ! :References: None
 !
-! :Owner: Daniel Price
+! :Owner: Cheryl Lau
 !
 ! :Runtime parameters: None
 !
@@ -25,11 +25,11 @@ module analysis
  private
  integer, parameter :: num_rhobin = 500
  integer :: binned_rho(num_rhobin)
- real    :: rhobin_min_cgs = 1E-25
- real    :: rhobin_max_cgs = 1E-5
+ real    :: rhobin_min_cgs = 1E-28
+ real    :: rhobin_max_cgs = 1E-8
  real    :: logrhobin_min,logrhobin_max
- real    :: centre(3) = (/ 2.18,2.88,-2.58 /)
- real    :: radius = 6. 
+ real    :: centre(3) = (/ 0.,0.,0. /)
+ real    :: radius = 70. 
  logical :: box_only = .true. 
 
 contains
