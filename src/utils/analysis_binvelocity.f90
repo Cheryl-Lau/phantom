@@ -10,7 +10,7 @@ module analysis
 !
 ! :References: None
 !
-! :Owner: Daniel Price
+! :Owner: Cheryl Lau 
 !
 ! :Runtime parameters: None
 !
@@ -28,9 +28,9 @@ module analysis
  real    :: velbin_min_cgs = 1.5E+3
  real    :: velbin_max_cgs = 4E+7
  real    :: logvelbin_min,logvelbin_max
- logical :: locate_range = .false. 
- real    :: centre(3) = (/ 2.18,2.88,-2.58 /)
- real    :: radius = 6. 
+ logical :: locate_range = .true. 
+ real    :: centre(3) = (/ 0.,0.,0. /)
+ real    :: radius = 70. 
  logical :: box_only = .true. 
 
 contains
