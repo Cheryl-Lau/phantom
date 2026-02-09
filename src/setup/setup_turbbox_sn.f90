@@ -167,7 +167,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !
     ! Set turbulence 
     !
-    rms_mach = 0.
+    rms_mach = 10.
     call prompt('Enter the Mach number of the cloud turbulence',rms_mach,0.)
 
     if (id==master) call write_setupfile(filename)
