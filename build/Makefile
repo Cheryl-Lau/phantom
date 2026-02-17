@@ -942,6 +942,7 @@ ifeq ($(SETUP), elongcloud_env_hpc)
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
     MAXP=5000000
+    MAXPTMASS=10000
     NCELLSMAX=4*maxp
 endif
 
