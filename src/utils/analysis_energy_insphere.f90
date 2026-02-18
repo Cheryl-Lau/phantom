@@ -25,7 +25,7 @@ module analysis
  private
 
  integer, parameter :: nrad = 5
- integer :: isink_src = 6
+ integer :: isink_src = 4
  real    :: rad_list(nrad) = (/ 5., 10., 20., 30., 50. /)  ! radii of spherical surfaces in code units 
  real    :: xyz_src_in(3)  = (/ 0., 0., 0. /)   ! Position of feedback source in code units 
  logical :: use_sink = .true. 

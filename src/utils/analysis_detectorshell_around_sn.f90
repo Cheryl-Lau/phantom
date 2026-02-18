@@ -24,7 +24,7 @@ module analysis
 
  private
 
- integer :: isink_sn  = 1
+ integer :: isink_sn  = 4
  real    :: xyz_sn_in(3) = (/ 0.d0, 0.d0, 0.d0 /) 
  logical :: use_sink  = .true. 
  
