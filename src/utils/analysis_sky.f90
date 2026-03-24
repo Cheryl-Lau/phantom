@@ -26,8 +26,8 @@ module analysis
 
  integer, parameter :: ntheta = 360/1
  integer, parameter :: nphi = 180/1
- real    :: maxr = 15.
- integer :: isink_src = 14 
+ real    :: maxr = 2.0
+ integer :: isink_src = 14
  real    :: xyz_src_in(3) = (/ 0.,0.,0. /)
  logical :: use_sink = .true. 
 
