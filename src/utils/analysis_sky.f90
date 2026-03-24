@@ -60,6 +60,15 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  real,   allocatable :: dumxyzh(:,:)
  character(len=70) :: filename
 
+ umass = 1.989d+33  ! solarm
+ udist = 3.086d+18  ! pc
+ utime = 4.706d+14
+ unit_velocity = udist/utime
+ unit_density  = umass/udist**3
+ unit_ergg     = unit_velocity**2
+ unit_energ    = umass*unit_ergg
+ 
+
  !- Particle mass
  pmass = massoftype(igas)
 
