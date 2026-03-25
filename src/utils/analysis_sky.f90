@@ -26,7 +26,7 @@ module analysis
 
  integer, parameter :: ntheta = 360/1
  integer, parameter :: nphi = 180/1
- real    :: maxr = 2.0
+ real    :: maxr = 4.0
  integer :: isink_src = 14
  real    :: xyz_src_in(3) = (/ 0.,0.,0. /)
  logical :: use_sink = .true. 
@@ -59,15 +59,6 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  real    :: phi_lowbound(nphi),phi_upbound(nphi),theta_lowbound(ntheta),theta_upbound(ntheta)
  real,   allocatable :: dumxyzh(:,:)
  character(len=70) :: filename
-
- umass = 1.989d+33  ! solarm
- udist = 3.086d+18  ! pc
- utime = 4.706d+14
- unit_velocity = udist/utime
- unit_density  = umass/udist**3
- unit_ergg     = unit_velocity**2
- unit_energ    = umass*unit_ergg
- 
 
  !- Particle mass
  pmass = massoftype(igas)
