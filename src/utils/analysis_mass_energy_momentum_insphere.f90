@@ -25,7 +25,6 @@ module analysis
  private
 
  integer, parameter :: nrad = 5
- integer :: isink_src = 4
  real    :: rad_list(nrad) = (/ 5., 10., 15., 20., 30. /)  ! radii of spherical surfaces in code units 
  real    :: xyz_src_in(3)  = (/ 0., 0., 0. /)   ! Position of feedback source in code units 
  logical :: use_sink = .true. 
@@ -43,7 +42,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  integer,          intent(in) :: num,npart,iunit
  real,             intent(in) :: xyzh(:,:),vxyzu(:,:)
  real,             intent(in) :: particlemass,time
- integer :: irad,ip
+ integer :: irad,ip,isink_src
  real    :: time_cgs,pmass,rad2,rad_pc,ek_tot,ek_tot_cgs,ek_part,et_tot,et_tot_cgs,et_part
  real    :: rp(3),r_unitvec(3),dist2,totenerg_cgs,xyz_src(3)
  real    :: mass_tot,momen_tot,momen_part,momen_tot_cgs,radvel 
@@ -51,6 +50,10 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
 
  if (use_sink) then 
+    open(unit=2204,file='sink_src.txt',status='old')
+    read(2204,*) isink_src
+    close(2204) 
+    print*, 'Centre: Sink ', isink_src
     if (isink_src > nptmass) call fatal('analysis_mass_energy_momentum_insphere','requested sink not found')
     xyz_src = xyzmh_ptmass(1:3,isink_src)
  else
