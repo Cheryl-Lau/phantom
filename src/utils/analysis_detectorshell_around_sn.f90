@@ -24,11 +24,9 @@ module analysis
 
  private
 
- integer :: isink_sn  = 4
  real    :: xyz_sn_in(3) = (/ 0.d0, 0.d0, 0.d0 /) 
  logical :: use_sink  = .true. 
  
- real    :: radius_detect = 20.0
  real    :: width_detect  = 1.0 
 
 contains
@@ -44,7 +42,8 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  integer,          intent(in) :: num,npart,iunit
  real,             intent(in) :: xyzh(:,:),vxyzu(:,:)
  real,             intent(in) :: particlemass,time
- integer :: ip
+ integer :: ip,isink_sn,io
+ real    :: radius_detect
  real    :: pmass,xyz_sn(3),r,r_unitvec(3),radvel,radmomen,u,T,rho,pressure,rampress
  real    :: radvel_cgs,radmomen_cgs,rho_cgs,pressure_cgs,rampress_cgs
  character(len=70) :: filename
@@ -54,13 +53,27 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
  !- Set centre 
  if (use_sink) then 
+    open(unit=2204,file='sink_src.txt',status='old',iostat=io)
+    if (io /= 0) call fatal('analysis_detectorshell_around_sn','cannot open sink_src.txt')
+    read(2204,*) isink_sn
+    close(2204) 
+    print*, 'Centre: Sink ', isink_sn
     if (isink_sn > nptmass) call fatal('analysis_detectorshell_around_sn','sink no found.')
     xyz_sn = xyzmh_ptmass(1:3,isink_sn)
  else
     xyz_sn = xyz_sn_in 
  endif 
 
- filename = 'gasflow_shell_'//TRIM(dumpfile)//'.dat'
+ !- Set radius of shell-detector 
+ open(unit=2205,file='radius.txt',status='old',iostat=io)
+ if (io /= 0) call fatal('analysis_detectorshell_around_sn','cannot open radius.txt')
+ read(2205,*) radius_detect
+ close(2205) 
+ print*, 'Radius to place detector shell [pc]: ', radius_detect
+
+
+
+ filename = 'gasflow_shell_'//trim(nint(radius_detect))//'pc_'//trim(dumpfile)//'.dat'
  open(unit=2206,file=filename)
 
  write(2206,'(1a20)') 'time [s]'
