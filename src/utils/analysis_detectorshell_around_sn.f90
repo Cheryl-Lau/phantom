@@ -46,7 +46,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  real    :: radius_detect
  real    :: pmass,xyz_sn(3),r,r_unitvec(3),radvel,radmomen,u,T,rho,pressure,rampress
  real    :: radvel_cgs,radmomen_cgs,rho_cgs,pressure_cgs,rampress_cgs
- character(len=70) :: filename
+ character(len=70) :: filename,rad_str
 
  !- Particle mass
  pmass = massoftype(igas)
@@ -72,8 +72,8 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  print*, 'Radius to place detector shell [pc]: ', radius_detect
 
 
-
- filename = 'gasflow_shell_'//nint(radius_detect)//'pc_'//trim(dumpfile)//'.dat'
+ write(rad_str,*) nint(radius_detect)
+ filename = 'gasflow_shell_'//trim(adjustl(rad_str))//'pc_'//trim(dumpfile)//'.dat'
  open(unit=2206,file=filename)
 
  write(2206,'(1a20)') 'time [s]'
