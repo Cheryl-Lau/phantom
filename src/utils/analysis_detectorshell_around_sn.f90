@@ -73,7 +73,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
 
 
- filename = 'gasflow_shell_'//trim(nint(radius_detect))//'pc_'//trim(dumpfile)//'.dat'
+ filename = 'gasflow_shell_'//nint(radius_detect)//'pc_'//trim(dumpfile)//'.dat'
  open(unit=2206,file=filename)
 
  write(2206,'(1a20)') 'time [s]'
