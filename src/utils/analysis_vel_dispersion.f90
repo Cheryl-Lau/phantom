@@ -23,17 +23,17 @@ module analysis
 
  private
 
- integer, parameter :: nrad  = 50
- real    :: rad_min = 1.d-2
- real    :: rad_max = 3.d+1
- real    :: rholimit_cgs     = 1.d-22
- logical :: only_highdenpart = .false. 
+ integer, parameter :: nrad = 100
+ real    :: rad_min = 1.d-3
+ real    :: rad_max = 5.d+1
+ real    :: rholimit_cgs    = 1.d-22
+ logical :: only_lowdenpart = .false. 
 
  integer :: isink_centre   = 1
  real    :: box_radius     = 70.
  real    :: box_centre(3)  = (/ 0.,0.,0. /)
  logical :: use_sink       = .false. 
- logical :: only_inbox     = .true.
+ logical :: only_inbox     = .false.
 
 contains
 
@@ -92,9 +92,15 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
     zmin_box = centre(3) - box_radius; zmax_box = centre(3) + box_radius 
  endif 
 
- open(unit=2026,file='velocity_dispersion_'//TRIM(dumpfile)//'.dat',status='replace')
- open(unit=2027,file='virial_term_'//TRIM(dumpfile)//'.dat',status='replace')
- open(unit=2028,file='density_sizescale_'//TRIM(dumpfile)//'.dat',status='replace')
+ if (only_lowdenpart) then 
+    open(unit=2026,file='velocity_dispersion_lowden_'//TRIM(dumpfile)//'.dat',status='replace')
+    open(unit=2027,file='virial_term_lowden_'//TRIM(dumpfile)//'.dat',status='replace')
+    open(unit=2028,file='density_sizescale_lowden_'//TRIM(dumpfile)//'.dat',status='replace')
+ elseif
+    open(unit=2026,file='velocity_dispersion_'//TRIM(dumpfile)//'.dat',status='replace')
+    open(unit=2027,file='virial_term_'//TRIM(dumpfile)//'.dat',status='replace')
+    open(unit=2028,file='density_sizescale_'//TRIM(dumpfile)//'.dat',status='replace')
+ endif 
 
  !- Write header line - the radii
  write(2026,'(15x,100f30.10)') rad_thresh(1:nrad)
@@ -104,7 +110,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
 
  !- Loop over each length-scale 
  !$omp parallel do default(none) shared(npart,pmass,xyzh,vxyzu,rad_thresh,rholimit_cgs) &
- !$omp shared(node,hfact,rad_max,xyzcache,ifirstincell,only_highdenpart) &
+ !$omp shared(node,hfact,rad_max,xyzcache,ifirstincell,only_lowdenpart) &
  !$omp shared(only_inbox,xmin_box,xmax_box,ymin_box,ymax_box,zmin_box,zmax_box) &
  !$omp shared(umass,udist,unit_velocity,unit_density) &
  !$omp private(ip,rho,nneigh,irad,rad2_limit,mean_v,sigma_v,mean_rho,n,ineigh,ip_neigh,dist2) &
@@ -114,7 +120,7 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
     print*,'ip/npart',ip,'/',npart
     rho = pmass*(hfact/abs(xyzh(4,ip)))**3
 
-    if (only_highdenpart .and. rho < rholimit_cgs/unit_density) cycle over_part
+    if (only_lowdenpart .and. rho > rholimit_cgs/unit_density) cycle over_part
 
     if (only_inbox) then 
        if (xyzh(1,ip) < xmin_box .or. xyzh(1,ip) > xmax_box) cycle over_part
