@@ -23,11 +23,11 @@ module analysis
 
  private
 
- integer, parameter :: nrad = 100
+ integer, parameter :: nrad = 80
  real    :: rad_min = 1.d-3
  real    :: rad_max = 5.d+1
- real    :: rholimit_cgs    = 1.d-22
- logical :: only_lowdenpart = .false. 
+ real    :: rholimit_cgs = 1.d-22
+ logical :: isolate_lowdenpart = .true. 
 
  integer :: isink_centre   = 1
  real    :: box_radius     = 70.
@@ -92,25 +92,26 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
     zmin_box = centre(3) - box_radius; zmax_box = centre(3) + box_radius 
  endif 
 
- if (only_lowdenpart) then 
-    open(unit=2026,file='velocity_dispersion_lowden_'//TRIM(dumpfile)//'.dat',status='replace')
-    open(unit=2027,file='virial_term_lowden_'//TRIM(dumpfile)//'.dat',status='replace')
-    open(unit=2028,file='density_sizescale_lowden_'//TRIM(dumpfile)//'.dat',status='replace')
- elseif
-    open(unit=2026,file='velocity_dispersion_'//TRIM(dumpfile)//'.dat',status='replace')
-    open(unit=2027,file='virial_term_'//TRIM(dumpfile)//'.dat',status='replace')
-    open(unit=2028,file='density_sizescale_'//TRIM(dumpfile)//'.dat',status='replace')
- endif 
-
+ open(unit=2026,file='velocity_dispersion_'//TRIM(dumpfile)//'.dat',status='replace')
+ open(unit=2027,file='virial_term_'//TRIM(dumpfile)//'.dat',status='replace')
+ open(unit=2028,file='density_sizescale_'//TRIM(dumpfile)//'.dat',status='replace')
  !- Write header line - the radii
  write(2026,'(15x,100f30.10)') rad_thresh(1:nrad)
  write(2027,'(15x,100f30.10)') rad_thresh(1:nrad)
  write(2028,'(15x,100f30.10)') rad_thresh(1:nrad)
 
+ if (isolate_lowdenpart) then 
+    open(unit=2036,file='velocity_dispersion_lowden_'//TRIM(dumpfile)//'.dat',status='replace')
+    open(unit=2037,file='virial_term_lowden_'//TRIM(dumpfile)//'.dat',status='replace')
+    open(unit=2038,file='density_sizescale_lowden_'//TRIM(dumpfile)//'.dat',status='replace')
+    write(2036,'(15x,100f30.10)') rad_thresh(1:nrad)
+    write(2037,'(15x,100f30.10)') rad_thresh(1:nrad)
+    write(2038,'(15x,100f30.10)') rad_thresh(1:nrad)
+ endif
 
  !- Loop over each length-scale 
  !$omp parallel do default(none) shared(npart,pmass,xyzh,vxyzu,rad_thresh,rholimit_cgs) &
- !$omp shared(node,hfact,rad_max,xyzcache,ifirstincell,only_lowdenpart) &
+ !$omp shared(node,hfact,rad_max,xyzcache,ifirstincell,isolate_lowdenpart) &
  !$omp shared(only_inbox,xmin_box,xmax_box,ymin_box,ymax_box,zmin_box,zmax_box) &
  !$omp shared(umass,udist,unit_velocity,unit_density) &
  !$omp private(ip,rho,nneigh,irad,rad2_limit,mean_v,sigma_v,mean_rho,n,ineigh,ip_neigh,dist2) &
@@ -119,8 +120,6 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  over_part: do ip = 1,npart
     print*,'ip/npart',ip,'/',npart
     rho = pmass*(hfact/abs(xyzh(4,ip)))**3
-
-    if (only_lowdenpart .and. rho > rholimit_cgs/unit_density) cycle over_part
 
     if (only_inbox) then 
        if (xyzh(1,ip) < xmin_box .or. xyzh(1,ip) > xmax_box) cycle over_part
@@ -179,6 +178,11 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
     write(2026,'(1i15,100f30.10)') ip, sigma_v_allrad(1:nrad)
     write(2027,'(1i15,100f30.10)') ip, virial_term_allrad(1:nrad)
     write(2028,'(1i15,100es30.10)') ip, rho_avg_allrad(1:nrad)
+    if (isolate_lowdenpart .and. rho < rholimit_cgs/unit_density) then 
+       write(2036,'(1i15,100f30.10)') ip, sigma_v_allrad(1:nrad)
+       write(2037,'(1i15,100f30.10)') ip, virial_term_allrad(1:nrad)
+       write(2038,'(1i15,100es30.10)') ip, rho_avg_allrad(1:nrad)
+    endif 
     !$omp end critical 
  enddo over_part
  !$omp end parallel do
@@ -186,6 +190,11 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
  close(2026)
  close(2027)
  close(2028) 
+ if (isolate_lowdenpart) then 
+    close(2036)
+    close(2037)
+    close(2038) 
+ endif 
  deallocate(dumxyzh)
 
 end subroutine do_analysis
