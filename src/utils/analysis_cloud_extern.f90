@@ -33,10 +33,11 @@ module analysis
 contains
 
 subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
- use units,    only:udist,umass,utime,unit_velocity,unit_density,unit_pressure,unit_ergg
+ use units,    only:udist,umass,utime,unit_velocity,unit_energ
  use io,       only:fatal,warning 
  use part,     only:hfact,rhoh,massoftype,igas
  use part,     only:xyzmh_ptmass,vxyz_ptmass,nptmass,ihsoft,ihacc
+ use physcon,  only:solarm
  character(len=*), intent(in) :: dumpfile
  integer,          intent(in) :: num,npart,iunit
  real,             intent(in) :: xyzh(:,:),vxyzu(:,:)
@@ -96,14 +97,20 @@ subroutine do_analysis(dumpfile,num,xyzh,vxyzu,particlemass,npart,time,iunit)
        totmomen = totmomen + momen 
     endif 
  enddo 
- tote = totekin + totetherm 
+ 
+ !- Convert to useful units 
+ totmass = totmass*umass/solarm
+ totekin = totekin*unit_energ
+ totetherm = totetherm*unit_energ
+ tote = totekin + totetherm
+ totmomen = totmomen*umass*unit_velocity
 
  !- Write results 
  open(unit=2207,file=filename,status='old')
  write(2207,'(1a20)') 'time [s]'
  write(2207,'(1e20.10)') time_cgs
  write(2207,'(5a20)') 'mass [msun]','ekin [erg]','etherm [erg]','etot [erg]','momen [g cm s^-1]'
- write(2207,'(5e20.10)') totmass, totekin, totetherm, tote, totmomen 
+ write(2207,'(5e20.10)') totmass, totekin, totetherm, tote, totmomen
  close(2207)
 
 
