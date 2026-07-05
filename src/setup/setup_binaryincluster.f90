@@ -96,16 +96,16 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  call set_units(dist=pc,mass=solarm,G=1.)
 
  !--Default values for the input params 
- totmass_req      = 1d0
- pmass            = 1d-5
- r_sphere         = 0.2
- mach             = 90.
- angvel_cgs       = 3.d-13
- cs_cgs           = 2.19d4  ! 8K assuming mu = 2.31 & gamma = 5/3
- nptmass_clust    = 50
- binary_cen_sink  = .true. 
- pin_cen_sink     = .false.
- make_sinks       = .true. 
+ totmass_req      = 1d0          ! total mass of gaseous sphere in Msun
+ pmass            = 1d-5         ! particle mass in Msun
+ r_sphere         = 0.2          ! radius of sphere in pc
+ mach             = 90.          ! turbulence mach number
+ angvel_cgs       = 3.d-13       ! sphere rotation angular velocity in rad/s
+ cs_cgs           = 2.19d4       ! sound speed in sphere in cm/s; 2.19e4 for 8 K, assuming mu = 2.31 & gamma = 5/3
+ nptmass_clust    = 50           ! initial number of sinks in the cluster
+ binary_cen_sink  = .true.       ! option to set the central sink as a binary
+ pin_cen_sink     = .false.      ! option to stop the central sink from moving
+ make_sinks       = .true.       ! option to create sinks dynamically
 
  !--Check for existence of the .in and .setup files
  filein = trim(fileprefix)//'.in'
@@ -127,11 +127,17 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call write_setupfile(fileset)
  endif
 
- !--Convert units 
+ !--Convert to code units 
  cs      = cs_cgs/unit_velocity 
  angvel  = angvel_cgs*utime
 
- !--Set sphere 
+
+
+ !-------------------------------------------------------------------------
+ ! Placing the gas particles 
+ !-------------------------------------------------------------------------
+
+ !--Organise the particles into a spherical shape (Sets the initial xyzh)
  npart_req = nint(totmass_req/pmass)
  if (npart_req > size(xyzh(1,:))) call fatal('setup_binaryincluster','npart_req exceeded limit')
  call set_sphere('closepacked',id,master,0.,r_sphere,psep,hfact_default,npart,xyzh,nptot=npart_total, &
@@ -145,13 +151,13 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call set_particle_type(i,igas)
  enddo
 
- !--Recomptue cloud properties 
+ !--Recomptue cloud properties with new npart after calling set_sphere
  totmass    = npart*pmass
  rhozero    = totmass/(4./3.*pi*r_sphere**3)
  t_ff       = sqrt(3.*pi/(32.*rhozero)) 
  if (abs(totmass-totmass_req)/totmass_req > 0.1) call fatal('setup_binaryincluster','mass does not match requested value')
 
- !--Impose turbulent velocity field 
+ !--Impose turbulent velocity field (Sets the initial vxyzu)
  vxyzu = 0.
  turbulent: if (mach > 0.) then
     call getcwd(cwd)
@@ -181,7 +187,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     enddo
  endif turbulent
 
- !--Impose uniform rotation velocity 
+ !--Impose uniform rotation velocity (Further modifies the initial vxyzu)
  rotating: if (angvel > 0.) then 
     do i = 1,npart
        vxyzu(1,i) = vxyzu(1,i) - angvel*xyzh(2,i)
@@ -193,12 +199,18 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  call reset_centreofmass(npart,xyzh,vxyzu)
 
  !--Thermodynamic properties  
- gamma   = 5./3.           
- Tfloor  = 3.
- temp    = 10.
- polyk   = kboltz*temp/(gmw*mass_proton_cgs)*(utime/udist)**2
- u       = polyk/(gamma-1.)
+ gamma   = 5./3.                                                ! specific heat capacity ratio
+ Tfloor  = 3.                                                   ! minimum gas temp
+ temp    = 10.                                                  ! initial gas temp 
+ polyk   = kboltz*temp/(gmw*mass_proton_cgs)*(utime/udist)**2   ! polytropic constant
+ u       = polyk/(gamma-1.)                                     ! initial specific internal energy 
  if (maxvxyzu >= 4) vxyzu(4,1:npart) = u
+
+
+
+ !-------------------------------------------------------------------------
+ ! Manually placing the stars (i.e. sink particles / point masses)
+ !-------------------------------------------------------------------------
 
  !--Set sinks 
  nptmass = nptmass_clust 
@@ -207,17 +219,17 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  if (nptmass > 0) then 
     isink = 1
     xyzmh_ptmass(1:3,isink) = (/ 0.,0.,0. /)
-    if (binary_cen_sink) then 
+    if (binary_cen_sink) then  ! As a binary star 
        sep      = 100*au/udist                     ! binary separation 
        mbinary  = 8. * 2.                          ! total mass of the binary 
-       angmom   = 2.5d-1 * sqrt(mbinary**3 * sep)  ! for equal mass pairs 
+       angmom   = 2.5d-1 * sqrt(mbinary**3 * sep)  ! L for equal mass pairs 
        xyzmh_ptmass(4,isink)  = mbinary ! mass 
-       xyzmh_ptmass(5,isink)  = sep     ! h_acc 
-       xyzmh_ptmass(6,isink)  = sep     ! h_soft 
-       xyzmh_ptmass(8,isink)  = 0.      ! spinx 
+       xyzmh_ptmass(5,isink)  = sep     ! h_acc    (est. accretion radius of the binary pair)
+       xyzmh_ptmass(6,isink)  = sep     ! h_soft   (gravitational softening radius of the binary pair)
+       xyzmh_ptmass(8,isink)  = 0.      ! spinx  
        xyzmh_ptmass(9,isink)  = 0.      ! spiny 
-       xyzmh_ptmass(10,isink) = angmom  ! spinz 
-    else 
+       xyzmh_ptmass(10,isink) = angmom  ! spinz    (internal angular momentum of the binary pair)
+    else   ! As a single star
        h_acc0 = 5.d0*au/udist 
        xyzmh_ptmass(4,isink)  = 8. * 2. ! mass
        xyzmh_ptmass(5,isink)  = h_acc0  ! h_acc
@@ -230,9 +242,9 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
  !--Place the rest of the sinks 
  if (nptmass > 1) then 
-    uppmass_innersink   = 8.                 ! range of stellar masses in inner regions 
+    uppmass_innersink   = 8.                 ! range of stellar masses in the cluster inner regions 
     lowmass_innersink   = 4. 
-    uppmass_outersink   = 5.                 ! range of stellar masses in outer regions 
+    uppmass_outersink   = 5.                 ! range of stellar masses in the cluster outer regions 
     lowmass_outersink   = 2. 
     r_thresh2           = (0.5*r_sphere)**2  ! where to divide the regions 
 
@@ -259,6 +271,11 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     enddo 
  endif 
 
+
+ !-----------------------------------------------------
+ ! Runtime settings 
+ !-----------------------------------------------------
+
  !--Set options for input file, if .in file does not exist
  if (.not.inexists) then
     tmax      = 2.*t_ff
@@ -281,6 +298,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
     iexternalforce = 17  ! cluster potential
 
+    !-- Dynamically create new sinks during runtime (allow star formation)
     if (make_sinks) then 
        icreate_sinks    = 1
        h_acc            = 5.d0*au/udist
