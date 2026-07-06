@@ -658,7 +658,11 @@ subroutine starcluster_force(xi,yi,zi,fxi,fyi,fzi,phi)
        fyi = fr*sin(theta_angle)*sin(phi_angle)
        fzi = fr*cos(theta_angle)
     endif 
-    if (fxi /= fxi .or. fyi /= fyi .or. fzi /= fzi) call fatal('extern_starcluster','NaN in ext forces')
+    if (fxi /= fxi .or. fyi /= fyi .or. fzi /= fzi) then 
+        print*,'ri, fr, theta_angle, phi_angle', ri, fr, theta_angle, phi_angle
+        print*,'fxi, fyi, fzi', fxi, fyi, fzi
+        call fatal('extern_starcluster','NaN in ext forces')
+    endif 
  endif 
 
  if (print_forces) then 
