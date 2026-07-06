@@ -1020,7 +1020,7 @@ ifeq ($(SETUP), binaryincluster)
     ISOTHERMAL=yes
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
-    MAXP=10000000
+    MAXP=20000000
     NCELLSMAX=4*maxp
 endif
 
