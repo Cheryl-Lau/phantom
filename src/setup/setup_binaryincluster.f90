@@ -199,8 +199,12 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  call reset_centreofmass(npart,xyzh,vxyzu)
 
  !--Thermodynamic properties  
- gamma   = 5./3.                                                ! specific heat capacity ratio
- Tfloor  = 3.                                                   ! minimum gas temp
+ if (isotherm) then 
+    gamma = 1
+ else 
+    gamma   = 5./3.                                             ! specific heat capacity ratio
+    Tfloor  = 3.                                                ! minimum gas temp
+ endif 
  temp    = 10.                                                  ! initial gas temp 
  polyk   = kboltz*temp/(gmw*mass_proton_cgs)*(utime/udist)**2   ! polytropic constant
  u       = polyk/(gamma-1.)                                     ! initial specific internal energy 
@@ -291,7 +295,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        icooling       = 0
     else 
        ieos           = 2
-       icooling       = 7
+       icooling       = 6
        ipdv_heating   = 1
        ishock_heating = 1
     endif 
