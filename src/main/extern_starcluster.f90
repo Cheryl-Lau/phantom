@@ -100,6 +100,8 @@ subroutine init_starcluster(ierr)
     endif    
  endif 
  
+ !--Compute cluster potential for the first time 
+ call cluster_profile(phi0,W0,sigma)
 
  !--Get prev Mclust and sigma if stored 
  inquire(file='Mclust_sigma_evol.dat',exist=iexist)
@@ -116,11 +118,10 @@ subroutine init_starcluster(ierr)
     print*,'Now setting Mclust_phi as: ',Mclust_phi 
 
     print*,'Fix sigma at: ',sigma_in
+
+    !--Compute cluster potential 
+    call cluster_profile(phi0,W0,sigma,sigma_in)
  endif 
-
-
- !--Compute cluster potential for the first time 
- call cluster_profile(phi0,W0,sigma,sigma_in)
 
 
  !--File to write Mclust_phi, phi0, W0, sigma 
