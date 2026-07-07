@@ -639,7 +639,7 @@ subroutine starcluster_force(xi,yi,zi,fxi,fyi,fzi,phi)
  r2i = xi**2 + yi**2 + zi**2 
  ri  = sqrt(r2i)
 
- if (ri > Rclust) then 
+ if (ri > Rclust .or. Mclust_phi < tiny(Mclust_phi) .or. nR == 0) then 
     fxi = 0.d0 
     fyi = 0.d0 
     fzi = 0.d0 
