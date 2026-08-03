@@ -305,7 +305,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !-- Dynamically create new sinks during runtime (allow star formation)
     if (make_sinks) then 
        icreate_sinks    = 1
-       rho_crit_cgs     = 1.d-10 
+       rho_crit_cgs     = 1.d-12 
        rho_crit         = rho_crit_cgs/unit_density
        h_acc            = 2.d0*hfact_default*(pmass/rho_crit)**(1.d0/3.d0)
        r_crit           = 2.d0*h_acc
