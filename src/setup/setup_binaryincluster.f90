@@ -62,7 +62,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use kernel,       only:hfact_default
  use domain,       only:i_belong
  use ptmass,       only:icreate_sinks,rho_crit,rho_crit_cgs,r_crit,h_acc,h_soft_sinksink,h_soft_sinkgas
- use ptmass,       only:pin_sink,pin_all,isink_to_pin 
+ use ptmass,       only:pin_sink,pin_all,isink_to_pin,r_merge_cond,r_merge_uncond
  use options,      only:iexternalforce
  use cooling,      only:Tfloor
  use velfield,     only:set_velfield_from_cubes
@@ -96,14 +96,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  call set_units(dist=pc,mass=solarm,G=1.)
 
  !--Default values for the input params 
- totmass_req      = 1d0          ! total mass of gaseous sphere in Msun
- pmass            = 1d-5         ! particle mass in Msun
+ totmass_req      = 1d2          ! total mass of gaseous sphere in Msun
+ pmass            = 1d-4         ! particle mass in Msun
  r_sphere         = 0.2          ! radius of sphere in pc
- mach             = 90.          ! turbulence mach number
+ mach             = 20.          ! turbulence mach number
  angvel_cgs       = 3.d-13       ! sphere rotation angular velocity in rad/s
  cs_cgs           = 2.19d4       ! sound speed in sphere in cm/s; 2.19e4 for 8 K, assuming mu = 2.31 & gamma = 5/3
- nptmass_clust    = 50           ! initial number of sinks in the cluster
- binary_cen_sink  = .true.       ! option to set the central sink as a binary
+ nptmass_clust    = 0            ! initial number of sinks in the cluster
+ binary_cen_sink  = .false.      ! option to set the central sink as a binary
  pin_cen_sink     = .false.      ! option to stop the central sink from moving
  make_sinks       = .true.       ! option to create sinks dynamically
 
@@ -287,7 +287,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     nout      = 10
     nfulldump = 1
     nmaxdumps = 2000
-    dtwallmax = 86400   ! s
+    dtwallmax = -1   ! s
     iverbose  = 1
 
     if (isotherm) then 
@@ -305,12 +305,14 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     !-- Dynamically create new sinks during runtime (allow star formation)
     if (make_sinks) then 
        icreate_sinks    = 1
-       h_acc            = 5.d0*au/udist
-       r_crit           = 5.d0*h_acc
        rho_crit_cgs     = 1.d-15 
        rho_crit         = rho_crit_cgs/unit_density
+       h_acc            = 2.d0*hfact_default*(pmass/rho_crit)**(1.d0/3.d0)
+       r_crit           = 2.d0*h_acc
        h_soft_sinkgas   = h_acc
        h_soft_sinksink  = h_acc
+       r_merge_cond     = 1.d-1*h_acc
+       r_merge_uncond   = 1.d-2*h_acc 
     else 
        icreate_sinks    = 0
     endif 
