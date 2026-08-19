@@ -1968,7 +1968,7 @@ endif
 ifeq ($(HDF5), yes)
 ifeq (X$(HDF5ROOT), X)
 #    HDF5ROOT= /usr/local/opt/hdf5
-    HDF5ROOT=/minthome/okitacscl1/hdf5-1.12.2/hdf5
+    HDF5ROOT=/home/cscl1/hdf5-1.12.2/hdf5
 endif
 ifeq (X$(HDF5INCLUDE), X)
     HDF5INCLUDE= $(HDF5ROOT)/include
