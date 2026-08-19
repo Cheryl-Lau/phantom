@@ -843,6 +843,21 @@ ifeq ($(SETUP), starbench_hpc)
     MAXP=20000000
 endif
 
+ifeq ($(SETUP), rhdgizmo_hpc)
+#	 Apply Phantom-CMI RHD scheme to gizmo dump
+    SETUPFILE=setup_unifdis_cmi.f90
+    FPPFLAGS= -DPHOTOION
+    SRCPHOTOION=utils_cmi.f90 kdtree_cmi.f90 hnode_cmi.f90 heating_cooling_cmi.f90 photoionize_cmi.F90
+    CMACIONIZE_HYPATIA=yes
+    HDF5=yes
+    PERIODIC=no
+    GRAVITY=yes
+    ISOTHERMAL=no
+    IND_TIMESTEPS=yes
+    KNOWN_SETUP=yes
+    MAXP=100000000
+endif
+
 ifeq ($(SETUP), rhdturbbox)
 #	 starbench but with turbulence 
     SETUPFILE=velfield_fromcubes.f90 setup_turbbox_cmi.f90
