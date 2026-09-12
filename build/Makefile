@@ -855,7 +855,7 @@ ifeq ($(SETUP), rhdgizmo_hpc)
     ISOTHERMAL=no
     IND_TIMESTEPS=yes
     KNOWN_SETUP=yes
-    MAXP=100000000
+    MAXP=10000000
 endif
 
 ifeq ($(SETUP), rhdturbbox)

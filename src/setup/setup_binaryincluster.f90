@@ -35,7 +35,8 @@ module setup
  real    :: totmass_req,pmass,r_sphere
  real    :: mach,angvel_cgs,cs_cgs
  logical :: binary_cen_sink,pin_cen_sink,make_sinks
- logical :: isotherm    = .true.    ! isothermal; otherwise adiabatic 
+ logical :: isotherm = .false. 
+ logical :: barotropic = .true.
 
  integer :: iseed = -123456
 
@@ -55,7 +56,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use prompting,    only:prompt
  use units,        only:set_units,select_unit,utime,udist,unit_density,unit_velocity
  use eos,          only:ieos,gmw
- use part,         only:set_particle_type,igas,nptmass,xyzmh_ptmass,vxyz_ptmass
+ use part,         only:set_particle_type,igas,nptmass,xyzmh_ptmass,vxyz_ptmass,rhoh
  use timestep,     only:dtmax,tmax,nout,dtwallmax
  use centreofmass, only:reset_centreofmass
  use options,      only:nfulldump,nmaxdumps,icooling,iexternalforce,ishock_heating,ipdv_heating
@@ -68,6 +69,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use velfield,     only:set_velfield_from_cubes
  use datafiles,    only:find_phantom_datafile
  use random,       only:ran2
+ use eos,          only:equationofstate,temperature_coef
  integer,           intent(in)    :: id
  integer,           intent(inout) :: npart
  integer,           intent(out)   :: npartoftype(:)
@@ -82,6 +84,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  character(len=20), parameter     :: filevz = 'cube_v3.dat'
  integer :: ierr,npart_req,i,isink 
  real    :: cs,angvel,totmass,t_ff,psep,rmsmach,v2i,turbfac,turbboxsize,temp,u
+ real    :: tempi,ponrhoi,xi,yi,zi,rhoi,eni,spsoundi
  real    :: sep,mbinary,angmom,h_acc0
  real    :: lowmass_innersink,lowmass_outersink,uppmass_innersink,uppmass_outersink
  real    :: r_thresh2,r2,mass,x,y,z 
@@ -89,8 +92,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  character(len=120) :: filex,filey,filez
  character(len=100) :: filein,fileset,cwd
 
- if (isotherm .and. maxvxyzu >= 4) call fatal('setup_binaryincluster','set ISOTHERMAL=yes in Makefile')
- if (maxvxyzu == 3 .and. .not.isotherm) call fatal('setup_binaryincluster','set isotherm=.true. in setup')
+
 
  !--Set units
  call set_units(dist=pc,mass=solarm,G=1.)
@@ -199,16 +201,38 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  call reset_centreofmass(npart,xyzh,vxyzu)
 
  !--Thermodynamic properties  
- if (isotherm) then 
+if (isotherm) then 
+   ieos           = 1
+   icooling       = 0
+elseif (barotropic) then 
+   ieos = 9 
+   icooling       = 0
+else 
+   ieos           = 2
+   icooling       = 6
+   ipdv_heating   = 1
+   ishock_heating = 1
+endif 
+
+ if (ieos==1) then 
     gamma = 1
- else 
+ elseif (ieos==2) then
     gamma   = 5./3.                                             ! specific heat capacity ratio
     Tfloor  = 3.                                                ! minimum gas temp
+    temp    = 10.                                                  ! initial gas temp 
+    polyk   = kboltz*temp/(gmw*mass_proton_cgs)*(utime/udist)**2   ! polytropic constant
+    u       = polyk/(gamma-1.)                                     ! initial specific internal energy 
+    vxyzu(4,1:npart) = u
+ elseif (ieos==9) then 
+    do i = 1,npart
+       rhoi = rhoh(xyzh(4,i),pmass)
+       xi   = xyzh(1,i)
+       yi   = xyzh(2,i) 
+       zi   = xyzh(3,i)
+       temperature_coef = 10 
+       call equationofstate(9,ponrhoi,spsoundi,rhoi,xi,yi,zi,eni,tempi)
+    enddo
  endif 
- temp    = 10.                                                  ! initial gas temp 
- polyk   = kboltz*temp/(gmw*mass_proton_cgs)*(utime/udist)**2   ! polytropic constant
- u       = polyk/(gamma-1.)                                     ! initial specific internal energy 
- if (maxvxyzu >= 4) vxyzu(4,1:npart) = u
 
 
 
@@ -282,23 +306,13 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
 
  !--Set options for input file, if .in file does not exist
  if (.not.inexists) then
-    tmax      = 2.*t_ff
+    tmax      = 1.d+1*t_ff
     dtmax     = 1.d-4*t_ff
     nout      = 10
     nfulldump = 1
-    nmaxdumps = 2000
+    nmaxdumps = 5000
     dtwallmax = -1   ! s
     iverbose  = 1
-
-    if (isotherm) then 
-       ieos           = 1
-       icooling       = 0
-    else 
-       ieos           = 2
-       icooling       = 6
-       ipdv_heating   = 1
-       ishock_heating = 1
-    endif 
 
     iexternalforce = 17  ! cluster potential
 
@@ -311,8 +325,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
        r_crit           = 2.d0*h_acc
        h_soft_sinkgas   = h_acc
        h_soft_sinksink  = h_acc
-       r_merge_cond     = 1.d-1*h_acc
-       r_merge_uncond   = 1.d-2*h_acc 
+       r_merge_cond     = 1.d-3*h_acc
+       r_merge_uncond   = 1.d-4*h_acc
     else 
        icreate_sinks    = 0
     endif 

@@ -88,14 +88,14 @@ module eos
  real,    public :: gamma3      = 5./3.
  !--Default initial parameters for piecewise polytrope Eos
  integer, parameter, public :: maxEOSopt =  4 ! maximum number of piecewise polytrope defaults
- real,    public :: rhocrit0pwpcgs = 2.62780d12
- real,    public :: rhocrit1pwpcgs = 5.01187d14
- real,    public :: rhocrit2pwpcgs = 1.0d15
- real,    public :: p1pwpcgs       = 2.46604d34
- real,    public :: gamma0pwp      = 5./3.
- real,    public :: gamma1pwp      = 3.166
- real,    public :: gamma2pwp      = 3.573
- real,    public :: gamma3pwp      = 3.281
+ real,    public :: rhocrit0pwpcgs = 5.5d-19       !2.62780d12
+ real,    public :: rhocrit1pwpcgs = 5.5d-15       !5.01187d14
+ real,    public :: rhocrit2pwpcgs = 2.0d-13       !1.0d15
+ real,    public :: p1pwpcgs       = 3.3526d-10    !2.46604d34
+ real,    public :: gamma0pwp      = 0.75          !5./3.
+ real,    public :: gamma1pwp      = 1.0           !3.166
+ real,    public :: gamma2pwp      = 1.4           !3.573
+ real,    public :: gamma3pwp      = 1.0           !3.281
  !--Mean molecular weight if temperature required
  real,    public :: gmw            = 2.381
  real,    public :: X_in = 0.74, Z_in = 0.02
@@ -281,19 +281,22 @@ subroutine equationofstate(eos_type,ponrhoi,spsoundi,rhoi,xi,yi,zi,eni,tempi,gam
 !
     if (rhoi < rhocrit0pwp) then
        gammai  = gamma0pwp
-       ponrhoi = k0pwp*rhoi**(gamma0pwp-1.)
+       ponrhoi = k0pwp*rhoi**(gamma0pwp)   ! (gamma0pwp-1.) 
     elseif (rhoi < rhocrit1pwp) then
        gammai  = gamma1pwp
-       ponrhoi = k1pwp*rhoi**(gamma1pwp-1.)
+       ponrhoi = k1pwp*rhoi**(gamma1pwp)   ! (gamma1pwp-1.)
     elseif (rhoi < rhocrit2pwp) then
        gammai  = gamma2pwp
-       ponrhoi = k2pwp*rhoi**(gamma2pwp-1.)
+       ponrhoi = k2pwp*rhoi**(gamma2pwp)   ! (gamma2pwp-1.)
     else
        gammai  = gamma3pwp
-       ponrhoi = k3pwp*rhoi**(gamma3pwp-1.)
+       ponrhoi = k3pwp*rhoi**(gamma3pwp)   ! (gamma3pwp-1.)
     endif
     spsoundi = sqrt(gammai*ponrhoi)
-    if (present(tempi)) tempi = temperature_coef*gmw*ponrhoi
+    if (present(tempi)) then
+       tempi = temperature_coef*gmw*ponrhoi
+       !if (tempi>0.d0) print*,'temperature_coef temp P/rho P',temperature_coef,tempi,ponrhoi,ponrhoi*rhoi
+    endif 
 
  case(10)
 !
@@ -653,8 +656,8 @@ subroutine init_eos(eos_type,ierr)
     p0pwp       = k0pwp*rhocrit0pwp**gamma0pwp
     !
     ! for testing the EoS
-    logrhomin = 10.  ! for testing the EoS [cgs]
-    logrhomax = 20.  ! for testing the EoS [cgs]
+    logrhomin = 1d-20 ! 10.  ! for testing the EoS [cgs]
+    logrhomax = 1d-10 ! 20.  ! for testing the EoS [cgs]
 
  case(10)
     !
