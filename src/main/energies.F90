@@ -80,6 +80,8 @@ subroutine compute_energies(t)
  use viscosity,      only:irealvisc,shearfunc
  use nicil,          only:nicil_update_nimhd,nicil_get_halldrift,nicil_get_ambidrift, &
                      use_ohm,use_hall,use_ambi,n_data_out,n_warn
+ use units,          only:unit_ergg,unit_pressure,unit_density,unit_energ,umass      
+ use physcon,        only:Rg,kboltz,avogadro 
 #ifdef GR
  use part,           only:metrics,metricderivs
  use metric_tools,   only:unpack_metric
@@ -112,7 +114,7 @@ subroutine compute_energies(t)
  real    :: etaohm,etahall,etaambi,vhall,vion
  real    :: curlBi(3),vhalli(3),vioni(3),data_out(n_data_out)
  real    :: erotxi,erotyi,erotzi,fdum(3)
- real    :: ethermi
+ real    :: ethermi,tempi,ui_cgs,gammai,ethermi_cgs
 #ifdef GR
  real    :: pdotv,bigvi(1:3),alpha_gr,beta_gr_UP(1:3),lorentzi,pxi,pyi,pzi
  real    :: gammaijdown(1:3,1:3),angi(1:3),fourvel_space(3)
@@ -183,11 +185,13 @@ subroutine compute_energies(t)
 !$omp shared(iev_etaa,iev_vel,iev_vhall,iev_vion,iev_n) &
 !$omp shared(iev_dtg,iev_ts,iev_macc,iev_totlum,iev_erot,iev_viscrat) &
 !$omp shared(eos_vars,grainsize,graindens,ndustsmall) &
+!$omp shared(umass,unit_density,unit_pressure,unit_ergg,unit_energ) & 
 #ifdef KROME
 !$omp shared(gamma_chem) &
 #endif
 !$omp private(i,j,xi,yi,zi,hi,rhoi,vxi,vyi,vzi,Bxi,Byi,Bzi,Bi,B2i,epoti,vsigi,v2i) &
 !$omp private(ponrhoi,spsoundi,ethermi,dumx,dumy,dumz,valfven2i,divBi,hdivBonBi,curlBi) &
+!$omp private(tempi,gammai,ui_cgs,ethermi_cgs) &
 !$omp private(rho1i,shearparam_art,shearparam_phys,ratio_phys_to_av,betai) &
 !$omp private(gasfrac,rhogasi,dustfracisum,dustfraci,dust_to_gas,n_total,n_total1,n_ion) &
 !$omp private(etaohm,etahall,etaambi,vhalli,vhall,vioni,vion,data_out) &
@@ -388,13 +392,29 @@ subroutine compute_energies(t)
              if (vxyzu(iu,i) < tiny(vxyzu(iu,i))) np_e_eq_0 = np_e_eq_0 + 1
              if (spsoundi < tiny(spsoundi) .and. vxyzu(iu,i) > 0. ) np_cs_eq_0 = np_cs_eq_0 + 1
           else
+             !print*,'calling eos',rhoi,xi,yi,zi
              call equationofstate(ieos,ponrhoi,spsoundi,rhoi,xi,yi,zi)
+             !print*,'ponrhoi from eos',ponrhoi
              if (ieos==2 .and. gamma > 1.001) then
                 !--thermal energy using polytropic equation of state
                 etherm = etherm + pmassi*ponrhoi/(gamma-1.)*gasfrac
              elseif (ieos==9) then
                 !--thermal energy using piecewise polytropic equation of state
-                etherm = etherm + pmassi*ponrhoi/(gamma_pwp(rhoi)-1.)*gasfrac
+                !print*,'rhoi pmass p/rho gamma gasfrac ',rhoi,pmassi,ponrhoi,gamma_pwp(rhoi),gasfrac
+                gammai = gamma_pwp(rhoi)
+                if (gammai > 1.001) then 
+                   etherm = etherm + pmassi*ponrhoi/(gammai-1.)*gasfrac
+                   print*,'u gamma>1 ',ponrhoi/(gammai-1.)
+                else
+                   tempi = ponrhoi*(unit_pressure/unit_density) / Rg 
+                   !ui_cgs = 6.2e+7*tempi  ! approx specific heat at constant volume of H2 at 8 K
+                   !etherm = etherm + pmassi*(ui_cgs/unit_ergg)*gasfrac
+                   ethermi_cgs = (3./2.*kboltz*tempi) * (pmassi*umass)/2.016*avogadro
+                   ethermi = ethermi_cgs/unit_energ
+                   etherm = etherm + ethermi
+                   print*,'u gamma<=1 ',ethermi/pmassi
+                endif 
+                !print*,'etherm',etherm 
              endif
              if (spsoundi < tiny(spsoundi)) np_cs_eq_0 = np_cs_eq_0 + 1
           endif
