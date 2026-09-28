@@ -281,17 +281,19 @@ subroutine equationofstate(eos_type,ponrhoi,spsoundi,rhoi,xi,yi,zi,eni,tempi,gam
 !
     if (rhoi < rhocrit0pwp) then
        gammai  = gamma0pwp
-       ponrhoi = k0pwp*rhoi**(gamma0pwp)   ! (gamma0pwp-1.) 
+       ponrhoi = k0pwp*rhoi**(gamma0pwp-1.) 
     elseif (rhoi < rhocrit1pwp) then
        gammai  = gamma1pwp
-       ponrhoi = k1pwp*rhoi**(gamma1pwp)   ! (gamma1pwp-1.)
+       ponrhoi = k1pwp*rhoi**(gamma1pwp-1.)
     elseif (rhoi < rhocrit2pwp) then
        gammai  = gamma2pwp
-       ponrhoi = k2pwp*rhoi**(gamma2pwp)   ! (gamma2pwp-1.)
+       ponrhoi = k2pwp*rhoi**(gamma2pwp-1.)
     else
        gammai  = gamma3pwp
-       ponrhoi = k3pwp*rhoi**(gamma3pwp)   ! (gamma3pwp-1.)
+       ponrhoi = k3pwp*rhoi**(gamma3pwp-1.)
     endif
+    !print*,'rhocrit0pwp, rhocrit1pwp, rhocrit2pwp', rhocrit0pwp, rhocrit1pwp, rhocrit2pwp
+    !print*,'rhoi ponrhoi in eos',rhoi,ponrhoi 
     spsoundi = sqrt(gammai*ponrhoi)
     if (present(tempi)) then
        tempi = temperature_coef*gmw*ponrhoi
@@ -647,13 +649,17 @@ subroutine init_eos(eos_type,ierr)
     rhocrit0pwp = rhocrit0pwpcgs/unit_density
     rhocrit1pwp = rhocrit1pwpcgs/unit_density
     rhocrit2pwp = rhocrit2pwpcgs/unit_density
-    p1pwp       = p1pwpcgs/unit_pressure
-    k1pwp       = p1pwp/rhocrit1pwp**gamma1pwp
-    k2pwp       = p1pwp/rhocrit1pwp**gamma2pwp
-    p2pwp       = k2pwp*rhocrit2pwp**gamma2pwp
-    k3pwp       = p2pwp/rhocrit2pwp**gamma3pwp
-    k0pwp       = k1pwp/(rhocrit0pwp**(gamma0pwp-gamma1pwp))
-    p0pwp       = k0pwp*rhocrit0pwp**gamma0pwp
+    !p1pwp       = p1pwpcgs/unit_pressure
+    !k1pwp       = p1pwp/rhocrit1pwp**gamma1pwp
+    !k2pwp       = p1pwp/rhocrit1pwp**gamma2pwp
+    !p2pwp       = k2pwp*rhocrit2pwp**gamma2pwp
+    !k3pwp       = p2pwp/rhocrit2pwp**gamma3pwp
+    !k0pwp       = k1pwp/(rhocrit0pwp**(gamma0pwp-gamma1pwp))
+    !p0pwp       = k0pwp*rhocrit0pwp**gamma0pwp
+    k0pwp        = 1.73e4/(unit_pressure/unit_density**0.75)
+    k1pwp        = 6.41e8/(unit_pressure/unit_density)
+    k2pwp        = 3.2e14/(unit_pressure/unit_density**1.4)
+    k3pwp        = 2.63e9/(unit_pressure/unit_density)
     !
     ! for testing the EoS
     logrhomin = 1d-20 ! 10.  ! for testing the EoS [cgs]
