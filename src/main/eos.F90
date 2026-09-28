@@ -91,7 +91,7 @@ module eos
  real,    public :: rhocrit0pwpcgs = 5.5d-19       !2.62780d12
  real,    public :: rhocrit1pwpcgs = 5.5d-15       !5.01187d14
  real,    public :: rhocrit2pwpcgs = 2.0d-13       !1.0d15
- real,    public :: p1pwpcgs       = 3.3526e-7     !2.46604d34
+ real,    public :: p1pwpcgs       = 3.5255e-6     !2.46604d34
  real,    public :: gamma0pwp      = 0.75          !5./3.
  real,    public :: gamma1pwp      = 1.0           !3.166
  real,    public :: gamma2pwp      = 1.4           !3.573
