@@ -24,7 +24,7 @@ module extern_starcluster
  implicit none
 
  real,    public :: Rcore  = 0.2
- real,    public :: Mclust = 1e3 
+ real,    public :: Mclust = 5e3 
 
  real,    public :: dMfrac = 5.d-3
 

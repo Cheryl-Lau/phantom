@@ -48,7 +48,7 @@ contains
 !+
 !----------------------------------------------------------------
 subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,time,fileprefix)
- use physcon,      only:pi,solarm,pc,au,kboltz,mass_proton_cgs,gg 
+ use physcon,      only:pi,solarm,pc,au,kboltz,mass_proton_cgs,gg,years 
  use dim,          only:maxvxyzu
  use setup_params, only:rhozero,npart_total
  use io,           only:master,fatal,iverbose
@@ -100,7 +100,7 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !--Default values for the input params 
  totmass_req      = 1d2          ! total mass of gaseous sphere in Msun
  pmass            = 1d-4         ! particle mass in Msun
- r_sphere         = 0.2          ! radius of sphere in pc
+ r_sphere         = 0.1          ! radius of sphere in pc
  mach             = 20.          ! turbulence mach number
  angvel_cgs       = 3.d-13       ! sphere rotation angular velocity in rad/s
  cs_cgs           = 2.19d4       ! sound speed in sphere in cm/s; 2.19e4 for 8 K, assuming mu = 2.31 & gamma = 5/3
@@ -306,7 +306,7 @@ endif
 
  !--Set options for input file, if .in file does not exist
  if (.not.inexists) then
-    tmax      = 1.d+1*t_ff
+    tmax      = t_ff + ((1.5e+5*years)/utime)   ! Miyawaki+ 2026; beyond which dispersed by stellar rad
     dtmax     = 1.d-4*t_ff
     nout      = 10
     nfulldump = 1
