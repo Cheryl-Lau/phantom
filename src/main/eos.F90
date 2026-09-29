@@ -292,8 +292,7 @@ subroutine equationofstate(eos_type,ponrhoi,spsoundi,rhoi,xi,yi,zi,eni,tempi,gam
        gammai  = gamma3pwp
        ponrhoi = k3pwp*rhoi**(gamma3pwp-1.)
     endif
-    !print*,'rhocrit0pwp, rhocrit1pwp, rhocrit2pwp', rhocrit0pwp, rhocrit1pwp, rhocrit2pwp
-    !print*,'rhoi ponrhoi in eos',rhoi,ponrhoi 
+   
     spsoundi = sqrt(gammai*ponrhoi)
     if (present(tempi)) then
        tempi = temperature_coef*gmw*ponrhoi

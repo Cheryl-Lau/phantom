@@ -392,29 +392,23 @@ subroutine compute_energies(t)
              if (vxyzu(iu,i) < tiny(vxyzu(iu,i))) np_e_eq_0 = np_e_eq_0 + 1
              if (spsoundi < tiny(spsoundi) .and. vxyzu(iu,i) > 0. ) np_cs_eq_0 = np_cs_eq_0 + 1
           else
-             !print*,'calling eos',rhoi,xi,yi,zi
              call equationofstate(ieos,ponrhoi,spsoundi,rhoi,xi,yi,zi)
-             !print*,'ponrhoi from eos',ponrhoi
              if (ieos==2 .and. gamma > 1.001) then
                 !--thermal energy using polytropic equation of state
                 etherm = etherm + pmassi*ponrhoi/(gamma-1.)*gasfrac
              elseif (ieos==9) then
                 !--thermal energy using piecewise polytropic equation of state
-                !print*,'rhoi pmass p/rho gamma gasfrac ',rhoi,pmassi,ponrhoi,gamma_pwp(rhoi),gasfrac
                 gammai = gamma_pwp(rhoi)
                 if (gammai > 1.001) then 
                    etherm = etherm + pmassi*ponrhoi/(gammai-1.)*gasfrac
-                   print*,'u gamma>1 ',ponrhoi/(gammai-1.)
                 else
+                   ! ideal gas law 
                    tempi = ponrhoi*(unit_pressure/unit_density) / Rg 
-                   !ui_cgs = 6.2e+7*tempi  ! approx specific heat at constant volume of H2 at 8 K
-                   !etherm = etherm + pmassi*(ui_cgs/unit_ergg)*gasfrac
+                   ! particle Etherm = molecule Ek * number of H2 molecules in pmassi
                    ethermi_cgs = (3./2.*kboltz*tempi) * (pmassi*umass)/2.016*avogadro
-                   ethermi = ethermi_cgs/unit_energ
-                   etherm = etherm + ethermi
-                   print*,'u gamma<=1 ',ethermi/pmassi
+                   ethermi  = ethermi_cgs/unit_energ
+                   etherm   = etherm + ethermi*gasfrac
                 endif 
-                !print*,'etherm',etherm 
              endif
              if (spsoundi < tiny(spsoundi)) np_cs_eq_0 = np_cs_eq_0 + 1
           endif
