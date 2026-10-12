@@ -87,25 +87,33 @@ module eos
  real,    public :: gamma2      = 1.1
  real,    public :: gamma3      = 5./3.
  !--Default initial parameters for piecewise polytrope Eos
- integer, parameter, public :: maxEOSopt =  4 ! maximum number of piecewise polytrope defaults
- real,    public :: rhocrit0pwpcgs = 5.5d-19       !2.62780d12
- real,    public :: rhocrit1pwpcgs = 5.5d-15       !5.01187d14
- real,    public :: rhocrit2pwpcgs = 2.0d-13       !1.0d15
- real,    public :: p1pwpcgs       = 3.5255e-6     !2.46604d34
- real,    public :: gamma0pwp      = 0.75          !5./3.
- real,    public :: gamma1pwp      = 1.0           !3.166
- real,    public :: gamma2pwp      = 1.4           !3.573
- real,    public :: gamma3pwp      = 1.0           !3.281 
+ integer, parameter, public :: maxEOSopt =  6 ! maximum number of piecewise polytrope defaults
+ real,    public :: rhocrit0pwpcgs = 6.d-23       !2.62780d12
+ real,    public :: rhocrit1pwpcgs = 5.d-19       !5.01187d14
+ real,    public :: rhocrit2pwpcgs = 1.d-13       !1.0d15
+ real,    public :: rhocrit3pwpcgs = 6.d-8  
+ real,    public :: rhocrit4pwpcgs = 4.d-3 
+ real,    public :: p1pwpcgs       = 1.733d-10     !2.46604d34
+ real,    public :: gamma0pwp      = 0.3           !5./3.
+ real,    public :: gamma1pwp      = 0.75          !3.166
+ real,    public :: gamma2pwp      = 1.0           !3.573
+ real,    public :: gamma3pwp      = 1.4           !3.281 
+ real,    public :: gamma4pwp      = 1.1
+ real,    public :: gamma5pwp      = 1.4
  !--Mean molecular weight if temperature required
  real,    public :: gmw            = 2.381
  real,    public :: X_in = 0.74, Z_in = 0.02
 
  real            :: rhocritT,rhocrit0,rhocrit1,rhocrit2,rhocrit3
  real            :: fac2,fac3,log10polyk2,log10rhocritT,rhocritT0slope
- real            :: rhocrit0pwp,rhocrit1pwp,rhocrit2pwp,p0pwp,p1pwp,p2pwp,k0pwp,k1pwp,k2pwp,k3pwp
+ real            :: rhocrit0pwp,rhocrit1pwp,rhocrit2pwp,rhocrit3pwp,rhocrit4pwp
+ real            :: p0pwp,p1pwp,p2pwp,p3pwp,p4pwp
+ real            :: k0pwp,k1pwp,k2pwp,k3pwp,k4pwp,k5pwp
  real, public    :: temperature_coef
 
  logical, public :: done_init_eos = .false.
+
+ logical, public :: incl_yso_heating = .true. 
  !
  ! error codes for calls to init_eos
  !
@@ -125,7 +133,7 @@ contains
 !----------------------------------------------------------------
 subroutine equationofstate(eos_type,ponrhoi,spsoundi,rhoi,xi,yi,zi,eni,tempi,gamma_local)
  use io,            only:fatal,error,warning
- use part,          only:xyzmh_ptmass
+ use part,          only:xyzmh_ptmass,nptmass
  use units,         only:unit_density,unit_pressure,unit_ergg,unit_velocity
  use eos_mesa,      only:get_eos_pressure_temp_gamma1_mesa
  use eos_helmholtz, only:eos_helmholtz_pres_sound
@@ -288,16 +296,25 @@ subroutine equationofstate(eos_type,ponrhoi,spsoundi,rhoi,xi,yi,zi,eni,tempi,gam
     elseif (rhoi < rhocrit2pwp) then
        gammai  = gamma2pwp
        ponrhoi = k2pwp*rhoi**(gamma2pwp-1.)
-    else
+    elseif (rhoi < rhocrit3pwp) then
        gammai  = gamma3pwp
        ponrhoi = k3pwp*rhoi**(gamma3pwp-1.)
+    elseif (rhoi < rhocrit4pwp) then
+       gammai  = gamma4pwp
+       ponrhoi = k4pwp*rhoi**(gamma4pwp-1.)
+    else
+       gammai  = gamma5pwp
+       ponrhoi = k5pwp*rhoi**(gamma5pwp-1.) 
     endif
-   
+
+    if (incl_yso_heating .and. nptmass > 0) call compute_yso_heating(xi,yi,zi,ponrhoi)
+
     spsoundi = sqrt(gammai*ponrhoi)
     if (present(tempi)) then
        tempi = temperature_coef*gmw*ponrhoi
        !if (tempi>0.d0) print*,'temperature_coef temp P/rho P',temperature_coef,tempi,ponrhoi,ponrhoi*rhoi
     endif 
+
 
  case(10)
 !
@@ -403,6 +420,86 @@ subroutine equationofstate(eos_type,ponrhoi,spsoundi,rhoi,xi,yi,zi,eni,tempi,gam
 
  return
 end subroutine equationofstate
+
+!----------------------------------------------------------------
+!+
+!  Routine to estimate the heating from accreting YSOs and modify the 
+!  P/rho term if it is greater than that from the EOS. 
+!+
+!----------------------------------------------------------------
+subroutine compute_yso_heating(xi,yi,zi,ponrhoi)
+ use part,    only:nptmass,xyzmh_ptmass
+ use physcon, only:solarl,au,kboltz,mass_proton_cgs
+ use units,   only:udist,umass,unit_pressure,unit_density
+ real,    intent(in)    :: xi,yi,zi 
+ real,    intent(inout) :: ponrhoi
+ integer :: isink
+ real    :: k_beta,beta,temp,ponrhoi_heated,ponrhoi_heated_cgs
+ real    :: dr2,dr2_cgs,distscale,luminscale,udist2,unit_ponrho
+ real    :: summation,xsink,ysink,zsink,msink,msink_cgs,lumin_cgs
+ 
+ distscale = (1.d3*au)**(-2)
+ luminscale = solarl**(-1)
+ udist2    = udist**2
+
+ summation = 0
+ do isink = 1,nptmass 
+    msink = xyzmh_ptmass(4,isink)
+    if (msink > 0.) then 
+       xsink = xyzmh_ptmass(1,isink)
+       ysink = xyzmh_ptmass(2,isink)
+       zsink = xyzmh_ptmass(3,isink)
+       dr2   = (xi-xsink)**2 + (yi-ysink)**2 + (zi-zsink)**2 
+       dr2_cgs   = dr2*udist2 
+       msink_cgs = msink*umass 
+       lumin_cgs = accrete_lumin(msink_cgs)
+       summation = summation + (lumin_cgs*luminscale) / (dr2_cgs*distscale)
+    endif 
+ enddo 
+
+ k_beta = 34. 
+ beta   = 1.      ! dense cores 
+ temp   = k_beta * summation**(1./(4.+beta))
+
+ ! convert to P/rho 
+ ponrhoi_heated_cgs = kboltz*temp/(gmw*mass_proton_cgs)
+ unit_ponrho        = unit_pressure/unit_density
+ ponrhoi_heated     = ponrhoi_heated_cgs/unit_ponrho
+
+ if (ponrhoi_heated > ponrhoi) ponrhoi = ponrhoi_heated
+
+end subroutine compute_yso_heating 
+
+
+!
+! Estimate YSO accretion luminosity in cgs units 
+!
+real function accrete_lumin(mass)
+ use physcon,  only:solarr,solarm,gg,years
+ real, intent(in) :: mass 
+ real  :: p,acc_eff,r_protostar,mcore_dot,tclump,Myears,mu,lumin0
+ 
+ Myears  = 1.d6*years 
+
+ p       = 1.2           ! params from fitting observed data (Myers 2011)
+ acc_eff = 0.5 
+ r_protostar = 2.5*solarr
+
+ if (mass < 10.*solarm) then
+    mcore_dot = 1.7d-6*solarm/years
+    tclump = 0.2*Myears
+ else
+    mcore_dot = 1.d-5*solarm/years 
+    tclump = 0.36*Myears 
+ endif 
+
+ mu = mass / (mcore_dot * tclump)
+ lumin0 = acc_eff * gg * mcore_dot**2 * tclump / r_protostar 
+
+ accrete_lumin = lumin0 * mu * (1. + mu**p)
+
+end function accrete_lumin
+
 
 !----------------------------------------------------------------
 !+
@@ -546,8 +643,12 @@ real function gamma_pwp(rhoi)
     gamma_pwp = gamma1pwp
  elseif (rhoi < rhocrit2pwp) then
     gamma_pwp = gamma2pwp
- else
+ elseif (rhoi < rhocrit3pwp) then
     gamma_pwp = gamma3pwp
+ elseif (rhoi < rhocrit4pwp) then
+    gamma_pwp = gamma4pwp
+ else 
+    gamma_pwp = gamma5pwp
  endif
 
 end function gamma_pwp
@@ -648,17 +749,21 @@ subroutine init_eos(eos_type,ierr)
     rhocrit0pwp = rhocrit0pwpcgs/unit_density
     rhocrit1pwp = rhocrit1pwpcgs/unit_density
     rhocrit2pwp = rhocrit2pwpcgs/unit_density
-    !p1pwp       = p1pwpcgs/unit_pressure
-    !k1pwp       = p1pwp/rhocrit1pwp**gamma1pwp
-    !k2pwp       = p1pwp/rhocrit1pwp**gamma2pwp
-    !p2pwp       = k2pwp*rhocrit2pwp**gamma2pwp
-    !k3pwp       = p2pwp/rhocrit2pwp**gamma3pwp
-    !k0pwp       = k1pwp/(rhocrit0pwp**(gamma0pwp-gamma1pwp))
-    !p0pwp       = k0pwp*rhocrit0pwp**gamma0pwp
-    k0pwp        = 1.73e4/(unit_pressure/unit_density**0.75)
-    k1pwp        = 6.41e8/(unit_pressure/unit_density)
-    k2pwp        = 3.2e14/(unit_pressure/unit_density**1.4)
-    k3pwp        = 2.63e9/(unit_pressure/unit_density)
+    rhocrit3pwp = rhocrit3pwpcgs/unit_density
+    rhocrit4pwp = rhocrit4pwpcgs/unit_density
+    
+    p1pwp       = p1pwpcgs/unit_pressure
+    k1pwp       = p1pwp/rhocrit1pwp**gamma1pwp
+    k2pwp       = p1pwp/rhocrit1pwp**gamma2pwp
+    p2pwp       = k2pwp*rhocrit2pwp**gamma2pwp
+    k3pwp       = p2pwp/rhocrit2pwp**gamma3pwp
+    p3pwp       = k3pwp*rhocrit3pwp**gamma3pwp
+    k4pwp       = p3pwp/rhocrit3pwp**gamma4pwp
+    p4pwp       = k4pwp*rhocrit4pwp**gamma4pwp
+    k5pwp       = p4pwp/rhocrit4pwp**gamma5pwp
+    k0pwp       = k1pwp/(rhocrit0pwp**(gamma0pwp-gamma1pwp))
+    p0pwp       = k0pwp*rhocrit0pwp**gamma0pwp
+
     !
     ! for testing the EoS
     logrhomin = 1d-20 ! 10.  ! for testing the EoS [cgs]
@@ -841,6 +946,7 @@ subroutine write_options_eos(iunit)
     call write_inopt(gamma2pwp,'gamma2pwp','adiabatic index 2 (piecewise polytropic eos)',iunit)
     call write_inopt(gamma3pwp,'gamma3pwp','adiabatic index 3 (piecewise polytropic eos)',iunit)
     call write_inopt(p1pwpcgs,'p1pwp','pressure at cutoff density rhocrit1pwp (piecewise polytropic eos)',iunit)
+    call write_inopt(incl_yso_heating,'incl_yso_heating','option to add heating from YSOs',iunit)
  case(10)
     call write_inopt(X_in,'X','hydrogen mass fraction',iunit)
     call write_inopt(Z_in,'Z','metallicity',iunit)
@@ -922,23 +1028,26 @@ subroutine read_options_eos(name,valstring,imatch,igotall,ierr)
     ngot = ngot + 1
  case('gamma0pwp')
     read(valstring,*,iostat=ierr) gamma0pwp
-    if (gamma0pwp <= 0.) call fatal(label,'gamma0pwp < 1.0')
+    !if (gamma0pwp <= 0.) call fatal(label,'gamma0pwp < 1.0')
     ngot = ngot + 1
  case('gamma1pwp')
     read(valstring,*,iostat=ierr) gamma1pwp
-    if (gamma1pwp < 1.) call fatal(label,'gamma1pwp < 1.0')
+    !if (gamma1pwp < 1.) call fatal(label,'gamma1pwp < 1.0')
     ngot = ngot + 1
  case('gamma2pwp')
     read(valstring,*,iostat=ierr) gamma2pwp
-    if (gamma2pwp < 1.) call fatal(label,'gamma2pwp < 1.0')
+    !if (gamma2pwp < 1.) call fatal(label,'gamma2pwp < 1.0')
     ngot = ngot + 1
  case('gamma3pwp')
     read(valstring,*,iostat=ierr) gamma3pwp
-    if (gamma3pwp < 1.) call fatal(label,'gamma3pwp < 1.0')
+    !if (gamma3pwp < 1.) call fatal(label,'gamma3pwp < 1.0')
     ngot = ngot + 1
  case('p1pwp')
     read(valstring,*,iostat=ierr) p1pwpcgs
-    if (p1pwpcgs <= 0.) call fatal(label,'p1pwp <= 0.0')
+    !if (p1pwpcgs <= 0.) call fatal(label,'p1pwp <= 0.0')
+    ngot = ngot + 1
+ case('incl_yso_heating')
+    read(valstring,*,iostat=ierr) incl_yso_heating
     ngot = ngot + 1
  case('X')
     read(valstring,*,iostat=ierr) X_in
@@ -962,7 +1071,7 @@ subroutine read_options_eos(name,valstring,imatch,igotall,ierr)
  if (ieos==8) then
     igotall = (ngot >= 9)
  elseif (ieos==9) then
-    igotall = (ngot >= 9)
+    igotall = (ngot >= 10)
  else
     igotall = (ngot >= 1)
  endif
