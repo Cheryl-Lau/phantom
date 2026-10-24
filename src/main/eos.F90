@@ -113,7 +113,7 @@ module eos
 
  logical, public :: done_init_eos = .false.
 
- logical, public :: incl_yso_heating = .true. 
+ logical, public :: incl_yso_heating = .false. 
  !
  ! error codes for calls to init_eos
  !
