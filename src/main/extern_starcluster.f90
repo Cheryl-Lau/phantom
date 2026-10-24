@@ -23,8 +23,8 @@ module extern_starcluster
 !
  implicit none
 
- real,    public :: Rcore  = 0.2
- real,    public :: Mclust = 5e3 
+ real,    public :: Rcore  = 1.5
+ real,    public :: Mclust = 5e3
 
  real,    public :: dMfrac = 5.d-3
 
@@ -51,7 +51,7 @@ module extern_starcluster
 
  !--Flags for checking and debugging 
  logical :: print_Mclust  = .false.  
- logical :: print_energy  = .true. 
+ logical :: print_energy  = .false. 
  logical :: print_profile = .true. 
  logical :: print_forces  = .false. 
 
