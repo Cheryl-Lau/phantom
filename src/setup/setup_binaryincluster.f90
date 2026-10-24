@@ -35,8 +35,8 @@ module setup
  real    :: totmass_req,pmass,r_sphere
  real    :: mach,angvel_cgs,cs_cgs
  logical :: binary_cen_sink,pin_cen_sink,make_sinks
- logical :: isotherm = .false. 
- logical :: barotropic = .true.
+ logical :: isotherm,barotropic   ! if both false, adiabatic
+ logical :: add_yso_heating
 
  integer :: iseed = -123456
 
@@ -54,8 +54,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use io,           only:master,fatal,iverbose
  use spherical,    only:set_sphere
  use prompting,    only:prompt
- use units,        only:set_units,select_unit,utime,udist,unit_density,unit_velocity
- use eos,          only:ieos,gmw
+ use units,        only:set_units,select_unit,utime,udist,unit_density,unit_velocity,unit_ergg,unit_pressure
+ use eos,          only:ieos,gmw,equationofstate,temperature_coef,incl_yso_heating
  use part,         only:set_particle_type,igas,nptmass,xyzmh_ptmass,vxyz_ptmass,rhoh
  use timestep,     only:dtmax,tmax,nout,dtwallmax
  use centreofmass, only:reset_centreofmass
@@ -69,7 +69,6 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  use velfield,     only:set_velfield_from_cubes
  use datafiles,    only:find_phantom_datafile
  use random,       only:ran2
- use eos,          only:equationofstate,temperature_coef
  integer,           intent(in)    :: id
  integer,           intent(inout) :: npart
  integer,           intent(out)   :: npartoftype(:)
@@ -82,12 +81,15 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  character(len=20), parameter     :: filevx = 'cube_v1.dat'
  character(len=20), parameter     :: filevy = 'cube_v2.dat'
  character(len=20), parameter     :: filevz = 'cube_v3.dat'
- integer :: ierr,npart_req,i,isink 
+ integer :: ierr,npart_req,i,isink,io_file
  real    :: cs,angvel,totmass,t_ff,psep,rmsmach,v2i,turbfac,turbboxsize,temp,u
- real    :: tempi,ponrhoi,xi,yi,zi,rhoi,eni,spsoundi
+ real    :: tempi,ponrhoi,xi,yi,zi,ri(3),r2i,vxi,vyi,vzi,vi(3),rhoi,eni,spsoundi
  real    :: sep,mbinary,angmom,h_acc0
  real    :: lowmass_innersink,lowmass_outersink,uppmass_innersink,uppmass_outersink
- real    :: r_thresh2,r2,mass,x,y,z 
+ real    :: r_thresh2,r2,mass,x,y,z
+ real    :: ekin_tot,ekin_rot,ekin_tan,ekin_turb,vradi(3),vradxi,vradyi,vradzi,vroti(3),vrotxi,vrotyi,vrotzi
+ real    :: tan_vec(3),tan_uvec(3),tan2i,vtan
+ real    :: rcol,r2col,colmass,colsigma,q_toomre
  logical :: setexists,inexists
  character(len=120) :: filex,filey,filez
  character(len=100) :: filein,fileset,cwd
@@ -98,16 +100,19 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  call set_units(dist=pc,mass=solarm,G=1.)
 
  !--Default values for the input params 
- totmass_req      = 1d2          ! total mass of gaseous sphere in Msun
- pmass            = 1d-4         ! particle mass in Msun
- r_sphere         = 0.1          ! radius of sphere in pc
- mach             = 20.          ! turbulence mach number
- angvel_cgs       = 3.d-13       ! sphere rotation angular velocity in rad/s
- cs_cgs           = 2.19d4       ! sound speed in sphere in cm/s; 2.19e4 for 8 K, assuming mu = 2.31 & gamma = 5/3
+ totmass_req      = 200.0          ! total mass of gaseous sphere in Msun
+ pmass            = 1d-3         ! particle mass in Msun
+ r_sphere         = 0.15         ! radius of sphere in pc
+ mach             = 12.           ! turbulence mach number
+ angvel_cgs       = 2.5d-13       ! sphere rotation angular velocity in rad/s
+ cs_cgs           = 1.86d4       ! sound speed in sphere in cm/s; 1.86e4 for 10 K, assuming mu = 2.381 & gamma = 1
  nptmass_clust    = 0            ! initial number of sinks in the cluster
  binary_cen_sink  = .false.      ! option to set the central sink as a binary
  pin_cen_sink     = .false.      ! option to stop the central sink from moving
  make_sinks       = .true.       ! option to create sinks dynamically
+ isotherm         = .false. 
+ barotropic       = .true. 
+ add_yso_heating  = .false. 
 
  !--Check for existence of the .in and .setup files
  filein = trim(fileprefix)//'.in'
@@ -129,11 +134,16 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
     call write_setupfile(fileset)
  endif
 
+ !--Check inputs 
+ if (isotherm .and. barotropic) call fatal('setup_binaryincluster','pick either isotherm or barotropic')
+ if (isotherm .and. add_yso_heating) call fatal('setup_binaryincluster','heating impossible with isotherm eos')
+ if (.not.isotherm .and. .not.barotropic .and. maxvxyzu>3) then 
+    stop 'If you want adiabatic eos, modify the Makefile to have ISOTHERMAL=no'
+ endif 
+
  !--Convert to code units 
  cs      = cs_cgs/unit_velocity 
  angvel  = angvel_cgs*utime
-
-
 
  !-------------------------------------------------------------------------
  ! Placing the gas particles 
@@ -203,10 +213,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  !--Thermodynamic properties  
 if (isotherm) then 
    ieos           = 1
-   icooling       = 0
 elseif (barotropic) then 
-   ieos = 9 
-   icooling       = 0
+   ieos           = 9 
 else 
    ieos           = 2
    icooling       = 6
@@ -215,25 +223,25 @@ else
 endif 
 
  if (ieos==1) then 
-    gamma = 1
+    gamma = 1.0
+    polyk = cs*cs
  elseif (ieos==2) then
-    gamma   = 5./3.                                             ! specific heat capacity ratio
+    gamma   = 1.4                                               ! specific heat capacity ratio
     Tfloor  = 3.                                                ! minimum gas temp
     temp    = 10.                                                  ! initial gas temp 
-    polyk   = kboltz*temp/(gmw*mass_proton_cgs)*(utime/udist)**2   ! polytropic constant
-    u       = polyk/(gamma-1.)                                     ! initial specific internal energy 
-    vxyzu(4,1:npart) = u
+    vxyzu(4,1:npart) = kboltz * temp / (gmw*mass_proton_cgs*(gamma-1.)) /unit_ergg 
+    polyk = vxyzu(4,1) * (gamma-1.0)
  elseif (ieos==9) then 
-    do i = 1,npart
-       rhoi = rhoh(xyzh(4,i),pmass)
-       xi   = xyzh(1,i)
-       yi   = xyzh(2,i) 
-       zi   = xyzh(3,i)
-       temperature_coef = 10 
-       call equationofstate(9,ponrhoi,spsoundi,rhoi,xi,yi,zi,eni,tempi)
-    enddo
+    gamma = 1.0
+    polyk = 6.41e8/(unit_pressure/unit_density**1.0)  ! at rho=1e-18
+    u = polyk/(gamma-1.0)
  endif 
 
+ if (add_yso_heating) then 
+    incl_yso_heating = .true. 
+ else 
+    incl_yso_heating = .false. 
+ endif 
 
 
  !-------------------------------------------------------------------------
@@ -306,11 +314,11 @@ endif
 
  !--Set options for input file, if .in file does not exist
  if (.not.inexists) then
-    tmax      = t_ff + ((1.5e+5*years)/utime)   ! Miyawaki+ 2026; beyond which dispersed by stellar rad
+    tmax      = (2e+5*years)/utime   ! Miyawaki+ 2026; beyond which dispersed by stellar rad
     dtmax     = 1.d-4*t_ff
-    nout      = 10
+    nout      = 100
     nfulldump = 1
-    nmaxdumps = 5000
+    nmaxdumps = 5 ! 5000
     dtwallmax = -1   ! s
     iverbose  = 1
 
@@ -319,10 +327,10 @@ endif
     !-- Dynamically create new sinks during runtime (allow star formation)
     if (make_sinks) then 
        icreate_sinks    = 1
-       rho_crit_cgs     = 1.d-10 
+       rho_crit_cgs     = 1.d-11 
        rho_crit         = rho_crit_cgs/unit_density
        h_acc            = 2.d0*hfact_default*(pmass/rho_crit)**(1.d0/3.d0)
-       r_crit           = 2.d0*h_acc
+       r_crit           = 2.01d0*h_acc
        h_soft_sinkgas   = h_acc
        h_soft_sinksink  = h_acc
        r_merge_cond     = 1.d-3*h_acc
@@ -337,7 +345,63 @@ endif
     endif 
  endif 
 
+
+ !--Calculate ratio of turb to rotational energy 
+ !  and estimate Toomre parameter 
+ ekin_tot  = 0. 
+ ekin_turb = 0. 
+ ekin_tan  = 0. 
+ ekin_rot  = 0. 
+ rcol      = 0.02
+ r2col     = rcol*rcol 
+ colmass   = 0. 
+
+ do i = 1,npart
+    xi = xyzh(1,i)
+    yi = xyzh(2,i)
+    zi = xyzh(3,i)
+    ri = (/ xi,yi,zi /)
+    vxi = vxyzu(1,i)
+    vyi = vxyzu(2,i)
+    vzi = vxyzu(3,i)
+    vi  = (/ vxi,vyi,vzi /)
+    ekin_tot  = ekin_tot  + 5.d-1*pmass*dot_product(vi,vi)
+    r2i = xi*xi + yi*yi + zi*zi
+    if (r2i < r2col) colmass = colmass + pmass 
+
+    tan_vec = (/ -yi, xi, 0.d0 /)
+    tan2i   = yi*yi + xi*xi 
+    tan_uvec = tan_vec / sqrt(tan2i) 
+    vtan   = dot_product(vi,tan_uvec)
+    vrotxi = (dot_product(vi,tan_vec)/tan2i)*tan_vec(1)
+    vrotyi = (dot_product(vi,tan_vec)/tan2i)*tan_vec(2)
+    vrotzi = (dot_product(vi,tan_vec)/tan2i)*tan_vec(3)
+    vroti  = (/ vrotxi, vrotyi, vrotzi /)
+    ekin_tan = ekin_tan + 5.d-1*pmass*dot_product(vroti,vroti)
+    if (vtan > 0.) ekin_rot  = ekin_rot  + 5.d-1*pmass*dot_product(vroti,vroti)  ! in direction of rotation
+
+    vradxi = (dot_product(vi,ri)/r2i)*xi
+    vradyi = (dot_product(vi,ri)/r2i)*yi
+    vradzi = (dot_product(vi,ri)/r2i)*zi
+    vradi  = (/ vradxi, vradyi, vradzi /)
+    ekin_turb = ekin_turb + 5.d-1*pmass*dot_product(vradi,vradi)
+ enddo 
+ if (colmass < tiny(colmass)) stop 'increase rcol!'
+ colsigma = colmass/(pi*r2col)
+ q_toomre = cs*angvel/(pi*colsigma)
+
+ open(2090,file='toomre_Q.dat',status='replace',iostat=io_file)
+ write(2090,'(1a20)') 'Q'
+ write(2090,'(1e20.10)') q_toomre
+ close(2090)
+
+ open(2080,file='ekin_rot.dat',status='replace',iostat=io_file)
+ write(2080,'(4a20)') 'ekin_tot', 'ekin_turb', 'ekin_tan (xy)', 'ekin_rot'
+ write(2080,'(4e20.10)') ekin_tot, ekin_turb, ekin_tan, ekin_rot
+ close(2080)
+
 end subroutine setpart
+
 
 
 subroutine gen_random_pos(rmax,x,y,z)
@@ -387,6 +451,10 @@ subroutine get_input_from_prompts()
  call prompt('Do you wish to pin the central star',pin_cen_sink)
  call prompt('Do you wish to dynamically create sinks during runtime',make_sinks)
 
+ call prompt('Do you wish to use isothermal eos',isotherm)
+ call prompt('Do you wish to use piecewise polytope eos',barotropic)
+ call prompt('Do you wish to approx heating from YSOs',add_yso_heating)
+
 end subroutine get_input_from_prompts
 
 !----------------------------------------------------------------
@@ -414,6 +482,9 @@ subroutine write_setupfile(filename)
  call write_inopt(binary_cen_sink,'binary_cen_sink','set the central star as a binary',iunit)
  call write_inopt(pin_cen_sink,'pin_cen_sink','pin the central star',iunit)
  call write_inopt(make_sinks,'make_sinks','dynamically create sink particles',iunit)
+ call write_inopt(isotherm,'isotherm','use isothermal eos',iunit)
+ call write_inopt(barotropic,'barotropic','use barotropic eos',iunit)
+ call write_inopt(add_yso_heating,'add_yso_heating','include heating from YSOs',iunit)
 
  close(iunit)
 
@@ -447,6 +518,9 @@ subroutine read_setupfile(filename,ierr)
  call read_inopt(binary_cen_sink,'binary_cen_sink',db,ierr)
  call read_inopt(pin_cen_sink,'pin_cen_sink',db,ierr)
  call read_inopt(make_sinks,'make_sinks',db,ierr)
+ call read_inopt(isotherm,'isotherm',db,ierr)
+ call read_inopt(barotropic,'barotropic',db,ierr)
+ call read_inopt(add_yso_heating,'add_yso_heating',db,ierr)
 
  call close_db(db)
 
