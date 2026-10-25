@@ -87,7 +87,8 @@ subroutine setpart(id,npart,npartoftype,xyzh,massoftype,vxyzu,polyk,gamma,hfact,
  real    :: sep,mbinary,angmom,h_acc0
  real    :: lowmass_innersink,lowmass_outersink,uppmass_innersink,uppmass_outersink
  real    :: r_thresh2,r2,mass,x,y,z
- real    :: ekin_tot,ekin_rot,ekin_tan,ekin_turb,vradi(3),vradxi,vradyi,vradzi,vroti(3),vrotxi,vrotyi,vrotzi
+ real    :: ekin_tot,ekin_rot,ekin_oprot,ekin_tan,ekin_turb,ekin_netrot
+ real    :: vradi(3),vradxi,vradyi,vradzi,vroti(3),vrotxi,vrotyi,vrotzi
  real    :: tan_vec(3),tan_uvec(3),tan2i,vtan
  real    :: rcol,r2col,colmass,colsigma,q_toomre
  logical :: setexists,inexists
@@ -352,6 +353,7 @@ endif
  ekin_turb = 0. 
  ekin_tan  = 0. 
  ekin_rot  = 0. 
+ ekin_oprot = 0. 
  rcol      = 0.02
  r2col     = rcol*rcol 
  colmass   = 0. 
@@ -378,7 +380,11 @@ endif
     vrotzi = (dot_product(vi,tan_vec)/tan2i)*tan_vec(3)
     vroti  = (/ vrotxi, vrotyi, vrotzi /)
     ekin_tan = ekin_tan + 5.d-1*pmass*dot_product(vroti,vroti)
-    if (vtan > 0.) ekin_rot  = ekin_rot  + 5.d-1*pmass*dot_product(vroti,vroti)  ! in direction of rotation
+    if (vtan > 0.) then 
+       ekin_rot   = ekin_rot  + 5.d-1*pmass*dot_product(vroti,vroti)  ! in direction of rotation
+    else 
+       ekin_oprot = ekin_oprot  + 5.d-1*pmass*dot_product(vroti,vroti)  ! in opposite direction of rotation
+    endif 
 
     vradxi = (dot_product(vi,ri)/r2i)*xi
     vradyi = (dot_product(vi,ri)/r2i)*yi
@@ -389,6 +395,7 @@ endif
  if (colmass < tiny(colmass)) stop 'increase rcol!'
  colsigma = colmass/(pi*r2col)
  q_toomre = cs*angvel/(pi*colsigma)
+ ekin_netrot = ekin_rot - ekin_oprot
 
  open(2090,file='toomre_Q.dat',status='replace',iostat=io_file)
  write(2090,'(1a20)') 'Q'
@@ -396,8 +403,8 @@ endif
  close(2090)
 
  open(2080,file='ekin_rot.dat',status='replace',iostat=io_file)
- write(2080,'(4a20)') 'ekin_tot', 'ekin_turb', 'ekin_tan (xy)', 'ekin_rot'
- write(2080,'(4e20.10)') ekin_tot, ekin_turb, ekin_tan, ekin_rot
+ write(2080,'(4a20)') 'ekin_turb', 'ekin_tan (xy)', 'ekin_rot', 'ekin_netrot'
+ write(2080,'(4e20.10)') ekin_turb, ekin_tan, ekin_rot, ekin_netrot
  close(2080)
 
 end subroutine setpart
