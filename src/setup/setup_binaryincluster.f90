@@ -315,9 +315,9 @@ endif
 
  !--Set options for input file, if .in file does not exist
  if (.not.inexists) then
-    tmax      = (3e+5*years)/utime   ! Miyawaki+ 2026; beyond which dispersed by stellar rad
-    dtmax     = 1.d-4*tmax ! 1.d-4*t_ff
-    nout      = 10
+    tmax      = t_ff + (3e+5*years)/utime   ! Miyawaki+ 2026; beyond which dispersed by stellar rad
+    dtmax     = 1.d-4*t_ff
+    nout      = 100
     nfulldump = 1
     nmaxdumps = 1000
     dtwallmax = -1   ! s
