@@ -315,11 +315,11 @@ endif
 
  !--Set options for input file, if .in file does not exist
  if (.not.inexists) then
-    tmax      = (2e+5*years)/utime   ! Miyawaki+ 2026; beyond which dispersed by stellar rad
-    dtmax     = 1.d-4*t_ff
-    nout      = 100
+    tmax      = (3e+5*years)/utime   ! Miyawaki+ 2026; beyond which dispersed by stellar rad
+    dtmax     = 1.d-4*tmax ! 1.d-4*t_ff
+    nout      = 10
     nfulldump = 1
-    nmaxdumps = 5 ! 5000
+    nmaxdumps = 1000
     dtwallmax = -1   ! s
     iverbose  = 1
 
@@ -328,14 +328,14 @@ endif
     !-- Dynamically create new sinks during runtime (allow star formation)
     if (make_sinks) then 
        icreate_sinks    = 1
-       rho_crit_cgs     = 1.d-11 
+       rho_crit_cgs     = 1.d-12 
        rho_crit         = rho_crit_cgs/unit_density
        h_acc            = 2.d0*hfact_default*(pmass/rho_crit)**(1.d0/3.d0)
-       r_crit           = 2.01d0*h_acc
+       r_crit           = 2.0001d0*h_acc
        h_soft_sinkgas   = h_acc
        h_soft_sinksink  = h_acc
-       r_merge_cond     = 1.d-3*h_acc
-       r_merge_uncond   = 1.d-4*h_acc
+       r_merge_cond     = 1.d-2*h_acc
+       r_merge_uncond   = 1.d-3*h_acc
     else 
        icreate_sinks    = 0
     endif 
